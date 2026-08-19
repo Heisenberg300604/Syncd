@@ -1,4 +1,4 @@
-import { useUser } from "@clerk/react";
+import { useUser, UserButton } from "@clerk/react";
 
 export function Home() {
   const { isLoaded, isSignedIn, user } = useUser();
@@ -18,9 +18,12 @@ export function Home() {
           Welcome, {user.username ?? user.fullName ?? "there"}
         </h1>
         <p className="text-zinc-400 mb-4">You're signed in.</p>
-        <div className="bg-zinc-900 rounded-xl p-4 text-left text-sm">
+        <div className="bg-zinc-900 rounded-xl p-4 text-left text-sm mb-6">
           <p className="text-zinc-500">Clerk User ID:</p>
           <p className="text-zinc-200 font-mono break-all">{user.id}</p>
+        </div>
+        <div className="flex justify-center">
+          <UserButton />
         </div>
       </div>
     </div>

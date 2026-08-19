@@ -19,5 +19,63 @@ model User {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  hostedRooms          Room[]      @relation("RoomHost")
+  playbackUpdatedRooms Room[]      @relation("RoomPlaybackUpdater")
+  memberships          RoomMember[]
+  messages             Message[]
+
   @@map("users")
+}
+
+model Room {
+  id                   String   @id @default(cuid())
+  roomCode             String   @unique @map("room_code")
+  hostUserId           String   @map("host_user_id")
+  currentVideoId       String?  @map("current_video_id")
+  currentTitle         String?  @map("current_title")
+  currentThumbnailUrl  String?  @map("current_thumbnail_url")
+  currentDuration      Float?   @map("current_duration")
+  isPlaying            Boolean  @default(false) @map("is_playing")
+  playbackPosition     Float    @default(0) @map("playback_position")
+  playbackUpdatedAt    DateTime? @map("playback_updated_at")
+  playbackUpdatedById  String?  @map("playback_updated_by")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  host            User         @relation("RoomHost", fields: [hostUserId], references: [id], onDelete: Restrict)
+  playbackUpdatedBy User?      @relation("RoomPlaybackUpdater", fields: [playbackUpdatedById], references: [id], onDelete: SetNull)
+
+  members  RoomMember[]
+  messages Message[]
+
+  @@index([hostUserId], map: "rooms_host_user_id_idx")
+  @@map("rooms")
+}
+
+model RoomMember {
+  roomId   String   @map("room_id")
+  userId   String   @map("user_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, userId])
+  @@index([userId], map: "room_members_user_id_idx")
+  @@map("room_members")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  roomId    String   @map("room_id")
+  userId    String   @map("user_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt], map: "messages_room_id_created_at_idx")
+  @@index([userId], map: "messages_user_id_idx")
+  @@map("messages")
 }
