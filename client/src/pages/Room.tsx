@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth, UserButton } from "@clerk/react";
 import { getRoom, leaveRoom } from "../services/api";
+import { useRoomPresence, type ConnectionStatus } from "../hooks/useRoomPresence";
 import type { RoomDTO } from "../services/types";
 
 export function Room() {
@@ -40,6 +41,11 @@ export function Room() {
       cancelled = true;
     };
   }, [roomCode, getToken]);
+
+  const { presence, connectionStatus } = useRoomPresence(
+    room ? room.roomCode : null,
+    room ? room.members : [],
+  );
 
   async function handleLeave() {
     if (!roomCode) return;
@@ -105,6 +111,8 @@ export function Room() {
     );
   }
 
+  const presenceMap = new Map(presence.map((p) => [p.userId, p.online]));
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white antialiased">
       <header className="flex items-center justify-between px-6 py-4 border-b border-white/5">
@@ -137,13 +145,16 @@ export function Room() {
                 {room.roomCode}
               </p>
             </div>
-            <button
-              onClick={handleLeave}
-              disabled={leaving}
-              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-zinc-950"
-            >
-              {leaving ? "Leaving..." : "Leave Room"}
-            </button>
+            <div className="flex items-center gap-3">
+              <ConnectionBadge status={connectionStatus} />
+              <button
+                onClick={handleLeave}
+                disabled={leaving}
+                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-zinc-950"
+              >
+                {leaving ? "Leaving..." : "Leave Room"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -166,6 +177,7 @@ export function Room() {
           <ul className="space-y-3">
             {room.members.map((member) => {
               const isHost = member.user.id === room.host.id;
+              const online = presenceMap.get(member.user.id) ?? false;
               return (
                 <li key={member.user.id} className="flex items-center gap-3">
                   <div className="relative h-10 w-10 flex-shrink-0">
@@ -173,8 +185,14 @@ export function Room() {
                       {member.user.username.charAt(0).toUpperCase()}
                     </div>
                     <span
-                      className="absolute -bottom-1 left-1/2 -translate-x-1/2 h-2 w-2 rounded-full bg-emerald-500 border-2 border-zinc-950"
-                      aria-label={`${member.user.username} is in room`}
+                      className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full border-2 border-zinc-950 ${
+                        online ? "bg-emerald-500" : "bg-zinc-600"
+                      }`}
+                      aria-label={
+                        online
+                          ? `${member.user.username} is online`
+                          : `${member.user.username} is offline`
+                      }
                     />
                   </div>
                   <span className="font-medium flex-1">{member.user.username}</span>
@@ -194,5 +212,21 @@ export function Room() {
         )}
       </main>
     </div>
+  );
+}
+
+function ConnectionBadge({ status }: { status: ConnectionStatus }) {
+  const styles: Record<ConnectionStatus, { color: string; label: string }> = {
+    connecting: { color: "bg-amber-500", label: "Connecting..." },
+    connected: { color: "bg-emerald-500", label: "Live" },
+    reconnecting: { color: "bg-amber-500", label: "Reconnecting..." },
+    disconnected: { color: "bg-red-500", label: "Disconnected" },
+  };
+  const { color, label } = styles[status];
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-zinc-400">
+      <span className={`h-1.5 w-1.5 rounded-full ${color} ${status === "connected" ? "animate-pulse" : ""}`} />
+      {label}
+    </span>
   );
 }

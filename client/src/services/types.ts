@@ -57,3 +57,13 @@ export interface LeaveRoomResponse {
   left: true;
   roomDeleted: boolean;
 }
+
+export interface PresenceMember {
+  userId: string;
+  username: string;
+  online: boolean;
+}
+
+export interface PresenceSnapshot {
+  members: PresenceMember[];
+}
