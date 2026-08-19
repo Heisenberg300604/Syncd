@@ -9,6 +9,7 @@ export const config = {
   databaseUrl: process.env["DATABASE_URL"] || "",
   clerkPublishableKey: process.env["CLERK_PUBLISHABLE_KEY"] || "",
   clerkSecretKey: process.env["CLERK_SECRET_KEY"] || "",
+  youtubeApiKey: process.env["YOUTUBE_API_KEY"] || "",
 } as const;
 
 export type Config = typeof config;

@@ -3,7 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth, UserButton } from "@clerk/react";
 import { getRoom, leaveRoom } from "../services/api";
 import { useRoomPresence, type ConnectionStatus } from "../hooks/useRoomPresence";
-import type { RoomDTO } from "../services/types";
+import { MusicSearch } from "../components/MusicSearch";
+import { YouTubePlayer } from "../components/YouTubePlayer";
+import type { RoomDTO, YouTubeSearchResult } from "../services/types";
 
 export function Room() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -14,6 +16,7 @@ export function Room() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [currentVideo, setCurrentVideo] = useState<YouTubeSearchResult | null>(null);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -157,6 +160,13 @@ export function Room() {
             </div>
           </div>
         </div>
+
+        <YouTubePlayer
+          currentVideo={currentVideo}
+          onCleared={() => setCurrentVideo(null)}
+        />
+
+        <MusicSearch onSelect={setCurrentVideo} />
 
         <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
           <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">

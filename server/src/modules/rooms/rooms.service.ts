@@ -183,6 +183,32 @@ export async function getRoomByCode(roomCode: string): Promise<RoomDTO | null> {
   return room ? toRoomDTO(room) : null;
 }
 
+export async function getRoomMembersForPresence(
+  roomCode: string,
+): Promise<{ roomId: string; members: { userId: string; username: string }[] } | null> {
+  const room = await prisma.room.findUnique({
+    where: { roomCode },
+    select: {
+      id: true,
+      members: {
+        select: {
+          user: { select: { id: true, username: true } },
+        },
+      },
+    },
+  });
+
+  if (!room) return null;
+
+  return {
+    roomId: room.id,
+    members: room.members.map((m) => ({
+      userId: m.user.id,
+      username: m.user.username,
+    })),
+  };
+}
+
 export async function leaveRoom(
   clerkUserId: string,
   roomCode: string,

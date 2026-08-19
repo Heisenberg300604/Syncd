@@ -6,6 +6,7 @@ import type {
   MeResponse,
   ProfileResponse,
   RoomResponse,
+  YouTubeSearchResponse,
 } from "./types";
 
 export const API_BASE_URL =
@@ -99,5 +100,16 @@ export function leaveRoom(
     `/rooms/${encodeURIComponent(roomCode)}/leave`,
     getToken,
     { method: "POST" },
+  );
+}
+
+export function searchMusic(
+  getToken: GetToken,
+  query: string,
+): Promise<YouTubeSearchResponse> {
+  return request<YouTubeSearchResponse>(
+    `/music/search?q=${encodeURIComponent(query)}`,
+    getToken,
+    { method: "GET" },
   );
 }
