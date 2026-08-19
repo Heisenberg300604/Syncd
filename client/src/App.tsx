@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SignIn, SignUp, Show, UserButton } from "@clerk/react";
+import { SignIn, SignUp } from "@clerk/react";
 import { Landing } from "./pages/Landing";
 import { RootGuard } from "./pages/RootGuard";
 import { Onboarding } from "./pages/Onboarding";
 import { Home } from "./pages/Home";
+import { Room } from "./pages/Room";
 import { ProtectedRoute, RequireAuth } from "./components/ProtectedRoute";
 
 const clerkAppearance = {
@@ -66,19 +67,11 @@ function App() {
         />
 
         <Route
-          path="/room/*"
+          path="/room/:roomCode"
           element={
-            <Show when="signed-in" fallback={<Navigate to="/signin" replace />}>
-              <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-                <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-8 backdrop-blur-xl text-center">
-                  <h1 className="mb-2 text-2xl font-bold text-white">Room</h1>
-                  <p className="text-zinc-400">Room interface coming soon...</p>
-                  <div className="mt-6 flex justify-center">
-                    <UserButton />
-                  </div>
-                </div>
-              </div>
-            </Show>
+            <ProtectedRoute>
+              <Room />
+            </ProtectedRoute>
           }
         />
         <Route path="*" element={<Navigate to="/" replace />} />

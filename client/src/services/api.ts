@@ -1,4 +1,12 @@
-import type { ApiError, MeResponse, ProfileResponse } from "./types";
+import type {
+  ApiError,
+  CreateRoomResponse,
+  JoinRoomResponse,
+  LeaveRoomResponse,
+  MeResponse,
+  ProfileResponse,
+  RoomResponse,
+} from "./types";
 
 export const API_BASE_URL =
   import.meta.env["VITE_API_BASE_URL"] || "http://localhost:5000/api";
@@ -58,4 +66,38 @@ export function createProfile(
     method: "POST",
     body: JSON.stringify({ username }),
   });
+}
+
+export function createRoom(getToken: GetToken): Promise<CreateRoomResponse> {
+  return request<CreateRoomResponse>("/rooms", getToken, { method: "POST" });
+}
+
+export function joinRoom(
+  getToken: GetToken,
+  roomCode: string,
+): Promise<JoinRoomResponse> {
+  return request<JoinRoomResponse>(
+    `/rooms/${encodeURIComponent(roomCode)}/join`,
+    getToken,
+    { method: "POST" },
+  );
+}
+
+export function getRoom(getToken: GetToken, roomCode: string): Promise<RoomResponse> {
+  return request<RoomResponse>(
+    `/rooms/${encodeURIComponent(roomCode)}`,
+    getToken,
+    { method: "GET" },
+  );
+}
+
+export function leaveRoom(
+  getToken: GetToken,
+  roomCode: string,
+): Promise<LeaveRoomResponse> {
+  return request<LeaveRoomResponse>(
+    `/rooms/${encodeURIComponent(roomCode)}/leave`,
+    getToken,
+    { method: "POST" },
+  );
 }
