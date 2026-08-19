@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SignIn, SignUp } from "@clerk/react";
+import { Analytics } from "@vercel/analytics/react";
 import { Landing } from "./pages/Landing";
 import { RootGuard } from "./pages/RootGuard";
 import { Onboarding } from "./pages/Onboarding";
@@ -20,6 +21,7 @@ const clerkAppearance = {
 function App() {
   return (
     <BrowserRouter>
+      <Analytics />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/enter" element={<RootGuard />} />
