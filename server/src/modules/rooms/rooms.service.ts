@@ -202,6 +202,7 @@ export async function getRoomMembersForPresence(
         select: {
           user: { select: { id: true, username: true } },
         },
+        orderBy: { joinedAt: "asc" },
       },
     },
   });

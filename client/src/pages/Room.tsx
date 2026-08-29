@@ -130,8 +130,6 @@ export function Room() {
     );
   }
 
-  const presenceMap = new Map(presence.map((p) => [p.userId, p.online]));
-
   return (
     <div className="min-h-screen bg-zinc-950 text-white antialiased">
       <header className="flex items-center justify-between px-6 py-4 border-b border-white/5">
@@ -208,30 +206,29 @@ export function Room() {
 
         <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
           <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">
-            Members <span className="text-violet-400 font-mono ml-2">{room.members.length}</span>
+            Members <span className="text-violet-400 font-mono ml-2">{presence.length}</span>
           </h2>
           <ul className="space-y-3">
-            {room.members.map((member) => {
-              const isHost = member.user.id === room.host.id;
-              const online = presenceMap.get(member.user.id) ?? false;
+            {presence.map((member) => {
+              const isHost = member.userId === room.host.id;
               return (
-                <li key={member.user.id} className="flex items-center gap-3">
+                <li key={member.userId} className="flex items-center gap-3">
                   <div className="relative h-10 w-10 flex-shrink-0">
                     <div className="h-full w-full rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium text-sm">
-                      {member.user.username.charAt(0).toUpperCase()}
+                      {member.username.charAt(0).toUpperCase()}
                     </div>
                     <span
                       className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full border-2 border-zinc-950 ${
-                        online ? "bg-emerald-500" : "bg-zinc-600"
+                        member.online ? "bg-emerald-500" : "bg-zinc-600"
                       }`}
                       aria-label={
-                        online
-                          ? `${member.user.username} is online`
-                          : `${member.user.username} is offline`
+                        member.online
+                          ? `${member.username} is online`
+                          : `${member.username} is offline`
                       }
                     />
                   </div>
-                  <span className="font-medium flex-1">{member.user.username}</span>
+                  <span className="font-medium flex-1">{member.username}</span>
                   {isHost && (
                     <span className="text-xs font-medium text-violet-400 bg-violet-500/10 rounded-full px-2.5 py-1">
                       Host
