@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { io as ioClient, type Socket } from "socket.io-client";
 import { useAuth } from "@clerk/react";
 import type {
+  ChatMessage,
   PlaybackAction,
   PlaybackSnapshot,
   PresenceSnapshot,
@@ -23,6 +24,7 @@ interface RoomJoinAck {
   ok: boolean;
   presence?: PresenceSnapshot;
   playback?: PlaybackSnapshot;
+  messages?: ChatMessage[];
   message?: string;
 }
 
@@ -30,6 +32,26 @@ interface PlaybackAck {
   ok: boolean;
   playback?: PlaybackSnapshot;
   message?: string;
+}
+
+interface ChatSendAck {
+  ok: boolean;
+  message?: string;
+}
+
+/**
+ * Combines two message lists into one, deduped by id and sorted by server
+ * timestamp. ISO 8601 strings sort correctly with a plain string compare, so
+ * no date parsing is needed. Used both for the join-ack history (which can
+ * overlap with messages already appended live) and for a single incoming
+ * `chat:new`.
+ */
+function mergeMessages(prev: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+  const byId = new Map(prev.map((m) => [m.id, m]));
+  for (const m of incoming) byId.set(m.id, m);
+  return Array.from(byId.values()).sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  );
 }
 
 export interface RoomSocket {
@@ -40,6 +62,10 @@ export interface RoomSocket {
   setTrack: (track: YouTubeSearchResult) => void;
   sendControl: (action: PlaybackAction, position: number) => void;
   clearTrack: () => void;
+  messages: ChatMessage[];
+  chatError: string | null;
+  chatSending: boolean;
+  sendChatMessage: (content: string) => void;
 }
 
 /**
@@ -62,6 +88,9 @@ export function useRoomSocket(
     useState<ConnectionStatus>("connecting");
   const [playback, setPlayback] = useState<PlaybackSnapshot | null>(null);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [chatSending, setChatSending] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
   // Clerk re-creates `getToken` on every token refresh; keeping it in a ref
@@ -84,6 +113,9 @@ export function useRoomSocket(
       }
       if (res.presence) setPresence(res.presence.members);
       if (res.playback) setPlayback(res.playback);
+      // Merge rather than replace: a reconnect's history snapshot can race
+      // with a `chat:new` for a message already appended live.
+      if (res.messages) setMessages((prev) => mergeMessages(prev, res.messages!));
     };
 
     (async () => {
@@ -125,6 +157,10 @@ export function useRoomSocket(
       socket.on("playback:update", (snapshot: PlaybackSnapshot) => {
         setPlayback(snapshot);
         setPlaybackError(null);
+      });
+
+      socket.on("chat:new", (incoming: ChatMessage) => {
+        setMessages((prev) => mergeMessages(prev, [incoming]));
       });
     })();
 
@@ -178,6 +214,24 @@ export function useRoomSocket(
     emitPlayback("playback:clear", { roomCode });
   }, [emitPlayback, roomCode]);
 
+  const sendChatMessage = useCallback(
+    (content: string) => {
+      const socket = socketRef.current;
+      if (!roomCode) return;
+      if (!socket || !socket.connected) {
+        setChatError("Not connected to the room yet");
+        return;
+      }
+
+      setChatSending(true);
+      socket.emit("chat:send", { roomCode, content }, (res: ChatSendAck) => {
+        setChatSending(false);
+        setChatError(res?.ok ? null : (res?.message ?? "Could not send message"));
+      });
+    },
+    [roomCode],
+  );
+
   return {
     presence,
     connectionStatus,
@@ -186,5 +240,9 @@ export function useRoomSocket(
     setTrack,
     sendControl,
     clearTrack,
+    messages,
+    chatError,
+    chatSending,
+    sendChatMessage,
   };
 }

@@ -4,7 +4,7 @@ Last updated: 2026-08-29
 
 ## Current Phase
 
-Phase 6 — Playback Synchronization
+Phase 7 — Real-Time Chat + Room UI Refinement
 
 Status: COMPLETE
 
@@ -94,6 +94,52 @@ Status: COMPLETE
   player (which is suppressed for a short window so it isn't re-emitted)
 - Play / pause / seek controls, progress bar, loading / error / ended states
 
+### Real-Time Chat (Phase 7)
+
+- `Message` model was already correctly shaped for this (`id, roomId, userId,
+  content, createdAt`, indexed on `(roomId, createdAt)`) — no migration
+- Socket.IO events, following the existing `domain:action` convention:
+  `chat:send` (client → server), `chat:new` (broadcast to the room)
+- Persist-before-broadcast: `chat:send` writes to PostgreSQL first; if the
+  write fails, nothing is broadcast and the sender gets an error ack
+- Authorization reuses the same `assertJoined` membership check playback
+  already uses — any room member may chat (unlike playback, which is
+  host-only)
+- Validation: reject empty/whitespace-only content, cap at 500 characters
+  (`messages.validation.ts`)
+- History delivery reuses the existing `room:join` ack — the same mechanism
+  presence and playback already use for initial sync and reconnection — rather
+  than a separate REST endpoint. The ack now also carries the 50 most recent
+  messages, oldest first
+- No optimistic sending: the input clears and shows a brief "sending" state,
+  but a message only appears once the server's `chat:new` broadcasts it back
+  (this app's playback/presence features follow the same wait-for-server
+  pattern, so chat matches rather than introducing a new one)
+- Reconnection merges the fresh history snapshot into existing client state by
+  message `id` instead of replacing it, so a message already rendered from a
+  live broadcast is never dropped by a slightly-stale snapshot race
+- Content safety: React already escapes all rendered text (no
+  `dangerouslySetInnerHTML` anywhere in the client); the backend additionally
+  trims and length-caps as defense in depth
+
+### Room UI Refinement (Phase 7)
+
+- `/room/:roomCode` restructured into a two-column layout on `lg`+ screens:
+  player + playback controls on the left (wider column), participants + live
+  chat stacked on the right; single-column stack on smaller screens
+- Folded the standalone "Host" card into the "Members" list, which already
+  showed a "Host" badge next to that member — removed a redundant display,
+  not a feature
+- Added a "Copy" button next to the room code (clipboard write, with brief
+  "Copied!" feedback)
+- Chat panel has its own internal scroll region (message list scrolls
+  independently of the page), auto-scrolls to new messages only when the
+  reader is already near the bottom, and shows a "↓ New messages" pill
+  otherwise
+- Reused the existing card visual language (`bg-zinc-950/50 border
+  border-white/10 rounded-2xl backdrop-blur-xl`) and violet/zinc palette
+  throughout — no new design tokens introduced
+
 ### Onboarding Reliability
 
 - `/me` is now fetched once per signed-in session via a shared
@@ -173,12 +219,26 @@ it against the server snapshot on every `playback:update` and on join/reconnect.
 re-fetched by every route guard. Route guards read the shared state; they do
 not each own a fetch.
 
+### Chat History Delivery
+
+Chat history rides the existing `room:join` socket ack — the same mechanism
+presence and playback already use — rather than a separate REST endpoint.
+This was a deliberate choice to avoid a second, redundant path to the same
+per-room data; it means chat becomes available exactly when the socket
+connects, same as the other two.
+
+### Room Member List Source
+
+The room's member list renders from the live `presence` state (refreshed on
+every join/leave/disconnect), not the one-time REST snapshot fetched when the
+page loads. Rendering from the static snapshot was a bug — a member who
+joined after the page loaded never appeared until a manual refresh.
+
 ---
 
 ## Not Started
 
 - Queue implementation
-- Real-time chat (Phase 7)
 - Security hardening
 - UI polish
 - Deployment
@@ -192,6 +252,11 @@ not each own a fetch.
   host transfer or automatic pause-on-host-leave yet
 - Track-change currently starts the track playing immediately
   (`isPlaying: true`) rather than loading paused
+- Chat history is capped at the 50 most recent messages per room with no
+  pagination — older messages are not retrievable from the UI (they remain in
+  PostgreSQL)
+- No typing indicators, reactions, edits, or deletion — out of scope for this
+  MVP by design
 
 ---
 

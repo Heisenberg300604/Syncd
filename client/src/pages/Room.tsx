@@ -6,6 +6,7 @@ import { useRoomSocket, type ConnectionStatus } from "../hooks/useRoomSocket";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { MusicSearch } from "../components/MusicSearch";
 import { YouTubePlayer } from "../components/YouTubePlayer";
+import { ChatPanel } from "../components/ChatPanel";
 import type { RoomDTO } from "../services/types";
 
 export function Room() {
@@ -18,6 +19,7 @@ export function Room() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -54,6 +56,10 @@ export function Room() {
     setTrack,
     sendControl,
     clearTrack,
+    messages,
+    chatError,
+    chatSending,
+    sendChatMessage,
   } = useRoomSocket(room ? room.roomCode : null, room ? room.members : []);
 
   const socketReady = connectionStatus === "connected";
@@ -65,6 +71,17 @@ export function Room() {
     currentUser.status === "authenticated" ? currentUser.me.user?.id : undefined;
   const isHost = Boolean(room && myUserId && room.host.id === myUserId);
   const canControlPlayback = socketReady && isHost;
+
+  async function handleCopyCode() {
+    if (!room) return;
+    try {
+      await navigator.clipboard.writeText(room.roomCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard access denied or unavailable — not worth surfacing an error for.
+    }
+  }
 
   async function handleLeave() {
     if (!roomCode) return;
@@ -153,14 +170,23 @@ export function Room() {
         <UserButton />
       </header>
 
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:py-12 space-y-6">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:py-12 space-y-6">
         <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <p className="text-sm text-zinc-400 mb-1">Room</p>
-              <p className="text-2xl font-bold font-mono tracking-widest text-violet-400">
-                {room.roomCode}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold font-mono tracking-widest text-violet-400">
+                  {room.roomCode}
+                </p>
+                <button
+                  onClick={handleCopyCode}
+                  className="text-xs font-medium text-zinc-400 hover:text-white transition-colors rounded-md px-2 py-1 hover:bg-white/5"
+                  aria-label="Copy room code"
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <ConnectionBadge status={connectionStatus} />
@@ -175,69 +201,73 @@ export function Room() {
           </div>
         </div>
 
-        <YouTubePlayer
-          playback={playback}
-          onControl={canControlPlayback ? sendControl : null}
-          onClear={clearTrack}
-          syncError={playbackError}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          <div className="lg:col-span-2 space-y-6">
+            <YouTubePlayer
+              playback={playback}
+              onControl={canControlPlayback ? sendControl : null}
+              onClear={clearTrack}
+              syncError={playbackError}
+            />
 
-        <MusicSearch
-          onSelect={setTrack}
-          disabled={!canControlPlayback}
-          disabledMessage={
-            !socketReady
-              ? "Connecting to the room — playback controls will be available in a moment."
-              : "Only the host can add music to this room."
-          }
-        />
-
-        <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">
-            Host
-          </h2>
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-violet-500 flex items-center justify-center text-white font-medium text-sm">
-              {room.host.username.charAt(0).toUpperCase()}
-            </div>
-            <span className="font-medium">{room.host.username}</span>
+            <MusicSearch
+              onSelect={setTrack}
+              disabled={!canControlPlayback}
+              disabledMessage={
+                !socketReady
+                  ? "Connecting to the room — playback controls will be available in a moment."
+                  : "Only the host can add music to this room."
+              }
+            />
           </div>
-        </div>
 
-        <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">
-            Members <span className="text-violet-400 font-mono ml-2">{presence.length}</span>
-          </h2>
-          <ul className="space-y-3">
-            {presence.map((member) => {
-              const isHost = member.userId === room.host.id;
-              return (
-                <li key={member.userId} className="flex items-center gap-3">
-                  <div className="relative h-10 w-10 flex-shrink-0">
-                    <div className="h-full w-full rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium text-sm">
-                      {member.username.charAt(0).toUpperCase()}
-                    </div>
-                    <span
-                      className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full border-2 border-zinc-950 ${
-                        member.online ? "bg-emerald-500" : "bg-zinc-600"
-                      }`}
-                      aria-label={
-                        member.online
-                          ? `${member.username} is online`
-                          : `${member.username} is offline`
-                      }
-                    />
-                  </div>
-                  <span className="font-medium flex-1">{member.username}</span>
-                  {isHost && (
-                    <span className="text-xs font-medium text-violet-400 bg-violet-500/10 rounded-full px-2.5 py-1">
-                      Host
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <div className="space-y-6">
+            <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
+              <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">
+                Members <span className="text-violet-400 font-mono ml-2">{presence.length}</span>
+              </h2>
+              <ul className="space-y-3">
+                {presence.map((member) => {
+                  const isHost = member.userId === room.host.id;
+                  return (
+                    <li key={member.userId} className="flex items-center gap-3">
+                      <div className="relative h-10 w-10 flex-shrink-0">
+                        <div className="h-full w-full rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium text-sm">
+                          {member.username.charAt(0).toUpperCase()}
+                        </div>
+                        <span
+                          className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full border-2 border-zinc-950 ${
+                            member.online ? "bg-emerald-500" : "bg-zinc-600"
+                          }`}
+                          aria-label={
+                            member.online
+                              ? `${member.username} is online`
+                              : `${member.username} is offline`
+                          }
+                        />
+                      </div>
+                      <span className="font-medium flex-1">{member.username}</span>
+                      {isHost && (
+                        <span className="text-xs font-medium text-violet-400 bg-violet-500/10 rounded-full px-2.5 py-1">
+                          Host
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            <ChatPanel
+              messages={messages}
+              currentUserId={myUserId}
+              connectionStatus={connectionStatus}
+              memberCount={presence.length}
+              sending={chatSending}
+              error={chatError}
+              onSend={sendChatMessage}
+            />
+          </div>
         </div>
 
         {error && (

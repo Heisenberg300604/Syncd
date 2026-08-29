@@ -6,6 +6,7 @@ import { findUserByClerkId } from "../modules/users/users.service.js";
 import { validateRoomCode } from "../modules/rooms/rooms.validation.js";
 import {
   getRoomHostId,
+  getRoomIdByCode,
   getRoomMembersForPresence,
 } from "../modules/rooms/rooms.service.js";
 import { presenceStore } from "./presenceStore.js";
@@ -26,6 +27,13 @@ import type {
   PlaybackSetPayload,
   PlaybackSnapshot,
 } from "../modules/playback/playback.types.js";
+import { createMessage, getRecentMessages } from "../modules/messages/messages.service.js";
+import { validateMessageContent } from "../modules/messages/messages.validation.js";
+import type {
+  ChatMessageDTO,
+  ChatSendAck,
+  ChatSendPayload,
+} from "../modules/messages/messages.types.js";
 import type {
   PresenceSnapshot,
   RoomJoinPayload,
@@ -125,6 +133,17 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       },
     );
 
+    socket.on(
+      "chat:send",
+      (payload: ChatSendPayload, ack?: (res: ChatSendAck) => void) => {
+        handleChatSend(io, user, payload, joinedRooms)
+          .then(() => ack?.({ ok: true }))
+          .catch((err) =>
+            ack?.({ ok: false, message: messageOf(err, "Could not send message") }),
+          );
+      },
+    );
+
     socket.on("room:leave", (payload: RoomJoinPayload, ack?: () => void) => {
       handleRoomLeave(io, socket, user, payload.roomCode, joinedRooms);
       ack?.();
@@ -195,8 +214,9 @@ async function handleRoomJoin(
 
   const presence = presenceStore.getSnapshot(roomCode, roomData.members);
   const playback = await getRoomPlayback(roomCode);
+  const messages = await getRecentMessages(roomData.roomId);
 
-  ack({ ok: true, presence, ...(playback ? { playback } : {}) });
+  ack({ ok: true, presence, messages, ...(playback ? { playback } : {}) });
 
   if (wasNewUser) {
     broadcastPresence(io, roomCode);
@@ -234,8 +254,8 @@ function broadcastPresence(io: SocketIOServer, roomCode: string): void {
     });
 }
 
-function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : "Playback update failed";
+function messageOf(err: unknown, fallback = "Playback update failed"): string {
+  return err instanceof Error ? err.message : fallback;
 }
 
 /**
@@ -334,4 +354,39 @@ function broadcastPlayback(
   playback: PlaybackSnapshot,
 ): void {
   io.to(roomName(roomCode)).emit("playback:update", playback);
+}
+
+/**
+ * Any room member may chat — unlike playback, this only needs `assertJoined`,
+ * not `assertHost`. The message is persisted before it is broadcast, so a
+ * failed write never reaches other clients.
+ */
+async function handleChatSend(
+  io: SocketIOServer,
+  user: { id: string; username: string },
+  payload: ChatSendPayload,
+  joinedRooms: Map<string, string>,
+): Promise<void> {
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+
+  const validation = validateMessageContent(payload?.content);
+  if (!validation.ok) {
+    throw new Error(validation.message);
+  }
+
+  const roomId = await getRoomIdByCode(roomCode);
+  if (!roomId) {
+    throw new Error("Room not found");
+  }
+
+  const message = await createMessage(roomId, user.id, validation.value);
+  broadcastChatMessage(io, roomCode, message);
+}
+
+function broadcastChatMessage(
+  io: SocketIOServer,
+  roomCode: string,
+  message: ChatMessageDTO,
+): void {
+  io.to(roomName(roomCode)).emit("chat:new", message);
 }
