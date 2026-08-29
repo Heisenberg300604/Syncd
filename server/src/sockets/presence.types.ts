@@ -1,3 +1,5 @@
+import type { PlaybackSnapshot } from "../modules/playback/playback.types.js";
+
 export interface PresenceMember {
   userId: string;
   username: string;
@@ -15,6 +17,8 @@ export interface RoomJoinPayload {
 export interface RoomJoinAck {
   ok: true;
   presence: PresenceSnapshot;
+  /** Absent only when the room has no playback row (should not happen). */
+  playback?: PlaybackSnapshot;
 }
 
 export interface RoomJoinErrorAck {

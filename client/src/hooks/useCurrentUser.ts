@@ -1,51 +1,20 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "@clerk/react";
-import { getMe } from "../services/api";
-import type { MeResponse } from "../services/types";
+import { useContext } from "react";
+import {
+  CurrentUserContext,
+  type CurrentUserContextValue,
+  type CurrentUserState,
+} from "../providers/currentUserContext";
 
-type FetchState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "needs-onboarding" }
-  | { status: "authenticated"; me: MeResponse };
+export type { CurrentUserState };
 
-export function useCurrentUser():
-  | { status: "loading" }
-  | { status: "unauthenticated" }
-  | { status: "needs-onboarding" }
-  | { status: "authenticated"; me: MeResponse } {
-  const { isLoaded, isSignedIn, getToken } = useAuth();
-  const [fetch, setFetch] = useState<FetchState>({ status: "idle" });
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-
-    let cancelled = false;
-
-    (async () => {
-      setFetch({ status: "loading" });
-      try {
-        const me = await getMe(getToken);
-        if (cancelled) return;
-        setFetch(
-          me.onboardingComplete && me.user
-            ? { status: "authenticated", me }
-            : { status: "needs-onboarding" },
-        );
-      } catch {
-        if (!cancelled) setFetch({ status: "needs-onboarding" });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoaded, isSignedIn, getToken]);
-
-  if (!isLoaded) return { status: "loading" };
-  if (!isSignedIn) return { status: "unauthenticated" };
-  if (fetch.status === "idle" || fetch.status === "loading") {
-    return { status: "loading" };
+export function useCurrentUserContext(): CurrentUserContextValue {
+  const value = useContext(CurrentUserContext);
+  if (!value) {
+    throw new Error("useCurrentUser must be used inside <CurrentUserProvider>");
   }
-  return fetch;
+  return value;
+}
+
+export function useCurrentUser(): CurrentUserState {
+  return useCurrentUserContext().state;
 }

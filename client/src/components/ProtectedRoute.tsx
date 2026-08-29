@@ -1,17 +1,16 @@
 import { Navigate } from "react-router-dom";
-import { useAuth } from "@clerk/react";
-import { useCurrentUser } from "../hooks/useCurrentUser";
+import { useCurrentUserContext } from "../hooks/useCurrentUser";
+import { AuthErrorScreen, AuthLoadingScreen } from "./AuthStatusScreen";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isLoaded } = useAuth();
-  const state = useCurrentUser();
+  const { state, refresh } = useCurrentUserContext();
 
-  if (!isLoaded || state.status === "loading") {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-        <p className="text-zinc-400">Checking authentication...</p>
-      </div>
-    );
+  if (state.status === "loading") {
+    return <AuthLoadingScreen />;
+  }
+
+  if (state.status === "error") {
+    return <AuthErrorScreen message={state.message} onRetry={refresh} />;
   }
 
   if (state.status === "unauthenticated") {
@@ -26,18 +25,17 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
-  const { isLoaded, isSignedIn } = useAuth();
-  const state = useCurrentUser();
+  const { state, refresh } = useCurrentUserContext();
 
-  if (!isLoaded || state.status === "loading") {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-        <p className="text-zinc-400">Checking authentication...</p>
-      </div>
-    );
+  if (state.status === "loading") {
+    return <AuthLoadingScreen />;
   }
 
-  if (!isSignedIn || state.status === "unauthenticated") {
+  if (state.status === "error") {
+    return <AuthErrorScreen message={state.message} onRetry={refresh} />;
+  }
+
+  if (state.status === "unauthenticated") {
     return <Navigate to="/signin" replace />;
   }
 

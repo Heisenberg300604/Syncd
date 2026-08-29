@@ -6,6 +6,23 @@ import { findUserByClerkId } from "../modules/users/users.service.js";
 import { validateRoomCode } from "../modules/rooms/rooms.validation.js";
 import { getRoomMembersForPresence } from "../modules/rooms/rooms.service.js";
 import { presenceStore } from "./presenceStore.js";
+import {
+  applyPlaybackControl,
+  clearRoomTrack,
+  getRoomPlayback,
+  setRoomTrack,
+} from "../modules/playback/playback.service.js";
+import {
+  isPlaybackAction,
+  validateTrackInput,
+} from "../modules/playback/playback.validation.js";
+import type {
+  PlaybackAck,
+  PlaybackClearPayload,
+  PlaybackControlPayload,
+  PlaybackSetPayload,
+  PlaybackSnapshot,
+} from "../modules/playback/playback.types.js";
 import type {
   PresenceSnapshot,
   RoomJoinPayload,
@@ -78,6 +95,33 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       });
     });
 
+    socket.on(
+      "playback:set",
+      (payload: PlaybackSetPayload, ack?: (res: PlaybackAck) => void) => {
+        handlePlaybackSet(io, user, payload, joinedRooms)
+          .then((playback) => ack?.({ ok: true, playback }))
+          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+      },
+    );
+
+    socket.on(
+      "playback:control",
+      (payload: PlaybackControlPayload, ack?: (res: PlaybackAck) => void) => {
+        handlePlaybackControl(io, user, payload, joinedRooms)
+          .then((playback) => ack?.({ ok: true, playback }))
+          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+      },
+    );
+
+    socket.on(
+      "playback:clear",
+      (payload: PlaybackClearPayload, ack?: (res: PlaybackAck) => void) => {
+        handlePlaybackClear(io, user, payload, joinedRooms)
+          .then((playback) => ack?.({ ok: true, playback }))
+          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+      },
+    );
+
     socket.on("room:leave", (payload: RoomJoinPayload, ack?: () => void) => {
       handleRoomLeave(io, socket, user, payload.roomCode, joinedRooms);
       ack?.();
@@ -147,8 +191,9 @@ async function handleRoomJoin(
   joinedRooms.set(roomCode, socketRoomName);
 
   const presence = presenceStore.getSnapshot(roomCode, roomData.members);
+  const playback = await getRoomPlayback(roomCode);
 
-  ack({ ok: true, presence });
+  ack({ ok: true, presence, ...(playback ? { playback } : {}) });
 
   if (wasNewUser) {
     broadcastPresence(io, roomCode);
@@ -184,4 +229,88 @@ function broadcastPresence(io: SocketIOServer, roomCode: string): void {
     .catch((err) => {
       logger.error(`broadcastPresence failed for ${roomCode}`, err);
     });
+}
+
+function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : "Playback update failed";
+}
+
+/**
+ * `joinedRooms` is only populated by `handleRoomJoin`, which verifies
+ * membership against the database. Reusing it keeps every playback event
+ * authorized without a query per play/pause.
+ */
+function assertJoined(
+  roomCode: unknown,
+  joinedRooms: Map<string, string>,
+): string {
+  const validation = validateRoomCode(roomCode);
+  if (!validation.ok) {
+    throw new Error(validation.message);
+  }
+  if (!joinedRooms.has(validation.value)) {
+    throw new Error("Not a member of this room");
+  }
+  return validation.value;
+}
+
+async function handlePlaybackSet(
+  io: SocketIOServer,
+  user: { id: string; username: string },
+  payload: PlaybackSetPayload,
+  joinedRooms: Map<string, string>,
+): Promise<PlaybackSnapshot> {
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+
+  const validation = validateTrackInput(payload?.track);
+  if (!validation.ok) {
+    throw new Error(validation.message);
+  }
+
+  const playback = await setRoomTrack(roomCode, user.id, validation.value);
+  logger.info(`${user.username} set ${validation.value.videoId} in ${roomCode}`);
+  broadcastPlayback(io, roomCode, playback);
+  return playback;
+}
+
+async function handlePlaybackControl(
+  io: SocketIOServer,
+  user: { id: string; username: string },
+  payload: PlaybackControlPayload,
+  joinedRooms: Map<string, string>,
+): Promise<PlaybackSnapshot> {
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+
+  if (!isPlaybackAction(payload?.action)) {
+    throw new Error("Unknown playback action");
+  }
+
+  const playback = await applyPlaybackControl(
+    roomCode,
+    user.id,
+    payload.action,
+    Number(payload?.position),
+  );
+  broadcastPlayback(io, roomCode, playback);
+  return playback;
+}
+
+async function handlePlaybackClear(
+  io: SocketIOServer,
+  user: { id: string; username: string },
+  payload: PlaybackClearPayload,
+  joinedRooms: Map<string, string>,
+): Promise<PlaybackSnapshot> {
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  const playback = await clearRoomTrack(roomCode, user.id);
+  broadcastPlayback(io, roomCode, playback);
+  return playback;
+}
+
+function broadcastPlayback(
+  io: SocketIOServer,
+  roomCode: string,
+  playback: PlaybackSnapshot,
+): void {
+  io.to(roomName(roomCode)).emit("playback:update", playback);
 }

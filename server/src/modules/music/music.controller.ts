@@ -2,9 +2,18 @@ import type { Request, Response } from "express";
 import { getAuth } from "@clerk/express";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
 import { AppError } from "../../utils/apiResponse.js";
-import { validateSearchQuery } from "./music.validation.js";
-import { searchYouTubeVideos } from "./music.service.js";
-import type { YouTubeSearchResponse } from "./music.types.js";
+import {
+  parseYouTubeVideoId,
+  validateSearchQuery,
+} from "./music.validation.js";
+import {
+  getYouTubeVideoById,
+  searchYouTubeVideos,
+} from "./music.service.js";
+import type {
+  YouTubeSearchResponse,
+  YouTubeVideoResponse,
+} from "./music.types.js";
 
 export const searchMusic = asyncHandler(
   async (req: Request, res: Response) => {
@@ -24,5 +33,24 @@ export const searchMusic = asyncHandler(
     const results = await searchYouTubeVideos(validation.value);
 
     res.status(200).json({ results } satisfies YouTubeSearchResponse);
+  },
+);
+export const resolveVideo = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { userId } = getAuth(req);
+
+    if (!userId) {
+      res.status(401).json({ authenticated: false, message: "Unauthorized" });
+      return;
+    }
+
+    const validation = parseYouTubeVideoId(req.query["url"]);
+    if (!validation.ok) {
+      throw new AppError(validation.message, 400);
+    }
+
+    const result = await getYouTubeVideoById(validation.value);
+
+    res.status(200).json({ result } satisfies YouTubeVideoResponse);
   },
 );

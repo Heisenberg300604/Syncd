@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth, UserButton } from "@clerk/react";
 import { getRoom, leaveRoom } from "../services/api";
-import { useRoomPresence, type ConnectionStatus } from "../hooks/useRoomPresence";
+import { useRoomSocket, type ConnectionStatus } from "../hooks/useRoomSocket";
 import { MusicSearch } from "../components/MusicSearch";
 import { YouTubePlayer } from "../components/YouTubePlayer";
-import type { RoomDTO, YouTubeSearchResult } from "../services/types";
+import type { RoomDTO } from "../services/types";
 
 export function Room() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -16,7 +16,6 @@ export function Room() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
-  const [currentVideo, setCurrentVideo] = useState<YouTubeSearchResult | null>(null);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -45,10 +44,17 @@ export function Room() {
     };
   }, [roomCode, getToken]);
 
-  const { presence, connectionStatus } = useRoomPresence(
-    room ? room.roomCode : null,
-    room ? room.members : [],
-  );
+  const {
+    presence,
+    connectionStatus,
+    playback,
+    playbackError,
+    setTrack,
+    sendControl,
+    clearTrack,
+  } = useRoomSocket(room ? room.roomCode : null, room ? room.members : []);
+
+  const socketReady = connectionStatus === "connected";
 
   async function handleLeave() {
     if (!roomCode) return;
@@ -162,11 +168,13 @@ export function Room() {
         </div>
 
         <YouTubePlayer
-          currentVideo={currentVideo}
-          onCleared={() => setCurrentVideo(null)}
+          playback={playback}
+          onControl={socketReady ? sendControl : null}
+          onClear={clearTrack}
+          syncError={playbackError}
         />
 
-        <MusicSearch onSelect={setCurrentVideo} />
+        <MusicSearch onSelect={setTrack} disabled={!socketReady} />
 
         <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
           <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">

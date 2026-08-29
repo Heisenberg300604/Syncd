@@ -7,6 +7,7 @@ import type {
   ProfileResponse,
   RoomResponse,
   YouTubeSearchResponse,
+  YouTubeVideoResponse,
 } from "./types";
 
 export const API_BASE_URL =
@@ -109,6 +110,17 @@ export function searchMusic(
 ): Promise<YouTubeSearchResponse> {
   return request<YouTubeSearchResponse>(
     `/music/search?q=${encodeURIComponent(query)}`,
+    getToken,
+    { method: "GET" },
+  );
+}
+
+export function resolveYouTubeLink(
+  getToken: GetToken,
+  urlOrId: string,
+): Promise<YouTubeVideoResponse> {
+  return request<YouTubeVideoResponse>(
+    `/music/video?url=${encodeURIComponent(urlOrId)}`,
     getToken,
     { method: "GET" },
   );

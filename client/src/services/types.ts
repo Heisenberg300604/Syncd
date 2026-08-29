@@ -79,3 +79,27 @@ export interface YouTubeSearchResult {
 export interface YouTubeSearchResponse {
   results: YouTubeSearchResult[];
 }
+
+export interface YouTubeVideoResponse {
+  result: YouTubeSearchResult;
+}
+
+/**
+ * The room's shared playback state, broadcast over Socket.IO.
+ *
+ * `position` is the playhead in seconds as of `updatedAt`. Both timestamps come
+ * from the server, so elapsed time must be computed as
+ * `serverTime - updatedAt` — never against the local clock.
+ */
+export interface PlaybackSnapshot {
+  videoId: string | null;
+  title: string | null;
+  thumbnailUrl: string | null;
+  duration: number | null;
+  isPlaying: boolean;
+  position: number;
+  updatedAt: string | null;
+  serverTime: string;
+}
+
+export type PlaybackAction = "play" | "pause" | "seek";

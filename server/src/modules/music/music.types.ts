@@ -9,3 +9,6 @@ export interface YouTubeSearchResult {
 export interface YouTubeSearchResponse {
   results: YouTubeSearchResult[];
 }
+export interface YouTubeVideoResponse {
+  result: YouTubeSearchResult;
+}

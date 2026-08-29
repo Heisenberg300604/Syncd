@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useAuth } from "@clerk/react";
 import { useNavigate } from "react-router-dom";
 import { createProfile } from "../services/api";
+import { useCurrentUserContext } from "../hooks/useCurrentUser";
 
 export function Onboarding() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
+  const { applyProfile } = useCurrentUserContext();
 
   const [username, setUsername] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +33,10 @@ export function Onboarding() {
 
     setSubmitting(true);
     try {
-      await createProfile(getToken, trimmed);
+      const { user } = await createProfile(getToken, trimmed);
+      // Seed the shared cache before navigating, otherwise the guard on /home
+      // still sees "needs-onboarding" and sends us straight back here.
+      applyProfile(user);
       navigate("/home", { replace: true });
     } catch (err) {
       const message =
