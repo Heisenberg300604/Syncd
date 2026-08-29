@@ -1,10 +1,10 @@
 # SyncD — Current State
 
-Last updated: 2026-08-19
+Last updated: 2026-08-29
 
 ## Current Phase
 
-Phase 5 — YouTube Integration
+Phase 6 — Playback Synchronization
 
 Status: COMPLETE
 
@@ -58,13 +58,53 @@ Status: COMPLETE
 
 - YouTube Data API v3 search (backend)
 - `GET /api/music/search?q=<query>` endpoint
+- `GET /api/music/video?url=<link>` endpoint — resolves a pasted YouTube link
+  (watch/shorts/embed/live/youtu.be, or a bare video id) to the same shape as
+  search results, rejecting videos the IFrame player cannot embed
 - YouTube API key kept server-side
-- Music search UI component
-- YouTube IFrame Player integration
-- Play / pause / seek controls
-- Progress bar
-- Loading / error / empty states
-- Playback is local to the current user (not synchronized)
+- Music search UI component, extended to accept a pasted link as an
+  alternative to a search query
+- YouTube IFrame Player integration, with the player container always mounted
+  so the player initializes even before a video is selected
+
+### Playback Synchronization (Phase 6)
+
+- Server-authoritative playback state, stored on the existing `Room` fields
+  (`currentVideoId`, `currentTitle`, `currentThumbnailUrl`, `currentDuration`,
+  `isPlaying`, `playbackPosition`, `playbackUpdatedAt`, `playbackUpdatedById`)
+  — no schema changes were needed
+- Socket.IO events: `playback:set` (load a track), `playback:control`
+  (play / pause / seek), `playback:clear`, broadcast to the room as
+  `playback:update`
+- Host-only authorization enforced server-side (`assertHost` in
+  `sockets/index.ts`, backed by `getRoomHostId`) — a non-host mutation is
+  rejected with an ack error and the room state is unchanged; the frontend
+  hiding controls for non-hosts is a UX nicety, not the security boundary
+- Initial sync: the current playback snapshot is included in the
+  `room:join` acknowledgment, so a fresh join or a reconnect after a dropped
+  socket both recover state the same way — no event replay
+- Timestamp-based position: clients derive the current playhead from
+  `playbackPosition + (serverTime - playbackUpdatedAt)` when playing, so
+  network latency doesn't leave joiners behind the host
+- Drift correction: a 5-second client-side check reseeks if the local player
+  drifts more than 2 seconds from the expected position; no per-second writes
+  to PostgreSQL — only `set` / `control` / `clear` persist
+- Echo-loop prevention: the client distinguishes a local user action (which
+  emits to the server) from a remote snapshot being applied to the local
+  player (which is suppressed for a short window so it isn't re-emitted)
+- Play / pause / seek controls, progress bar, loading / error / ended states
+
+### Onboarding Reliability
+
+- `/me` is now fetched once per signed-in session via a shared
+  `CurrentUserProvider`/context instead of once per route mount
+- A failed or slow `/me` request (stale token right after the Clerk redirect,
+  a network blip, a 500) no longer routes the user to onboarding — only a
+  successful response with `onboardingComplete: false` does; other failures
+  show a retryable error screen instead
+- Completing onboarding seeds the shared cache directly from the profile
+  creation response, instead of relying on a second `/me` round trip that
+  could race the redirect to `/home`
 
 ---
 
@@ -115,16 +155,43 @@ The frontend never has access to the API key.
 
 The backend proxies search requests and returns only the fields the frontend needs.
 
+### Playback Authority
+
+The `Room` row is the single source of truth for what is playing, its
+position, and play/pause state — the same fields used for the read-only
+Phase 5 display now double as the authoritative Phase 6 state.
+
+Only the room's host may mutate playback. This is enforced in the Socket.IO
+handlers, not just hidden in the UI.
+
+Clients never treat their own YouTube player as authoritative; they reconcile
+it against the server snapshot on every `playback:update` and on join/reconnect.
+
+### Current User Caching
+
+`/me` is fetched once per signed-in session and shared via context, not
+re-fetched by every route guard. Route guards read the shared state; they do
+not each own a fetch.
+
 ---
 
 ## Not Started
 
-- Playback synchronization (Phase 6)
 - Queue implementation
 - Real-time chat (Phase 7)
 - Security hardening
 - UI polish
 - Deployment
+
+## Known Limitations
+
+- Drift correction is threshold-based (reseek past 2s drift, checked every
+  5s), not frame-accurate — acceptable for casual co-watching, not for
+  anything requiring sample-accurate sync
+- If the host disconnects, playback state freezes where it was; there is no
+  host transfer or automatic pause-on-host-leave yet
+- Track-change currently starts the track playing immediately
+  (`isPlaying: true`) rather than loading paused
 
 ---
 

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth, UserButton } from "@clerk/react";
 import { getRoom, leaveRoom } from "../services/api";
 import { useRoomSocket, type ConnectionStatus } from "../hooks/useRoomSocket";
+import { useCurrentUser } from "../hooks/useCurrentUser";
 import { MusicSearch } from "../components/MusicSearch";
 import { YouTubePlayer } from "../components/YouTubePlayer";
 import type { RoomDTO } from "../services/types";
@@ -11,6 +12,7 @@ export function Room() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const { getToken } = useAuth();
   const navigate = useNavigate();
+  const currentUser = useCurrentUser();
 
   const [room, setRoom] = useState<RoomDTO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +57,14 @@ export function Room() {
   } = useRoomSocket(room ? room.roomCode : null, room ? room.members : []);
 
   const socketReady = connectionStatus === "connected";
+
+  // Room mounts inside ProtectedRoute, so by the time it renders the guard has
+  // already confirmed the viewer is authenticated and onboarded — this is
+  // only for UX (hiding controls); the server enforces the real boundary.
+  const myUserId =
+    currentUser.status === "authenticated" ? currentUser.me.user?.id : undefined;
+  const isHost = Boolean(room && myUserId && room.host.id === myUserId);
+  const canControlPlayback = socketReady && isHost;
 
   async function handleLeave() {
     if (!roomCode) return;
@@ -169,12 +179,20 @@ export function Room() {
 
         <YouTubePlayer
           playback={playback}
-          onControl={socketReady ? sendControl : null}
+          onControl={canControlPlayback ? sendControl : null}
           onClear={clearTrack}
           syncError={playbackError}
         />
 
-        <MusicSearch onSelect={setTrack} disabled={!socketReady} />
+        <MusicSearch
+          onSelect={setTrack}
+          disabled={!canControlPlayback}
+          disabledMessage={
+            !socketReady
+              ? "Connecting to the room — playback controls will be available in a moment."
+              : "Only the host can add music to this room."
+          }
+        />
 
         <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
           <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">

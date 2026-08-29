@@ -7,6 +7,8 @@ import type { YouTubeSearchResult } from "../services/types";
 interface MusicSearchProps {
   onSelect: (result: YouTubeSearchResult) => void;
   disabled?: boolean;
+  /** Overrides the default "connecting" copy shown while disabled. */
+  disabledMessage?: string;
 }
 
 /** Matches any youtube.com / youtu.be URL, with or without a scheme. */
@@ -17,7 +19,11 @@ function isYouTubeLink(value: string): boolean {
   return YOUTUBE_LINK_REGEX.test(value);
 }
 
-export function MusicSearch({ onSelect, disabled = false }: MusicSearchProps) {
+export function MusicSearch({
+  onSelect,
+  disabled = false,
+  disabledMessage,
+}: MusicSearchProps) {
   const { getToken } = useAuth();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<YouTubeSearchResult[]>([]);
@@ -88,8 +94,8 @@ export function MusicSearch({ onSelect, disabled = false }: MusicSearchProps) {
 
       {disabled && (
         <p className="text-xs text-amber-400 mb-3">
-          Connecting to the room — playback controls will be available in a
-          moment.
+          {disabledMessage ??
+            "Connecting to the room — playback controls will be available in a moment."}
         </p>
       )}
 

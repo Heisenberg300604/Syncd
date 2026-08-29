@@ -4,7 +4,10 @@ import { verifyToken } from "@clerk/backend";
 import { config } from "../config/env.js";
 import { findUserByClerkId } from "../modules/users/users.service.js";
 import { validateRoomCode } from "../modules/rooms/rooms.validation.js";
-import { getRoomMembersForPresence } from "../modules/rooms/rooms.service.js";
+import {
+  getRoomHostId,
+  getRoomMembersForPresence,
+} from "../modules/rooms/rooms.service.js";
 import { presenceStore } from "./presenceStore.js";
 import {
   applyPlaybackControl,
@@ -254,6 +257,21 @@ function assertJoined(
   return validation.value;
 }
 
+/**
+ * Only the host may mutate playback. The frontend hides the controls for
+ * everyone else, but that is a UX nicety — this is the actual boundary, since
+ * the socket payload is otherwise just a room code any member could send.
+ */
+async function assertHost(roomCode: string, userId: string): Promise<void> {
+  const hostUserId = await getRoomHostId(roomCode);
+  if (!hostUserId) {
+    throw new Error("Room not found");
+  }
+  if (hostUserId !== userId) {
+    throw new Error("Only the host can control playback");
+  }
+}
+
 async function handlePlaybackSet(
   io: SocketIOServer,
   user: { id: string; username: string },
@@ -261,6 +279,7 @@ async function handlePlaybackSet(
   joinedRooms: Map<string, string>,
 ): Promise<PlaybackSnapshot> {
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  await assertHost(roomCode, user.id);
 
   const validation = validateTrackInput(payload?.track);
   if (!validation.ok) {
@@ -280,6 +299,7 @@ async function handlePlaybackControl(
   joinedRooms: Map<string, string>,
 ): Promise<PlaybackSnapshot> {
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  await assertHost(roomCode, user.id);
 
   if (!isPlaybackAction(payload?.action)) {
     throw new Error("Unknown playback action");
@@ -302,6 +322,7 @@ async function handlePlaybackClear(
   joinedRooms: Map<string, string>,
 ): Promise<PlaybackSnapshot> {
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  await assertHost(roomCode, user.id);
   const playback = await clearRoomTrack(roomCode, user.id);
   broadcastPlayback(io, roomCode, playback);
   return playback;
