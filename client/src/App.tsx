@@ -8,14 +8,23 @@ import { Home } from "./pages/Home";
 import { Room } from "./pages/Room";
 import { ProtectedRoute, RequireAuth } from "./components/ProtectedRoute";
 import { CurrentUserProvider } from "./providers/CurrentUserProvider";
+import { AuthShell } from "./components/ui/AuthShell";
 
+// Clerk's own theming is unreliable for full dark mode, so the visual work is
+// done by the `.syncd-clerk` CSS overrides in index.css. These values just keep
+// Clerk's computed states (focus rings, primary button) on-brand.
 const clerkAppearance = {
-  elements: {
-    formButtonPrimary: "bg-violet-500 hover:bg-violet-600 text-white",
-    card: "bg-zinc-950 border-zinc-800",
-    headerTitle: "text-white",
-    headerSubtitle: "text-zinc-400",
-    socialButtonsBlockButton: "bg-zinc-900 border-zinc-700 hover:bg-zinc-800",
+  variables: {
+    colorPrimary: "#f7a23b",
+    colorText: "#f5f3f0",
+    colorTextSecondary: "#b0a79c",
+    colorBackground: "#181512",
+    colorInputBackground: "#201b16",
+    colorInputText: "#f5f3f0",
+    colorDanger: "#f87171",
+    colorSuccess: "#34d399",
+    borderRadius: "12px",
+    fontFamily: '"Manrope", ui-sans-serif, system-ui, sans-serif',
   },
 };
 
@@ -31,25 +40,31 @@ function App() {
           <Route
             path="/signin"
             element={
-              <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-                <SignIn
-                  appearance={clerkAppearance}
-                  fallbackRedirectUrl="/enter"
-                  forceRedirectUrl="/enter"
-                />
-              </div>
+              <AuthShell wide>
+                <div className="syncd-clerk">
+                  <SignIn
+                    appearance={clerkAppearance}
+                    fallbackRedirectUrl="/enter"
+                    forceRedirectUrl="/enter"
+                    signUpUrl="/signup"
+                  />
+                </div>
+              </AuthShell>
             }
           />
           <Route
             path="/signup"
             element={
-              <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-                <SignUp
-                  appearance={clerkAppearance}
-                  fallbackRedirectUrl="/enter"
-                  forceRedirectUrl="/enter"
-                />
-              </div>
+              <AuthShell wide>
+                <div className="syncd-clerk">
+                  <SignUp
+                    appearance={clerkAppearance}
+                    fallbackRedirectUrl="/enter"
+                    forceRedirectUrl="/enter"
+                    signInUrl="/signin"
+                  />
+                </div>
+              </AuthShell>
             }
           />
 

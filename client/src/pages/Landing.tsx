@@ -20,9 +20,9 @@ export function Landing() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white antialiased">
+    <div className="min-h-screen bg-canvas text-ink antialiased">
       <Navbar />
-      <main className="pt-16">
+      <main>
         <Hero />
         <ProductStatement />
         <HowItWorks />

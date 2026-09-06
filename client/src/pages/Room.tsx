@@ -7,7 +7,13 @@ import { useCurrentUser } from "../hooks/useCurrentUser";
 import { MusicSearch } from "../components/MusicSearch";
 import { YouTubePlayer } from "../components/YouTubePlayer";
 import { ChatPanel } from "../components/ChatPanel";
+import { AppHeader } from "../components/ui/AppHeader";
+import { Card } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
+import { Avatar } from "../components/ui/Avatar";
 import type { RoomDTO } from "../services/types";
+
+const panelLabel = "text-xs font-semibold uppercase tracking-wider text-ink-faint";
 
 export function Room() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -101,108 +107,77 @@ export function Room() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-        <p className="text-zinc-400">Loading room...</p>
+      <div className="min-h-screen bg-canvas text-ink antialiased">
+        <AppHeader actions={<UserButton />} />
+        <div className="flex items-center justify-center gap-3 px-4 py-32">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+          <p className="text-sm text-ink-muted">Loading room…</p>
+        </div>
       </div>
     );
   }
 
   if (error || !room) {
     return (
-      <div className="min-h-screen bg-zinc-950 text-white antialiased">
-        <header className="flex items-center justify-between px-6 py-4 border-b border-white/5">
-          <div className="flex items-center gap-2 text-lg font-semibold">
-            <svg
-              className="h-6 w-6 text-violet-400"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 18V5l12-2v13" />
-              <circle cx="6" cy="18" r="3" />
-              <circle cx="18" cy="16" r="3" />
-            </svg>
-            <span>SyncD</span>
-          </div>
-          <UserButton />
-        </header>
-        <main className="flex flex-col items-center justify-center px-4 py-16">
-          <div className="w-full max-w-md text-center space-y-4">
-            <p className="text-red-400">
-              {error ?? "Room not found"}
-            </p>
-            <button
+      <div className="min-h-screen bg-canvas text-ink antialiased">
+        <AppHeader actions={<UserButton />} />
+        <main className="flex flex-col items-center px-5 py-24">
+          <Card className="w-full max-w-md space-y-4 p-8 text-center">
+            <p className="text-danger">{error ?? "Room not found"}</p>
+            <Button
+              variant="secondary"
               onClick={() => navigate("/home", { replace: true })}
-              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+              className="w-full"
             >
-              Back to Home
-            </button>
-          </div>
+              Back to home
+            </Button>
+          </Card>
         </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white antialiased">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-white/5">
-        <div className="flex items-center gap-2 text-lg font-semibold">
-          <svg
-            className="h-6 w-6 text-violet-400"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M9 18V5l12-2v13" />
-            <circle cx="6" cy="18" r="3" />
-            <circle cx="18" cy="16" r="3" />
-          </svg>
-          <span>SyncD</span>
-        </div>
-        <UserButton />
-      </header>
+    <div className="min-h-screen bg-canvas text-ink antialiased">
+      <AppHeader
+        actions={
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleLeave}
+              disabled={leaving}
+            >
+              {leaving ? "Leaving…" : "Leave"}
+            </Button>
+            <UserButton />
+          </div>
+        }
+      />
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:py-12 space-y-6">
-        <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <p className="text-sm text-zinc-400 mb-1">Room</p>
-              <div className="flex items-center gap-2">
-                <p className="text-2xl font-bold font-mono tracking-widest text-violet-400">
-                  {room.roomCode}
-                </p>
-                <button
-                  onClick={handleCopyCode}
-                  className="text-xs font-medium text-zinc-400 hover:text-white transition-colors rounded-md px-2 py-1 hover:bg-white/5"
-                  aria-label="Copy room code"
-                >
-                  {copied ? "Copied!" : "Copy"}
-                </button>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <ConnectionBadge status={connectionStatus} />
+      <main className="mx-auto max-w-6xl space-y-5 px-5 py-6 sm:px-8 sm:py-8">
+        {/* Room code — the thing you share */}
+        <Card className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <p className={panelLabel}>Room code</p>
+            <div className="mt-1 flex items-center gap-3">
+              <span className="font-mono text-2xl font-medium tracking-[0.3em] text-accent">
+                {room.roomCode}
+              </span>
               <button
-                onClick={handleLeave}
-                disabled={leaving}
-                className="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 hover:border-white/20 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-zinc-950"
+                onClick={handleCopyCode}
+                className="rounded-md px-2 py-1 text-xs font-medium text-ink-muted transition-colors hover:bg-white/5 hover:text-ink"
+                aria-label="Copy room code"
               >
-                {leaving ? "Leaving..." : "Leave Room"}
+                {copied ? "Copied!" : "Copy"}
               </button>
             </div>
           </div>
-        </div>
+          <ConnectionBadge status={connectionStatus} />
+        </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
+          <div className="min-w-0 space-y-5 lg:col-span-2">
             <YouTubePlayer
               playback={playback}
               onControl={canControlPlayback ? sendControl : null}
@@ -221,42 +196,40 @@ export function Room() {
             />
           </div>
 
-          <div className="space-y-6">
-            <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-              <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">
-                Members <span className="text-violet-400 font-mono ml-2">{presence.length}</span>
+          <div className="min-w-0 space-y-5">
+            <Card className="p-5">
+              <h2 className={panelLabel}>
+                People{" "}
+                <span className="ml-1 font-mono text-accent">
+                  {presence.length}
+                </span>
               </h2>
-              <ul className="space-y-3">
+              <ul className="mt-4 space-y-1">
                 {presence.map((member) => {
-                  const isHost = member.userId === room.host.id;
+                  const memberIsHost = member.userId === room.host.id;
                   return (
-                    <li key={member.userId} className="flex items-center gap-3">
-                      <div className="relative h-10 w-10 flex-shrink-0">
-                        <div className="h-full w-full rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium text-sm">
-                          {member.username.charAt(0).toUpperCase()}
-                        </div>
-                        <span
-                          className={`absolute -bottom-1 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full border-2 border-zinc-950 ${
-                            member.online ? "bg-emerald-500" : "bg-zinc-600"
-                          }`}
-                          aria-label={
-                            member.online
-                              ? `${member.username} is online`
-                              : `${member.username} is offline`
-                          }
-                        />
-                      </div>
-                      <span className="font-medium flex-1">{member.username}</span>
-                      {isHost && (
-                        <span className="text-xs font-medium text-violet-400 bg-violet-500/10 rounded-full px-2.5 py-1">
-                          Host
+                    <li
+                      key={member.userId}
+                      className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-white/5"
+                    >
+                      <Avatar
+                        name={member.username}
+                        size={36}
+                        online={member.online}
+                      />
+                      <span className="flex-1 truncate text-sm font-medium">
+                        {member.username}
+                      </span>
+                      {memberIsHost && (
+                        <span className="rounded-full bg-accent-lo px-2 py-0.5 text-[10px] font-semibold text-accent">
+                          HOST
                         </span>
                       )}
                     </li>
                   );
                 })}
               </ul>
-            </div>
+            </Card>
 
             <ChatPanel
               messages={messages}
@@ -270,25 +243,30 @@ export function Room() {
           </div>
         </div>
 
-        {error && (
-          <p className="text-sm text-red-400 text-center">{error}</p>
-        )}
+        {error && <p className="text-center text-sm text-danger">{error}</p>}
       </main>
     </div>
   );
 }
 
 function ConnectionBadge({ status }: { status: ConnectionStatus }) {
-  const styles: Record<ConnectionStatus, { color: string; label: string }> = {
-    connecting: { color: "bg-amber-500", label: "Connecting..." },
-    connected: { color: "bg-emerald-500", label: "Live" },
-    reconnecting: { color: "bg-amber-500", label: "Reconnecting..." },
-    disconnected: { color: "bg-red-500", label: "Disconnected" },
+  const styles: Record<
+    ConnectionStatus,
+    { color: string; label: string }
+  > = {
+    connecting: { color: "bg-warning", label: "Connecting…" },
+    connected: { color: "bg-online", label: "Live · in sync" },
+    reconnecting: { color: "bg-warning", label: "Reconnecting…" },
+    disconnected: { color: "bg-danger", label: "Disconnected" },
   };
   const { color, label } = styles[status];
   return (
-    <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-      <span className={`h-1.5 w-1.5 rounded-full ${color} ${status === "connected" ? "animate-pulse" : ""}`} />
+    <span className="flex items-center gap-2 rounded-full border border-line bg-white/3 px-3 py-1.5 text-xs text-ink-muted">
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${color} ${
+          status === "connected" ? "animate-pulse" : ""
+        }`}
+      />
       {label}
     </span>
   );

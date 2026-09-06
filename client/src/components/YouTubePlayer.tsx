@@ -3,6 +3,8 @@ import { useYouTubePlayer } from "../hooks/useYouTubePlayer";
 import { formatSeconds } from "../utils/duration";
 import type { PlaybackAction, PlaybackSnapshot } from "../services/types";
 import type { PlayerState } from "../hooks/useYouTubePlayer";
+import { Card } from "./ui/Card";
+import { EqualizerBars } from "./ui/EqualizerBars";
 
 interface YouTubePlayerProps {
   playback: PlaybackSnapshot | null;
@@ -13,9 +15,9 @@ interface YouTubePlayerProps {
 }
 
 const stateLabels: Record<PlayerState, string> = {
-  initialising: "Starting player...",
+  initialising: "Starting player…",
   idle: "Ready",
-  buffering: "Buffering...",
+  buffering: "Buffering…",
   playing: "Playing",
   paused: "Paused",
   ended: "Ended",
@@ -149,10 +151,18 @@ export function YouTubePlayer({
   const message = syncError ?? player.error;
 
   return (
-    <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-      <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-4">
-        Now Playing
-      </h2>
+    <Card className="p-5 sm:p-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
+          Now playing
+        </h2>
+        {videoId && isPlaying && (
+          <span className="flex items-center gap-1.5 text-xs text-accent">
+            <EqualizerBars className="h-3" />
+            Live
+          </span>
+        )}
+      </div>
 
       <div className="space-y-4">
         {/*
@@ -160,15 +170,15 @@ export function YouTubePlayer({
           selected leaves the ref null when the player effect runs, and the
           IFrame player is then never constructed.
         */}
-        <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black">
+        <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
           <div
             ref={containerRef}
             className={`absolute inset-0 ${videoId ? "" : "invisible"}`}
           />
           {!videoId && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
               <svg
-                className="h-12 w-12 text-zinc-700 mb-3"
+                className="mb-3 h-11 w-11 text-ink-faint"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -178,11 +188,11 @@ export function YouTubePlayer({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={1.5}
-                  d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z"
+                  d="M9 18V5l12-3v13M9 18c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3zm12-3c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3z"
                 />
               </svg>
-              <p className="text-sm text-zinc-500">
-                Search for a song or paste a YouTube link to start watching
+              <p className="text-sm text-ink-muted">
+                Search for a song or paste a YouTube link to start listening
                 together.
               </p>
             </div>
@@ -195,21 +205,21 @@ export function YouTubePlayer({
               <img
                 src={playback.thumbnailUrl}
                 alt=""
-                className="h-16 w-24 rounded-lg object-cover flex-shrink-0 bg-zinc-800"
+                className="h-16 w-24 shrink-0 rounded-md bg-white/5 object-cover"
               />
             )}
-            <div className="flex-1 min-w-0">
-              <h3 className="font-medium text-white truncate">
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate font-semibold text-ink">
                 {playback?.title || "Untitled"}
               </h3>
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm text-ink-muted">
                 Playing for everyone in the room
               </p>
             </div>
             <button
               onClick={onClear}
               disabled={!onControl}
-              className="text-xs text-zinc-400 hover:text-white transition-colors flex-shrink-0 disabled:opacity-50"
+              className="shrink-0 text-xs text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
             >
               Clear
             </button>
@@ -222,17 +232,17 @@ export function YouTubePlayer({
               <button
                 onClick={handleToggle}
                 disabled={controlsDisabled}
-                className="h-10 w-10 rounded-full bg-violet-500 text-white flex items-center justify-center hover:bg-violet-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-accent-ink transition-colors hover:bg-accent-hi disabled:opacity-50 disabled:pointer-events-none"
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? (
-                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
                 ) : (
-                  <svg className="h-5 w-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                  <svg className="ml-0.5 h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                 )}
               </button>
 
-              <span className="text-xs text-zinc-500 font-mono w-12 text-right">
+              <span className="w-12 text-right font-mono text-xs text-ink-faint">
                 {formatSeconds(displayedTime)}
               </span>
 
@@ -247,21 +257,21 @@ export function YouTubePlayer({
                 onMouseUp={(e) => commitSeek(Number(e.currentTarget.value))}
                 onTouchEnd={(e) => commitSeek(Number(e.currentTarget.value))}
                 onKeyUp={(e) => commitSeek(Number(e.currentTarget.value))}
-                className="flex-1 h-1.5 bg-zinc-800 rounded-full appearance-none cursor-pointer accent-violet-500 disabled:cursor-not-allowed"
+                className="syncd-range flex-1"
                 aria-label="Seek"
               />
 
-              <span className="text-xs text-zinc-500 font-mono w-12">
+              <span className="w-12 font-mono text-xs text-ink-faint">
                 {formatSeconds(duration)}
               </span>
             </div>
 
-            <p className="text-xs text-zinc-500">{stateLabels[player.state]}</p>
+            <p className="text-xs text-ink-faint">{stateLabels[player.state]}</p>
           </div>
         )}
 
-        {message && <p className="text-sm text-red-400">{message}</p>}
+        {message && <p className="text-sm text-danger">{message}</p>}
       </div>
-    </div>
+    </Card>
   );
 }

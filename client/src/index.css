@@ -1,1 +1,271 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Caveat:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
+
+/* -------------------------------------------------------------------------- */
+/*  SyncD design tokens                                                        */
+/*                                                                            */
+/*  One coherent system for the marketing site and the product: a warm        */
+/*  cinematic sunset. Deep warm-charcoal surfaces, amber/orange as the brand   */
+/*  accent (highlights, live/sync state, product actions), white reserved for  */
+/*  the top-of-funnel call to action. Borders are hairlines. Glow is reserved  */
+/*  for live/active states, the hero visual, and primary CTAs.                 */
+/* -------------------------------------------------------------------------- */
+
+@theme {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", "SFMono-Regular", Menlo,
+    Consolas, monospace;
+  --font-hand: "Caveat", "Bradley Hand", "Segoe Script", cursive;
+
+  /* Surfaces (level 0 -> 3) */
+  --color-canvas: #0a0908;
+  --color-surface: #12100e;
+  --color-raised: #181512;
+  --color-overlay: #201b16;
+
+  /* Borders */
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --color-ink: #f5f3f0;
+  --color-ink-muted: #b0a79c;
+  --color-ink-faint: #7c7167;
+
+  /* Primary accent — warm amber/orange */
+  --color-accent: #f7a23b;
+  --color-accent-hi: #f97316;
+  --color-accent-lo: rgba(247, 162, 59, 0.12);
+  --color-accent-ink: #1a1206;
+
+  /* Cool counter-note — used only as a faint atmospheric highlight */
+  --color-cool: #7dd3fc;
+
+  /* Status */
+  --color-online: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+
+  /* Radius scale */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-2xl: 26px;
+
+  /* Soft atmospheric shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 10px 30px -12px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 30px 70px -24px rgba(0, 0, 0, 0.7);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* --- Clerk sign-in / sign-up widget ------------------------------------------ */
+/* Clerk's `appearance` prop does not reliably produce a full dark theme, so the
+   visual treatment is forced here. Targets Clerk's stable `cl-*` classes. */
+
+.syncd-clerk {
+  width: 100%;
+}
+.syncd-clerk .cl-rootBox,
+.syncd-clerk .cl-cardBox {
+  width: 100%;
+}
+.syncd-clerk .cl-card,
+.syncd-clerk .cl-cardBox {
+  background: var(--color-raised) !important;
+  border: 1px solid var(--color-line) !important;
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+.syncd-clerk .cl-card {
+  width: 100% !important;
+}
+.syncd-clerk .cl-socialButtonsBlockButton {
+  white-space: nowrap !important;
+}
+.syncd-clerk .cl-headerTitle,
+.syncd-clerk .cl-formHeaderTitle,
+.syncd-clerk .cl-identityPreviewText,
+.syncd-clerk .cl-otpCodeFieldInput {
+  color: var(--color-ink) !important;
+}
+.syncd-clerk .cl-headerSubtitle,
+.syncd-clerk .cl-formHeaderSubtitle,
+.syncd-clerk .cl-dividerText,
+.syncd-clerk .cl-footerActionText,
+.syncd-clerk .cl-formFieldLabel,
+.syncd-clerk .cl-formFieldInfoText,
+.syncd-clerk .cl-formFieldSuccessText,
+.syncd-clerk .cl-identityPreviewEditButton,
+.syncd-clerk .cl-footerPagesLink,
+.syncd-clerk .cl-footer * {
+  color: var(--color-ink-muted) !important;
+}
+/* "Last used" badge on the social buttons */
+.syncd-clerk .cl-badge,
+.syncd-clerk .cl-badge *,
+.syncd-clerk [class*="badge" i],
+.syncd-clerk [class*="badge" i] * {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+.syncd-clerk .cl-socialButtonsBlockButton,
+.syncd-clerk .cl-socialButtonsBlockButton__text,
+.syncd-clerk .cl-socialButtonsBlockButtonText,
+.syncd-clerk .cl-alternativeMethodsBlockButton {
+  color: var(--color-ink) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid var(--color-line) !important;
+}
+.syncd-clerk .cl-socialButtonsBlockButton:hover,
+.syncd-clerk .cl-alternativeMethodsBlockButton:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.syncd-clerk .cl-dividerLine {
+  background: var(--color-line) !important;
+}
+.syncd-clerk .cl-formFieldInput,
+.syncd-clerk .cl-otpCodeFieldInput {
+  background: #201b16 !important;
+  color: var(--color-ink) !important;
+  border: 1px solid var(--color-line) !important;
+}
+.syncd-clerk .cl-formFieldInput::placeholder {
+  color: var(--color-ink-faint) !important;
+}
+.syncd-clerk .cl-formButtonPrimary {
+  background: var(--color-accent) !important;
+  color: var(--color-accent-ink) !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+}
+.syncd-clerk .cl-formButtonPrimary:hover {
+  background: var(--color-accent-hi) !important;
+}
+.syncd-clerk .cl-footerActionLink,
+.syncd-clerk .cl-formResendCodeLink,
+.syncd-clerk .cl-formFieldAction,
+.syncd-clerk .cl-alternativeMethodsBlockButton__arrow,
+.syncd-clerk a {
+  color: var(--color-accent) !important;
+}
+.syncd-clerk .cl-formFieldInputShowPasswordButton,
+.syncd-clerk .cl-formFieldInputShowPasswordIcon {
+  color: var(--color-ink-muted) !important;
+}
+
+/* Reserved accent glow — live playback, synchronized state, primary CTA, focus */
+.syncd-glow {
+  box-shadow:
+    0 0 0 1px rgba(247, 162, 59, 0.22),
+    0 12px 40px -8px rgba(247, 162, 59, 0.32);
+}
+
+/* Consistent range-input (seek bar) treatment */
+.syncd-range {
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+.syncd-range::-webkit-slider-thumb {
+  appearance: none;
+  height: 14px;
+  width: 14px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 4px rgba(247, 162, 59, 0.18);
+}
+.syncd-range::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--color-accent);
+}
+.syncd-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* --- Motion --------------------------------------------------------------- */
+
+@keyframes syncd-equalizer {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes syncd-pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  70% {
+    transform: scale(2);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes syncd-dash {
+  to {
+    stroke-dashoffset: -240;
+  }
+}
+
+.syncd-eq-bar {
+  transform-origin: bottom;
+  animation: syncd-equalizer 1.1s ease-in-out infinite;
+}
+
+.syncd-pulse-ring {
+  animation: syncd-pulse-ring 2.8s ease-out infinite;
+}
+
+.syncd-dash {
+  stroke-dasharray: 6 9;
+  animation: syncd-dash 14s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .syncd-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

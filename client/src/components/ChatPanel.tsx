@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "../services/types";
 import type { ConnectionStatus } from "../hooks/useRoomSocket";
+import { Card } from "./ui/Card";
+import { Avatar } from "./ui/Avatar";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -83,26 +85,26 @@ export function ChatPanel({
     connectionStatus === "disconnected" || connectionStatus === "reconnecting";
 
   return (
-    <div className="bg-zinc-950/50 border border-white/10 rounded-2xl backdrop-blur-xl flex flex-col h-[28rem]">
-      <div className="px-6 py-4 border-b border-white/5 flex-shrink-0">
-        <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
-          Live Chat
+    <Card className="flex h-[28rem] flex-col">
+      <div className="shrink-0 border-b border-line px-5 py-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
+          Chat
         </h2>
-        <p className="text-xs text-zinc-500 mt-0.5">
+        <p className="mt-0.5 text-xs text-ink-faint">
           {memberCount} {memberCount === 1 ? "person" : "people"} here
         </p>
       </div>
 
-      <div className="relative flex-1 min-h-0">
+      <div className="relative min-h-0 flex-1">
         <div
           ref={listRef}
           onScroll={handleScroll}
-          className="h-full overflow-y-auto px-6 py-4 space-y-3"
+          className="h-full space-y-3 overflow-y-auto px-5 py-4"
         >
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center py-8">
-              <p className="text-sm text-zinc-500">No messages yet.</p>
-              <p className="text-sm text-zinc-500 mt-1">
+            <div className="flex h-full flex-col items-center justify-center py-8 text-center">
+              <p className="text-sm text-ink-faint">No messages yet.</p>
+              <p className="mt-1 text-sm text-ink-faint">
                 Start the conversation 👋
               </p>
             </div>
@@ -112,25 +114,36 @@ export function ChatPanel({
               return (
                 <div
                   key={msg.id}
-                  className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}
+                  className={`flex items-end gap-2 ${
+                    isMine ? "flex-row-reverse" : ""
+                  }`}
                 >
+                  {!isMine && <Avatar name={msg.username} size={26} />}
                   <div
-                    className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm ${
-                      isMine
-                        ? "bg-violet-500 text-white"
-                        : "bg-white/5 text-zinc-100"
+                    className={`flex max-w-[80%] flex-col ${
+                      isMine ? "items-end" : "items-start"
                     }`}
                   >
-                    {!isMine && (
-                      <p className="text-xs font-medium text-violet-300 mb-0.5">
-                        {msg.username}
+                    <div
+                      className={`rounded-lg px-3.5 py-2 text-sm ${
+                        isMine
+                          ? "bg-accent text-accent-ink"
+                          : "bg-white/5 text-ink"
+                      }`}
+                    >
+                      {!isMine && (
+                        <p className="mb-0.5 text-xs font-medium text-accent">
+                          {msg.username}
+                        </p>
+                      )}
+                      <p className="whitespace-pre-wrap break-words">
+                        {msg.content}
                       </p>
-                    )}
-                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                    </div>
+                    <span className="mt-1 px-1 text-[10px] text-ink-faint">
+                      {formatTime(msg.createdAt)}
+                    </span>
                   </div>
-                  <span className="text-[10px] text-zinc-500 mt-1 px-1">
-                    {formatTime(msg.createdAt)}
-                  </span>
                 </div>
               );
             })
@@ -140,44 +153,44 @@ export function ChatPanel({
         {hasNewBelow && (
           <button
             onClick={scrollToBottom}
-            className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-violet-500 text-white text-xs font-medium px-3 py-1.5 shadow-lg hover:bg-violet-600 transition-colors"
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-accent-ink shadow-md transition-colors hover:bg-accent-hi"
           >
             ↓ New messages
           </button>
         )}
       </div>
 
-      <div className="px-6 py-4 border-t border-white/5 flex-shrink-0 space-y-2">
+      <div className="shrink-0 space-y-2 border-t border-line px-5 py-4">
         {disconnected && (
-          <p className="text-xs text-amber-400">
+          <p className="text-xs text-warning">
             {connectionStatus === "reconnecting"
               ? "Reconnecting…"
               : "Disconnected — trying to reconnect…"}
           </p>
         )}
-        {error && <p className="text-xs text-red-400">{error}</p>}
+        {error && <p className="text-xs text-danger">{error}</p>}
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Type a message..."
+            placeholder="Type a message…"
             maxLength={MESSAGE_MAX_LENGTH}
             autoComplete="off"
             disabled={connectionStatus !== "connected"}
-            className="flex-1 bg-zinc-900 border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 disabled:opacity-50"
+            className="h-10 flex-1 rounded-md border border-line bg-white/3 px-3.5 text-sm text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/40 disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={
               connectionStatus !== "connected" || draft.trim().length === 0
             }
-            className="rounded-lg bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="rounded-md bg-accent px-4 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hi disabled:opacity-50 disabled:pointer-events-none"
           >
             Send
           </button>
         </form>
       </div>
-    </div>
+    </Card>
   );
 }

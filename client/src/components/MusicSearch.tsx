@@ -3,6 +3,7 @@ import { useAuth } from "@clerk/react";
 import { resolveYouTubeLink, searchMusic } from "../services/api";
 import { formatIsoDuration } from "../utils/duration";
 import type { YouTubeSearchResult } from "../services/types";
+import { Card } from "./ui/Card";
 
 interface MusicSearchProps {
   onSelect: (result: YouTubeSearchResult) => void;
@@ -65,50 +66,50 @@ export function MusicSearch({
   const submitLabel = isYouTubeLink(query.trim()) ? "Play link" : "Search";
 
   return (
-    <div className="bg-zinc-950/50 border border-white/10 rounded-2xl p-6 backdrop-blur-xl">
-      <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-1">
-        Add something to watch
+    <Card className="p-5 sm:p-6">
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
+        Add music
       </h2>
-      <p className="text-xs text-zinc-500 mb-4">
-        Search for a song, or paste any YouTube link to play it for the whole
-        room.
+      <p className="mt-1 text-xs text-ink-faint">
+        Search for a song, or paste a YouTube link to play it for the whole room.
       </p>
-      <form onSubmit={handleSubmit} className="flex gap-2 mb-4">
+
+      <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Song name or https://youtube.com/watch?v=..."
+          placeholder="Song name or YouTube link…"
           autoComplete="off"
           disabled={busy || disabled}
-          className="flex-1 bg-zinc-900 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder-zinc-500 text-sm focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/50 disabled:opacity-50"
+          className="h-10 flex-1 rounded-md border border-line bg-white/3 px-4 text-sm text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none focus:ring-1 focus:ring-accent/40 disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={busy || disabled || query.trim().length === 0}
-          className="rounded-lg bg-violet-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-violet-600 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+          className="whitespace-nowrap rounded-md bg-accent px-4 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent-hi disabled:opacity-50 disabled:pointer-events-none"
         >
-          {busy ? "Loading..." : submitLabel}
+          {busy ? "Loading…" : submitLabel}
         </button>
       </form>
 
       {disabled && (
-        <p className="text-xs text-amber-400 mb-3">
+        <p className="mt-3 text-xs text-warning">
           {disabledMessage ??
             "Connecting to the room — playback controls will be available in a moment."}
         </p>
       )}
 
-      {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
+      {error && <p className="mt-3 text-sm text-danger">{error}</p>}
 
       {!busy && hasSearched && results.length === 0 && !error && (
-        <p className="text-sm text-zinc-500 text-center py-4">
+        <p className="py-6 text-center text-sm text-ink-faint">
           No results found. Try a different search.
         </p>
       )}
 
       {results.length > 0 && (
-        <ul className="space-y-2 max-h-80 overflow-y-auto">
+        <ul className="mt-4 max-h-80 space-y-1 overflow-y-auto">
           {results.map((result) => {
             const length = formatIsoDuration(result.duration);
             return (
@@ -116,24 +117,24 @@ export function MusicSearch({
                 <button
                   onClick={() => onSelect(result)}
                   disabled={disabled}
-                  className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/5 transition-colors text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="group flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-white/5 disabled:opacity-50 disabled:pointer-events-none"
                 >
                   <img
                     src={result.thumbnailUrl}
                     alt=""
-                    className="h-12 w-16 rounded object-cover flex-shrink-0 bg-zinc-800"
+                    className="h-12 w-16 shrink-0 rounded-md bg-white/5 object-cover"
                     loading="lazy"
                   />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate group-hover:text-violet-300">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink group-hover:text-accent">
                       {result.title}
                     </p>
-                    <p className="text-xs text-zinc-400 truncate">
+                    <p className="truncate text-xs text-ink-muted">
                       {result.channelTitle}
                     </p>
                   </div>
                   {length && (
-                    <span className="text-xs text-zinc-500 font-mono flex-shrink-0">
+                    <span className="shrink-0 font-mono text-xs text-ink-faint">
                       {length}
                     </span>
                   )}
@@ -143,6 +144,6 @@ export function MusicSearch({
           })}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }
