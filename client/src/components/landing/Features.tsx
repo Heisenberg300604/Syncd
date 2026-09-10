@@ -1,4 +1,6 @@
 import { Section, SectionHeading } from "./Section";
+import GlareHover from "../ui/GlareHover";
+import { ScrollReveal } from "../ui/ScrollReveal";
 
 const features = [
   {
@@ -48,23 +50,34 @@ export function Features() {
       />
 
       <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {features.map((feature) => (
-          <article
+        {features.map((feature, index) => (
+          <ScrollReveal
             key={feature.title}
-            className="group rounded-lg border border-line bg-raised p-6 shadow-md transition-colors hover:border-line-strong"
+            delay={index * 80}
+            distance={24}
+            className="h-full"
           >
-            <div className="grid h-11 w-11 place-items-center rounded-md border border-line bg-white/3 text-accent transition-colors group-hover:bg-accent-lo group-hover:border-accent/30">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d={feature.d} />
-              </svg>
-            </div>
-            <h3 className="mt-4 text-base font-semibold text-ink">
-              {feature.title}
-            </h3>
-            <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
-              {feature.description}
-            </p>
-          </article>
+            <GlareHover
+              glareColor="#f7a23b"
+              glareOpacity={0.25}
+              glareAngle={-45}
+              glareSize={280}
+              transitionDuration={650}
+              className="group block h-full w-full rounded-lg border border-line bg-raised p-6 shadow-md transition-all duration-300 hover:border-line-strong hover:bg-surface/80"
+            >
+              <div className="grid h-11 w-11 place-items-center rounded-md border border-line bg-white/3 text-accent transition-colors group-hover:bg-accent-lo group-hover:border-accent/30">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d={feature.d} />
+                </svg>
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-ink">
+                {feature.title}
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
+                {feature.description}
+              </p>
+            </GlareHover>
+          </ScrollReveal>
         ))}
       </div>
     </Section>

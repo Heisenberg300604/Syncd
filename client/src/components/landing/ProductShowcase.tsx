@@ -2,6 +2,7 @@ import { Section, SectionHeading } from "./Section";
 import { Card } from "../ui/Card";
 import { Avatar } from "../ui/Avatar";
 import { EqualizerBars } from "../ui/EqualizerBars";
+import { ScrollReveal, ParallaxImage } from "../ui/ScrollReveal";
 
 const currentTrack = {
   title: "Midnight City",
@@ -36,9 +37,33 @@ const chatMessages = [
 const sectionLabel =
   "text-xs font-semibold uppercase tracking-wider text-ink-faint";
 
+function ProductShowcaseBackground() {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      aria-hidden="true"
+    >
+      <ParallaxImage
+        src="/hero-background-abstract.webp"
+        speed={0.14}
+        opacity={0.55}
+      />
+      {/* Atmospheric grading to blend seamlessly into canvas */}
+      <div className="absolute inset-0 bg-gradient-to-b from-canvas via-canvas/45 to-canvas" />
+      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-canvas to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-canvas to-transparent" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_50%,transparent_20%,var(--color-canvas)_95%)]" />
+    </div>
+  );
+}
+
 export function ProductShowcase() {
   return (
-    <Section id="showcase" raised>
+    <Section
+      id="showcase"
+      className="overflow-hidden border-y border-line"
+      background={<ProductShowcaseBackground />}
+    >
       <SectionHeading
         title="Everything you need for a shared session."
         subtitle="A complete room interface built for synchronous music."
@@ -46,8 +71,14 @@ export function ProductShowcase() {
 
       <div className="mt-14 grid gap-5 lg:grid-cols-3">
         {/* -------------------------------------------------- Player + queue */}
-        <div className="min-w-0 space-y-5 lg:col-span-2">
-          <Card className="p-6">
+        <ScrollReveal
+          animation="fade-up"
+          distance={28}
+          duration={850}
+          delay={100}
+          className="min-w-0 space-y-5 lg:col-span-2"
+        >
+          <Card className="p-6 bg-surface/85 backdrop-blur-xl border border-line-strong/60 shadow-xl">
             <div className="flex flex-col items-start gap-6 sm:flex-row">
               <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-md sm:h-36 sm:w-36">
                 <div className="absolute inset-0 bg-[linear-gradient(160deg,#4a2a1c_0%,#241228_50%,#0a0908_100%)]" />
@@ -108,7 +139,7 @@ export function ProductShowcase() {
             </div>
           </Card>
 
-          <Card className="p-6">
+          <Card className="p-6 bg-surface/85 backdrop-blur-xl border border-line-strong/60 shadow-xl">
             <h4 className={sectionLabel}>Up next</h4>
             <div className="mt-4 space-y-1">
               {queueTracks.map((track, i) => (
@@ -133,11 +164,17 @@ export function ProductShowcase() {
               ))}
             </div>
           </Card>
-        </div>
+        </ScrollReveal>
 
         {/* People + chat */}
-        <div className="min-w-0 space-y-5">
-          <Card className="p-6">
+        <ScrollReveal
+          animation="fade-up"
+          distance={28}
+          duration={850}
+          delay={240}
+          className="min-w-0 space-y-5"
+        >
+          <Card className="p-6 bg-surface/85 backdrop-blur-xl border border-line-strong/60 shadow-xl">
             <div className="flex items-center justify-between">
               <h4 className={sectionLabel}>
                 People <span className="ml-1 font-mono text-accent">4</span>
@@ -170,7 +207,7 @@ export function ProductShowcase() {
             </div>
           </Card>
 
-          <Card className="flex max-h-80 flex-col p-6">
+          <Card className="flex max-h-80 flex-col p-6 bg-surface/85 backdrop-blur-xl border border-line-strong/60 shadow-xl">
             <h4 className={sectionLabel}>Chat</h4>
             <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1">
               {chatMessages.map((msg, index) => (
@@ -198,7 +235,7 @@ export function ProductShowcase() {
               </button>
             </div>
           </Card>
-        </div>
+        </ScrollReveal>
       </div>
     </Section>
   );

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ScrollReveal } from "../ui/ScrollReveal";
 
 interface SectionProps {
   id?: string;
@@ -8,10 +9,18 @@ interface SectionProps {
   /** Faint warm atmosphere behind the section. */
   glow?: boolean;
   className?: string;
+  background?: ReactNode;
 }
 
 /** Consistent vertical rhythm + container width for every landing section. */
-export function Section({ id, children, raised, glow, className = "" }: SectionProps) {
+export function Section({
+  id,
+  children,
+  raised,
+  glow,
+  className = "",
+  background,
+}: SectionProps) {
   return (
     <section
       id={id}
@@ -19,6 +28,7 @@ export function Section({ id, children, raised, glow, className = "" }: SectionP
         raised ? "border-y border-line bg-surface/40" : ""
       } ${className}`}
     >
+      {background}
       {glow && (
         <div
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_50%_50%_at_50%_0%,var(--color-accent-lo),transparent_70%)]"
@@ -44,7 +54,10 @@ export function SectionHeading({
   className = "",
 }: SectionHeadingProps) {
   return (
-    <div
+    <ScrollReveal
+      animation="fade-up"
+      distance={22}
+      duration={800}
       className={`${
         align === "center" ? "mx-auto max-w-2xl text-center" : "max-w-xl"
       } ${className}`}
@@ -55,6 +68,6 @@ export function SectionHeading({
       {subtitle && (
         <p className="mt-4 text-pretty text-lg text-ink-muted">{subtitle}</p>
       )}
-    </div>
+    </ScrollReveal>
   );
 }

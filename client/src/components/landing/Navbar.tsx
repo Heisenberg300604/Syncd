@@ -22,6 +22,13 @@ export function Navbar() {
 
   const closeMenu = () => setIsOpen(false);
 
+  const handleLogoClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (window.scrollY > 0) {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   return (
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-colors duration-300 ${
@@ -35,7 +42,12 @@ export function Navbar() {
         aria-label="Main navigation"
       >
         <div className="flex h-16 items-center justify-between">
-          <Link to="/" aria-label="SyncD home">
+          <Link
+            to="/"
+            onClick={handleLogoClick}
+            aria-label="SyncD home"
+            className="cursor-pointer transition-opacity hover:opacity-85"
+          >
             <Logo />
           </Link>
 

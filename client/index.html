@@ -1,20 +1,56 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" style="background-color: transparent; color-scheme: dark;">
   <head>
     <meta charset="UTF-8" />
+    <style>
+      html, body {
+        background-color: transparent;
+        color: #f4ede4;
+        margin: 0;
+        padding: 0;
+      }
+      #root {
+        min-height: 100vh;
+        background-color: transparent;
+      }
+    </style>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
       content="SyncD is a social music room. Create a room, share the code, and listen together in real time — perfectly in sync."
     />
-    <meta name="theme-color" content="#070a0f" />
+    <meta name="theme-color" content="#0a0908" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Preload Critical Google Fonts -->
+    <link
+      rel="preload"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Caveat:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      as="style"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Caveat:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
+
+    <!-- Preload Hero Background Image to eliminate image pop-in -->
+    <link
+      rel="preload"
+      as="image"
+      href="/hero-background-primary.webp"
+      type="image/webp"
+      fetchpriority="high"
+    />
+
+    <!-- Preload App Entry -->
+    <link rel="modulepreload" href="/src/main.tsx" />
+
     <title>SyncD — Listen to music together, in sync</title>
   </head>
-  <body>
+  <body style="background-color: transparent;">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/main.tsx" fetchpriority="high"></script>
   </body>
 </html>
