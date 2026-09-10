@@ -9,10 +9,9 @@ import type {
   PresenceMember,
   YouTubeSearchResult,
 } from "../services/types";
+import { clientConfig } from "../config/env";
 
-const SOCKET_URL =
-  import.meta.env["VITE_API_BASE_URL"]?.replace(/\/api$/, "") ||
-  "http://localhost:5000";
+const SOCKET_URL = clientConfig.socketUrl;
 
 export type ConnectionStatus =
   | "connecting"
@@ -46,7 +45,10 @@ interface ChatSendAck {
  * overlap with messages already appended live) and for a single incoming
  * `chat:new`.
  */
-function mergeMessages(prev: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
+function mergeMessages(
+  prev: ChatMessage[],
+  incoming: ChatMessage[],
+): ChatMessage[] {
   const byId = new Map(prev.map((m) => [m.id, m]));
   for (const m of incoming) byId.set(m.id, m);
   return Array.from(byId.values()).sort((a, b) =>
@@ -115,7 +117,8 @@ export function useRoomSocket(
       if (res.playback) setPlayback(res.playback);
       // Merge rather than replace: a reconnect's history snapshot can race
       // with a `chat:new` for a message already appended live.
-      if (res.messages) setMessages((prev) => mergeMessages(prev, res.messages!));
+      if (res.messages)
+        setMessages((prev) => mergeMessages(prev, res.messages!));
     };
 
     (async () => {
@@ -226,7 +229,9 @@ export function useRoomSocket(
       setChatSending(true);
       socket.emit("chat:send", { roomCode, content }, (res: ChatSendAck) => {
         setChatSending(false);
-        setChatError(res?.ok ? null : (res?.message ?? "Could not send message"));
+        setChatError(
+          res?.ok ? null : (res?.message ?? "Could not send message"),
+        );
       });
     },
     [roomCode],

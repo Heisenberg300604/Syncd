@@ -9,9 +9,9 @@ import type {
   YouTubeSearchResponse,
   YouTubeVideoResponse,
 } from "./types";
+import { clientConfig } from "../config/env";
 
-export const API_BASE_URL =
-  import.meta.env["VITE_API_BASE_URL"] || "http://localhost:5000/api";
+export const API_BASE_URL = clientConfig.apiBaseUrl;
 
 type GetToken = () => Promise<string | null>;
 
@@ -47,7 +47,8 @@ async function request<T>(
 
   if (!res.ok) {
     const error = (body ?? {}) as ApiError;
-    const message = typeof error === "string" ? error : (error.message ?? "Request failed");
+    const message =
+      typeof error === "string" ? error : (error.message ?? "Request failed");
     const err = new Error(message) as Error & { status: number };
     err.status = res.status;
     throw err;
@@ -85,7 +86,10 @@ export function joinRoom(
   );
 }
 
-export function getRoom(getToken: GetToken, roomCode: string): Promise<RoomResponse> {
+export function getRoom(
+  getToken: GetToken,
+  roomCode: string,
+): Promise<RoomResponse> {
   return request<RoomResponse>(
     `/rooms/${encodeURIComponent(roomCode)}`,
     getToken,

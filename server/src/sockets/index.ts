@@ -47,7 +47,7 @@ const roomName = (roomCode: string) => `${ROOM_PREFIX}${roomCode}`;
 export function createSocketServer(httpServer: HttpServer): SocketIOServer {
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: config.corsOrigin,
+      origin: config.corsOrigins,
       credentials: true,
     },
   });
