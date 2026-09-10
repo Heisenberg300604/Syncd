@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:validate": "prisma validate",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio"
   },

@@ -10,9 +10,6 @@ import { ProtectedRoute, RequireAuth } from "./components/ProtectedRoute";
 import { CurrentUserProvider } from "./providers/CurrentUserProvider";
 import { AuthShell } from "./components/ui/AuthShell";
 
-// Clerk's own theming is unreliable for full dark mode, so the visual work is
-// done by the `.syncd-clerk` CSS overrides in index.css. These values just keep
-// Clerk's computed states (focus rings, primary button) on-brand.
 const clerkAppearance = {
   variables: {
     colorPrimary: "#f7a23b",
