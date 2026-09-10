@@ -27,7 +27,10 @@ import type {
   PlaybackSetPayload,
   PlaybackSnapshot,
 } from "../modules/playback/playback.types.js";
-import { createMessage, getRecentMessages } from "../modules/messages/messages.service.js";
+import {
+  createMessage,
+  getRecentMessages,
+} from "../modules/messages/messages.service.js";
 import { validateMessageContent } from "../modules/messages/messages.validation.js";
 import type {
   ChatMessageDTO,
@@ -84,11 +87,13 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
   });
 
   io.on("connection", (socket) => {
-    const user = socket.data.user as {
-      id: string;
-      clerkUserId: string;
-      username: string;
-    } | undefined;
+    const user = socket.data.user as
+      | {
+          id: string;
+          clerkUserId: string;
+          username: string;
+        }
+      | undefined;
 
     if (!user) {
       socket.disconnect(true);
@@ -99,12 +104,17 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
 
     const joinedRooms = new Map<string, string>(); // roomCode -> socketRoomName
 
-    socket.on("room:join", (payload: RoomJoinPayload, ack: (res: RoomJoinResponse) => void) => {
-      handleRoomJoin(io, socket, user, payload, ack, joinedRooms).catch((err) => {
-        const message = err instanceof Error ? err.message : "Join failed";
-        ack({ ok: false, message });
-      });
-    });
+    socket.on(
+      "room:join",
+      (payload: RoomJoinPayload, ack: (res: RoomJoinResponse) => void) => {
+        handleRoomJoin(io, socket, user, payload, ack, joinedRooms).catch(
+          (err) => {
+            const message = err instanceof Error ? err.message : "Join failed";
+            ack({ ok: false, message });
+          },
+        );
+      },
+    );
 
     socket.on(
       "playback:set",
@@ -139,7 +149,10 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
         handleChatSend(io, user, payload, joinedRooms)
           .then(() => ack?.({ ok: true }))
           .catch((err) =>
-            ack?.({ ok: false, message: messageOf(err, "Could not send message") }),
+            ack?.({
+              ok: false,
+              message: messageOf(err, "Could not send message"),
+            }),
           );
       },
     );
@@ -150,11 +163,17 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
     });
 
     socket.on("disconnect", (reason) => {
-      logger.info(`Socket disconnected: ${user.username} (${socket.id}) — ${reason}`);
+      logger.info(
+        `Socket disconnected: ${user.username} (${socket.id}) — ${reason}`,
+      );
 
       for (const [roomCode, socketRoomName] of joinedRooms) {
         socket.leave(socketRoomName);
-        const nowOffline = presenceStore.removeSocket(roomCode, user.id, socket.id);
+        const nowOffline = presenceStore.removeSocket(
+          roomCode,
+          user.id,
+          socket.id,
+        );
         if (nowOffline) {
           broadcastPresence(io, roomCode);
         }
@@ -208,7 +227,12 @@ async function handleRoomJoin(
     if (code !== roomCode) joinedRooms.delete(code);
   });
 
-  const wasNewUser = presenceStore.addSocket(roomCode, user.id, user.username, socket.id);
+  const wasNewUser = presenceStore.addSocket(
+    roomCode,
+    user.id,
+    user.username,
+    socket.id,
+  );
   socket.join(socketRoomName);
   joinedRooms.set(roomCode, socketRoomName);
 
@@ -307,7 +331,9 @@ async function handlePlaybackSet(
   }
 
   const playback = await setRoomTrack(roomCode, user.id, validation.value);
-  logger.info(`${user.username} set ${validation.value.videoId} in ${roomCode}`);
+  logger.info(
+    `${user.username} set ${validation.value.videoId} in ${roomCode}`,
+  );
   broadcastPlayback(io, roomCode, playback);
   return playback;
 }
