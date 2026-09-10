@@ -2,9 +2,9 @@ services:
   - type: web
     name: syncd-api
     runtime: node
+    plan: free
     rootDir: server
-    buildCommand: npm ci && npm run db:generate && npm run build
-    preDeployCommand: npm run db:migrate:deploy
+    buildCommand: npm ci && npm run db:generate && npm run db:migrate:deploy && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
