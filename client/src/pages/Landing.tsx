@@ -11,6 +11,7 @@ import { UseCases } from "../components/landing/UseCases";
 import { BrandStatement } from "../components/landing/BrandStatement";
 import { FinalCTA } from "../components/landing/FinalCTA";
 import { Footer } from "../components/landing/Footer";
+import { ScrollToTop } from "../components/ui/ScrollToTop";
 
 export function Landing() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -34,6 +35,7 @@ export function Landing() {
         <FinalCTA />
       </main>
       <Footer />
+      <ScrollToTop />
     </div>
   );
 }

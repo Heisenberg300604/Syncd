@@ -234,8 +234,11 @@ body {
 }
 
 @keyframes syncd-dash {
-  to {
-    stroke-dashoffset: -240;
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -20;
   }
 }
 
@@ -249,8 +252,26 @@ body {
 }
 
 .syncd-dash {
-  stroke-dasharray: 6 9;
-  animation: syncd-dash 14s linear infinite;
+  stroke-dasharray: 2 3;
+  animation: syncd-dash 2.8s linear infinite;
+  will-change: stroke-dashoffset;
+}
+
+/* Scroll reveal utility */
+.syncd-reveal {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  filter: blur(6px);
+  transition: opacity 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform, filter;
+}
+
+.syncd-reveal.is-revealed {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  filter: blur(0);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -267,5 +288,7 @@ body {
   .syncd-reveal {
     opacity: 1 !important;
     transform: none !important;
+    filter: none !important;
+    transition: none !important;
   }
 }

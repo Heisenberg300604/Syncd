@@ -1,6 +1,7 @@
 import { Button } from "../ui/Button";
 import { Avatar } from "../ui/Avatar";
 import { EqualizerBars } from "../ui/EqualizerBars";
+import { ScrollReveal, ParallaxImage } from "../ui/ScrollReveal";
 
 /* -------------------------------------------------------------------------- */
 /*  Data                                                                       */
@@ -43,10 +44,9 @@ function HeroBackground() {
       className="pointer-events-none absolute inset-0 overflow-hidden"
       aria-hidden="true"
     >
-      <img
-        src="/hero-background-primary.png"
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover object-center"
+      <ParallaxImage
+        src="/hero-background-primary.webp"
+        speed={0.16}
       />
       {/* Atmospheric grading — sink the photo into the canvas */}
       <div className="absolute inset-0 bg-gradient-to-b from-canvas/60 via-canvas/25 to-canvas" />
@@ -55,12 +55,6 @@ function HeroBackground() {
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-[radial-gradient(ellipse_60%_50%_at_18%_100%,var(--color-accent-lo),transparent_70%)]" />
       {/* Edge vignette */}
       <div className="absolute inset-0 shadow-[inset_0_0_240px_70px_rgba(7,10,15,0.9)]" />
-      {/* Foreground rock / headphones */}
-      <img
-        src="/bottom-landscape-headphones.png"
-        alt=""
-        className="absolute inset-x-0 bottom-0 h-[36%] w-full object-cover object-top opacity-70 [mask-image:linear-gradient(to_top,#000_30%,transparent)]"
-      />
       <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-canvas to-transparent" />
     </div>
   );
@@ -79,22 +73,27 @@ function ConnectionLines() {
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id="syncd-line" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#fcd34d" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#f97316" stopOpacity="0.1" />
-        </linearGradient>
+        <radialGradient id="syncd-line" cx="40%" cy="50%" r="55%">
+          <stop offset="0%" stopColor="#fcd34d" stopOpacity="0.9" />
+          <stop offset="50%" stopColor="#f7a23b" stopOpacity="0.75" />
+          <stop offset="100%" stopColor="#f97316" stopOpacity="0.4" />
+        </radialGradient>
       </defs>
       <g
         fill="none"
         stroke="url(#syncd-line)"
-        strokeWidth="1"
+        strokeWidth="1.5"
         strokeLinecap="round"
         style={{ vectorEffect: "non-scaling-stroke" }}
       >
-        <path d="M12,10 Q34,26 50,46" className="syncd-dash" style={{ vectorEffect: "non-scaling-stroke" }} />
-        <path d="M88,14 Q66,28 52,45" className="syncd-dash" style={{ vectorEffect: "non-scaling-stroke", animationDelay: "-4s" }} />
-        <path d="M6,52 Q26,52 44,52" className="syncd-dash" style={{ vectorEffect: "non-scaling-stroke", animationDelay: "-8s" }} />
-        <path d="M90,82 Q70,66 56,56" className="syncd-dash" style={{ vectorEffect: "non-scaling-stroke", animationDelay: "-2s" }} />
+        {/* Card -> Aman (top-left) */}
+        <path d="M28,28 Q18,22 12,14" className="syncd-dash" style={{ vectorEffect: "non-scaling-stroke" }} />
+        {/* Card -> Priya (top-right) */}
+        <path d="M62,34 Q76,22 90,11" className="syncd-dash" style={{ vectorEffect: "non-scaling-stroke", animationDelay: "-0.7s" }} />
+        {/* Card -> Rahul (bottom-left) */}
+        <path d="M22,72 Q14,76 8,81" className="syncd-dash" style={{ vectorEffect: "non-scaling-stroke", animationDelay: "-1.4s" }} />
+        {/* Card -> Nibedan (bottom-right) */}
+        <path d="M62,60 Q72,65 81,70" className="syncd-dash" style={{ vectorEffect: "non-scaling-stroke", animationDelay: "-2.1s" }} />
       </g>
     </svg>
   );
@@ -268,84 +267,157 @@ export function Hero() {
       <div className="relative z-10 mx-auto grid w-full max-w-6xl grid-cols-1 gap-12 px-5 sm:px-8 lg:grid-cols-12 lg:gap-8">
         {/* ---------------------------------------------------- Left column */}
         <div className="min-w-0 lg:col-span-5 lg:pt-6">
-          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-ink-muted backdrop-blur-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-            Music brings people closer
-          </span>
-
-          <h1 className="mt-6 text-[2.5rem] font-extrabold leading-[1.05] tracking-tight text-ink sm:text-5xl lg:text-[3.5rem]">
-            Listen together.
-            <br />
-            Stay in{" "}
-            <span className="bg-gradient-to-r from-amber-300 to-orange-500 bg-clip-text text-transparent">
-              sync
+          <ScrollReveal animation="fade-up" distance={16} duration={700} delay={60}>
+            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-ink-muted backdrop-blur-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+              Music brings people closer
             </span>
-            .
-          </h1>
+          </ScrollReveal>
 
-          <p className="mt-5 max-w-md text-base leading-relaxed text-ink-muted sm:text-[17px]">
-            Create a room, share the code, and enjoy music together in real time —
-            wherever your friends are.
-          </p>
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Button to="/enter" size="lg" variant="light" pill glow>
-              <span className="grid h-5 w-5 place-items-center rounded-full bg-canvas text-white">
-                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-                </svg>
+          <ScrollReveal animation="fade-up" distance={24} duration={850} delay={140}>
+            <h1 className="mt-6 text-[2.5rem] font-extrabold leading-[1.05] tracking-tight text-ink sm:text-5xl lg:text-[3.5rem]">
+              Listen together.
+              <br />
+              Stay in{" "}
+              <span className="bg-gradient-to-r from-amber-300 to-orange-500 bg-clip-text text-transparent">
+                sync
               </span>
-              Create a room
-            </Button>
-            <Button to="/enter" size="lg" variant="secondary" pill>
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Join a room
-            </Button>
-          </div>
+              .
+            </h1>
+          </ScrollReveal>
 
-          <p className="mt-5 text-xs text-ink-faint">
-            No account required to join · Free forever
-          </p>
+          <ScrollReveal animation="fade-up" distance={20} duration={850} delay={220}>
+            <p className="mt-5 max-w-md text-base leading-relaxed text-ink-muted sm:text-[17px]">
+              Create a room, share the code, and enjoy music together in real time —
+              wherever your friends are.
+            </p>
+          </ScrollReveal>
 
-          <SocialProof />
+          <ScrollReveal animation="fade-up" distance={18} duration={850} delay={300}>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Button to="/enter" size="lg" variant="light" pill glow className="group">
+                <svg
+                  className="h-4 w-4 text-canvas"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.4}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Create a room
+              </Button>
+              <Button to="/enter" size="lg" variant="secondary" pill className="group">
+                <svg
+                  className="h-4 w-4 text-accent transition-transform duration-200 group-hover:scale-110"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                  <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+                </svg>
+                Join a room
+              </Button>
+            </div>
+
+            <p className="mt-5 text-xs text-ink-faint">
+              No account required to join · Free forever
+            </p>
+          </ScrollReveal>
+
+          <ScrollReveal animation="fade-up" distance={16} duration={850} delay={380}>
+            <SocialProof />
+          </ScrollReveal>
         </div>
 
         {/* ---------------------------------------------------- Right column */}
         <div className="min-w-0 lg:col-span-7">
           <div className="relative mx-auto hidden min-h-[560px] max-w-2xl lg:block">
-            <ConnectionLines />
+            {/* Connection lines fade in smoothly as listeners connect */}
+            <ScrollReveal
+              animation="fade-up"
+              distance={0}
+              blur={false}
+              duration={900}
+              delay={450}
+              className="pointer-events-none absolute inset-0 h-full w-full"
+            >
+              <ConnectionLines />
+            </ScrollReveal>
 
-            {listeners.map((l) => (
+            {/* Listeners enter sequentially one by one */}
+            {listeners.map((l, index) => (
               <div key={l.name} className={`absolute ${l.pos}`}>
-                <ListenerNode {...l} />
+                <ScrollReveal
+                  animation="zoom-in"
+                  distance={12}
+                  duration={650}
+                  delay={350 + index * 130}
+                >
+                  <ListenerNode {...l} />
+                </ScrollReveal>
               </div>
             ))}
 
+            {/* Central Music Player anchors the room */}
             <div className="absolute left-1/2 top-1/2 w-full -translate-x-1/2 -translate-y-1/2 px-10">
-              <MusicPlayerCard />
+              <ScrollReveal
+                animation="zoom-in"
+                distance={16}
+                duration={800}
+                delay={200}
+              >
+                <MusicPlayerCard />
+              </ScrollReveal>
             </div>
 
+            {/* Live Chat reaction pops up after the session is established */}
             <div className="absolute -bottom-2 right-0 w-[236px]">
-              <ChatReaction />
+              <ScrollReveal
+                animation="fade-up"
+                distance={20}
+                duration={700}
+                delay={920}
+              >
+                <ChatReaction />
+              </ScrollReveal>
             </div>
 
-            <p className="pointer-events-none absolute right-0 top-[30%] text-right font-hand text-lg leading-tight text-ink-muted/80">
-              Same song.
-              <br />
-              Different places.
-              <br />
-              One moment.
-            </p>
+            {/* Atmospheric handwritten note drifts in last */}
+            <div className="pointer-events-none absolute right-0 top-[30%] text-right">
+              <ScrollReveal
+                animation="fade-left"
+                distance={14}
+                duration={750}
+                delay={1080}
+                as="p"
+                className="font-hand text-lg leading-tight text-ink-muted/80"
+              >
+                Same song.
+                <br />
+                Different places.
+                <br />
+                One moment.
+              </ScrollReveal>
+            </div>
           </div>
 
-          {/* Mobile / tablet */}
+          {/* Mobile / tablet — staggered card and reaction */}
           <div className="mx-auto flex max-w-[380px] flex-col items-center gap-5 lg:hidden">
-            <MusicPlayerCard />
-            <div className="w-full max-w-[300px]">
+            <ScrollReveal animation="zoom-in" distance={16} duration={800} delay={200} className="w-full">
+              <MusicPlayerCard />
+            </ScrollReveal>
+            <ScrollReveal animation="fade-up" distance={16} duration={700} delay={420} className="w-full max-w-[300px]">
               <ChatReaction />
-            </div>
+            </ScrollReveal>
           </div>
         </div>
       </div>

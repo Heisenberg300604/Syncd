@@ -1,4 +1,5 @@
 import { Section } from "./Section";
+import { ScrollReveal } from "../ui/ScrollReveal";
 
 const pillars = [
   {
@@ -19,24 +20,31 @@ export function BrandStatement() {
   return (
     <Section id="brand-statement" raised glow>
       <div className="mx-auto max-w-3xl text-center">
-        <h2 className="text-balance text-3xl font-bold leading-tight tracking-tight text-ink sm:text-4xl lg:text-5xl">
-          Music feels better together.
-        </h2>
-        <p className="mx-auto mt-5 max-w-xl text-pretty text-lg text-ink-muted">
-          SyncD turns listening into a shared experience — without the noise and
-          complexity of a full video call.
-        </p>
+        <ScrollReveal animation="fade-up" distance={24} duration={850}>
+          <h2 className="text-balance text-3xl font-bold leading-tight tracking-tight text-ink sm:text-4xl lg:text-5xl">
+            Music feels better together.
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl text-pretty text-lg text-ink-muted">
+            SyncD turns listening into a shared experience — without the noise and
+            complexity of a full video call.
+          </p>
+        </ScrollReveal>
 
         <div className="mt-14 flex flex-wrap items-center justify-center gap-x-12 gap-y-8">
-          {pillars.map((pillar) => (
-            <div key={pillar.label} className="flex flex-col items-center gap-3">
-              <div className="grid h-14 w-14 place-items-center rounded-full border border-line bg-white/3 text-accent">
+          {pillars.map((pillar, index) => (
+            <ScrollReveal
+              key={pillar.label}
+              delay={index * 120}
+              distance={20}
+              className="flex flex-col items-center gap-3"
+            >
+              <div className="grid h-14 w-14 place-items-center rounded-full border border-line bg-white/3 text-accent transition-transform duration-300 hover:scale-110">
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={pillar.d} />
                 </svg>
               </div>
               <p className="text-sm text-ink-muted">{pillar.label}</p>
-            </div>
+            </ScrollReveal>
           ))}
         </div>
       </div>
