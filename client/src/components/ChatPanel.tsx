@@ -3,6 +3,7 @@ import type { ChatMessage } from "../services/types";
 import type { ConnectionStatus } from "../hooks/useRoomSocket";
 import { Card } from "./ui/Card";
 import { Avatar } from "./ui/Avatar";
+import { EmojiPicker } from "./ui/EmojiPicker";
 
 interface ChatPanelProps {
   messages: ChatMessage[];
@@ -17,6 +18,19 @@ interface ChatPanelProps {
 const MESSAGE_MAX_LENGTH = 500;
 /** How close to the bottom (px) counts as "already at the bottom". */
 const NEAR_BOTTOM_THRESHOLD = 80;
+
+/** Emoji, variation selectors, ZWJ and skin-tone modifiers — nothing else. */
+const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|️|‍)+$/u;
+
+/**
+ * A message of nothing but a few emoji reads better rendered large, the way
+ * most chat clients do it.
+ */
+function isJumboEmoji(content: string): boolean {
+  if (!EMOJI_ONLY.test(content)) return false;
+  const graphemes = [...new Intl.Segmenter().segment(content)];
+  return graphemes.length > 0 && graphemes.length <= 3;
+}
 
 function formatTime(iso: string): string {
   const date = new Date(iso);
@@ -39,6 +53,7 @@ export function ChatPanel({
   const [draft, setDraft] = useState("");
   const [hasNewBelow, setHasNewBelow] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const wasNearBottom = useRef(true);
   const messageCount = messages.length;
 
@@ -71,6 +86,26 @@ export function ChatPanel({
     list.scrollTop = list.scrollHeight;
     wasNearBottom.current = true;
     setHasNewBelow(false);
+  }
+
+  /** Insert at the caret (or replace the selection) rather than appending. */
+  function handleEmojiSelect(emoji: string) {
+    const input = inputRef.current;
+    const start = input?.selectionStart ?? draft.length;
+    const end = input?.selectionEnd ?? draft.length;
+    const next = draft.slice(0, start) + emoji + draft.slice(end);
+
+    if (next.length > MESSAGE_MAX_LENGTH) return;
+
+    setDraft(next);
+
+    // Restore the caret after React has committed the new value.
+    requestAnimationFrame(() => {
+      if (!input) return;
+      const caret = start + emoji.length;
+      input.focus();
+      input.setSelectionRange(caret, caret);
+    });
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -111,6 +146,7 @@ export function ChatPanel({
           ) : (
             messages.map((msg) => {
               const isMine = msg.userId === currentUserId;
+              const jumbo = isJumboEmoji(msg.content);
               return (
                 <div
                   key={msg.id}
@@ -125,10 +161,12 @@ export function ChatPanel({
                     }`}
                   >
                     <div
-                      className={`rounded-lg px-3.5 py-2 text-sm ${
-                        isMine
-                          ? "bg-accent text-accent-ink"
-                          : "bg-white/5 text-ink"
+                      className={`rounded-lg text-sm ${
+                        jumbo
+                          ? "px-1 py-0.5 text-ink"
+                          : isMine
+                            ? "bg-accent px-3.5 py-2 text-accent-ink"
+                            : "bg-white/5 px-3.5 py-2 text-ink"
                       }`}
                     >
                       {!isMine && (
@@ -136,7 +174,11 @@ export function ChatPanel({
                           {msg.username}
                         </p>
                       )}
-                      <p className="whitespace-pre-wrap break-words">
+                      <p
+                        className={`whitespace-pre-wrap break-words ${
+                          jumbo ? "text-3xl leading-tight" : ""
+                        }`}
+                      >
                         {msg.content}
                       </p>
                     </div>
@@ -170,7 +212,12 @@ export function ChatPanel({
         )}
         {error && <p className="text-xs text-danger">{error}</p>}
         <form onSubmit={handleSubmit} className="flex gap-2">
+          <EmojiPicker
+            onSelect={handleEmojiSelect}
+            disabled={connectionStatus !== "connected"}
+          />
           <input
+            ref={inputRef}
             type="text"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
