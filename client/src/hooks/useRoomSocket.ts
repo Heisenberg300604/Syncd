@@ -44,13 +44,33 @@ interface ChatSendAck {
  * no date parsing is needed. Used both for the join-ack history (which can
  * overlap with messages already appended live) and for a single incoming
  * `chat:new`.
+ *
+ * Optimistic messages use a temporary id prefixed with `optimistic:`. When
+ * the real message arrives from the server (with its DB id), we remove the
+ * matching optimistic entry by content + userId proximity so the message
+ * doesn't flash or duplicate.
  */
 function mergeMessages(
   prev: ChatMessage[],
   incoming: ChatMessage[],
 ): ChatMessage[] {
   const byId = new Map(prev.map((m) => [m.id, m]));
-  for (const m of incoming) byId.set(m.id, m);
+  for (const m of incoming) {
+    byId.set(m.id, m);
+    // If a real message just arrived, drop any optimistic placeholder for it.
+    if (!m.id.startsWith("optimistic:")) {
+      for (const [key, existing] of byId) {
+        if (
+          key.startsWith("optimistic:") &&
+          existing.userId === m.userId &&
+          existing.content === m.content
+        ) {
+          byId.delete(key);
+          break;
+        }
+      }
+    }
+  }
   return Array.from(byId.values()).sort((a, b) =>
     a.createdAt.localeCompare(b.createdAt),
   );
@@ -77,6 +97,7 @@ export interface RoomSocket {
 export function useRoomSocket(
   roomCode: string | null,
   initialMembers: { user: { id: string; username: string } }[],
+  currentUser?: { id: string; username: string } | null,
 ): RoomSocket {
   const { getToken } = useAuth();
   const [presence, setPresence] = useState<PresenceMember[]>(
@@ -100,6 +121,13 @@ export function useRoomSocket(
   const getTokenRef = useRef(getToken);
   useEffect(() => {
     getTokenRef.current = getToken;
+  });
+
+  // Keep current user in a ref so sendChatMessage can always read the latest
+  // value without needing it as a useCallback dependency.
+  const currentUserRef = useRef(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
   });
 
   useEffect(() => {
@@ -226,12 +254,31 @@ export function useRoomSocket(
         return;
       }
 
+      // Optimistically append the message so it appears instantly.
+      // The placeholder id is replaced by the real DB id when the server
+      // broadcasts `chat:new` back and mergeMessages deduplicates it.
+      const optimisticId = `optimistic:${Date.now()}`;
+      const me = currentUserRef.current;
+      const optimisticMsg: ChatMessage = {
+        id: optimisticId,
+        roomId: roomCode,
+        userId: me?.id ?? "",
+        username: me?.username ?? "",
+        content,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => mergeMessages(prev, [optimisticMsg]));
+
       setChatSending(true);
       socket.emit("chat:send", { roomCode, content }, (res: ChatSendAck) => {
         setChatSending(false);
-        setChatError(
-          res?.ok ? null : (res?.message ?? "Could not send message"),
-        );
+        if (!res?.ok) {
+          // Roll back the optimistic message on failure.
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+          setChatError(res?.message ?? "Could not send message");
+        } else {
+          setChatError(null);
+        }
       });
     },
     [roomCode],

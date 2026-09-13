@@ -52,6 +52,7 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const [draft, setDraft] = useState("");
   const [hasNewBelow, setHasNewBelow] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const wasNearBottom = useRef(true);
@@ -120,17 +121,46 @@ export function ChatPanel({
     connectionStatus === "disconnected" || connectionStatus === "reconnecting";
 
   return (
-    <Card className="flex h-[28rem] flex-col">
-      <div className="shrink-0 border-b border-line px-5 py-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
-          Chat
-        </h2>
-        <p className="mt-0.5 text-xs text-ink-faint">
-          {memberCount} {memberCount === 1 ? "person" : "people"} here
-        </p>
+    <Card className={`flex flex-col transition-all duration-300 ${collapsed ? "" : "h-[28rem]"}`}>
+      {/* Header — always visible */}
+      <div className={`shrink-0 px-5 py-4 ${collapsed ? "" : "border-b border-line"}`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
+              Chat
+            </h2>
+            <p className="mt-0.5 text-xs text-ink-faint">
+              {memberCount} {memberCount === 1 ? "person" : "people"} here
+            </p>
+          </div>
+
+          {/* Collapse / expand chevron */}
+          <button
+            onClick={() => setCollapsed((c) => !c)}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-white/8 hover:text-ink"
+            aria-label={collapsed ? "Expand chat" : "Collapse chat"}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              className={`h-3.5 w-3.5 transition-transform duration-300 ${
+                collapsed ? "rotate-180" : "rotate-0"
+              }`}
+            >
+              {/* Chevron down — rotates to up when collapsed */}
+              <path
+                fillRule="evenodd"
+                d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <div className="relative min-h-0 flex-1">
+      {!collapsed && (
+        <div className="relative min-h-0 flex-1">
         <div
           ref={listRef}
           onScroll={handleScroll}
@@ -200,8 +230,10 @@ export function ChatPanel({
             ↓ New messages
           </button>
         )}
-      </div>
+        </div>
+      )}
 
+      {!collapsed && (
       <div className="shrink-0 space-y-2 border-t border-line px-5 py-4">
         {disconnected && (
           <p className="text-xs text-warning">
@@ -238,6 +270,7 @@ export function ChatPanel({
           </button>
         </form>
       </div>
+      )}
     </Card>
   );
 }

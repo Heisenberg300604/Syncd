@@ -76,7 +76,7 @@ export async function createRoomWithHost(
   while (retries < ROOM_CODE_MAX_RETRIES_OUT) {
     code = generateRoomCode();
     try {
-      const roomId = await prisma.$transaction(async (tx) => {
+      const { roomId, joinedAt } = await prisma.$transaction(async (tx) => {
         const created = await tx.room.create({
           data: {
             roomCode: code,
@@ -85,27 +85,34 @@ export async function createRoomWithHost(
           select: { id: true },
         });
 
-        await tx.roomMember.create({
+        const member = await tx.roomMember.create({
           data: {
             roomId: created.id,
             userId: host.id,
           },
+          select: { joinedAt: true },
         });
 
-        return created.id;
+        return { roomId: created.id, joinedAt: member.joinedAt };
       });
 
-      // Fetch with relations after the transaction commits
-      const room = await prisma.room.findUnique({
-        where: { id: roomId },
-        include: roomInclude,
-      });
+      // Build the DTO from already-known data — no extra DB round-trip needed.
+      const hostPublic = toPublicUser(host);
+      const dto: RoomDTO = {
+        id: roomId,
+        roomCode: code,
+        host: hostPublic,
+        members: [{ user: hostPublic, joinedAt: joinedAt.toISOString() }],
+        currentVideoId: null,
+        currentTitle: null,
+        currentThumbnailUrl: null,
+        currentDuration: null,
+        isPlaying: false,
+        playbackPosition: 0,
+        playbackUpdatedAt: null,
+      };
 
-      if (!room) {
-        throw new AppError("Failed to create room", 500);
-      }
-
-      return toRoomDTO(room);
+      return dto;
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -235,9 +242,12 @@ export async function leaveRoom(
     throw new AppError("User profile not found", 404);
   }
 
+  // Single query: get the room's id + hostUserId alongside the membership row.
+  // Avoids fetching the full member list (roomInclude) — we only need these two
+  // fields to decide whether the user is a member and whether they are the host.
   const room = await prisma.room.findUnique({
     where: { roomCode },
-    include: roomInclude,
+    select: { id: true, hostUserId: true },
   });
 
   if (!room) {
@@ -251,6 +261,7 @@ export async function leaveRoom(
         userId: user.id,
       },
     },
+    select: { roomId: true },
   });
 
   if (!membership) {
@@ -264,21 +275,19 @@ export async function leaveRoom(
   // where hostUserId points to a non-member. Host transfer is a future feature.
   const isHost = room.hostUserId === user.id;
 
-  await prisma.$transaction(async (tx) => {
-    if (isHost) {
-      // Deleting the room cascades to all room_members and messages
-      await tx.room.delete({ where: { id: room.id } });
-    } else {
-      await tx.roomMember.delete({
-        where: {
-          roomId_userId: {
-            roomId: room.id,
-            userId: user.id,
-          },
+  if (isHost) {
+    // Deleting the room cascades to all room_members and messages
+    await prisma.room.delete({ where: { id: room.id } });
+  } else {
+    await prisma.roomMember.delete({
+      where: {
+        roomId_userId: {
+          roomId: room.id,
+          userId: user.id,
         },
-      });
-    }
-  });
+      },
+    });
+  }
 
   return { roomDeleted: isHost };
 }
