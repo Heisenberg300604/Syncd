@@ -109,3 +109,15 @@ export interface ChatMessage {
   content: string;
   createdAt: string;
 }
+
+/** A single item in the room's shared playback queue. */
+export interface QueueItem {
+  videoId: string;
+  title: string;
+  thumbnailUrl: string;
+  /** ISO 8601 duration string, e.g. "PT3M45S". */
+  duration: string;
+}
+
+/** The full ordered queue as broadcast over Socket.IO. */
+export type QueueSnapshot = QueueItem[];

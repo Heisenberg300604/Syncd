@@ -8,6 +8,10 @@ import { Card } from "./ui/Card";
 interface MusicSearchProps {
   onSelect: (result: YouTubeSearchResult) => void;
   disabled?: boolean;
+  /** When true the host can queue tracks instead of (or alongside) playing them immediately. */
+  canQueue?: boolean;
+  /** Called when the user clicks "Add to queue". */
+  onQueue?: (result: YouTubeSearchResult) => void;
   /** Overrides the default "connecting" copy shown while disabled. */
   disabledMessage?: string;
 }
@@ -23,6 +27,8 @@ function isYouTubeLink(value: string): boolean {
 export function MusicSearch({
   onSelect,
   disabled = false,
+  canQueue = false,
+  onQueue,
   disabledMessage,
 }: MusicSearchProps) {
   const { getToken } = useAuth();
@@ -44,10 +50,14 @@ export function MusicSearch({
       // A pasted link goes straight to the room; a phrase runs a search.
       if (isYouTubeLink(trimmed)) {
         const { result } = await resolveYouTubeLink(getToken, trimmed);
-        setResults([]);
+        setResults([result]);
         setHasSearched(false);
         setQuery("");
-        onSelect(result);
+        // If there's nothing playing yet, play immediately.
+        if (!canQueue) {
+          onSelect(result);
+          setResults([]);
+        }
         return;
       }
 
@@ -114,31 +124,73 @@ export function MusicSearch({
             const length = formatIsoDuration(result.duration);
             return (
               <li key={result.videoId}>
-                <button
-                  onClick={() => onSelect(result)}
-                  disabled={disabled}
-                  className="group flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-white/5 disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  <img
-                    src={result.thumbnailUrl}
-                    alt=""
-                    className="h-12 w-16 shrink-0 rounded-md bg-white/5 object-cover"
-                    loading="lazy"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-ink group-hover:text-accent">
-                      {result.title}
-                    </p>
-                    <p className="truncate text-xs text-ink-muted">
-                      {result.channelTitle}
-                    </p>
+                {canQueue && onQueue ? (
+                  // Host with a track playing: show Play now + Add to queue
+                  <div className="group flex w-full items-center gap-3 rounded-md px-2 py-2 hover:bg-white/5">
+                    <img
+                      src={result.thumbnailUrl}
+                      alt=""
+                      className="h-12 w-16 shrink-0 rounded-md bg-white/5 object-cover"
+                      loading="lazy"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-ink">
+                        {result.title}
+                      </p>
+                      <p className="truncate text-xs text-ink-muted">
+                        {result.channelTitle}
+                      </p>
+                    </div>
+                    {length && (
+                      <span className="shrink-0 font-mono text-xs text-ink-faint">
+                        {length}
+                      </span>
+                    )}
+                    <div className="flex shrink-0 flex-col gap-1 sm:flex-row">
+                      <button
+                        onClick={() => { onSelect(result); setResults([]); }}
+                        disabled={disabled}
+                        className="rounded px-2.5 py-1 text-xs font-semibold text-ink-muted ring-1 ring-white/10 transition-colors hover:bg-white/10 hover:text-ink disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        Play now
+                      </button>
+                      <button
+                        onClick={() => { onQueue(result); setResults([]); }}
+                        disabled={disabled}
+                        className="rounded bg-accent/15 px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:bg-accent/25 disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        + Queue
+                      </button>
+                    </div>
                   </div>
-                  {length && (
-                    <span className="shrink-0 font-mono text-xs text-ink-faint">
-                      {length}
-                    </span>
-                  )}
-                </button>
+                ) : (
+                  // Default: single-click plays immediately
+                  <button
+                    onClick={() => onSelect(result)}
+                    disabled={disabled}
+                    className="group flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-white/5 disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    <img
+                      src={result.thumbnailUrl}
+                      alt=""
+                      className="h-12 w-16 shrink-0 rounded-md bg-white/5 object-cover"
+                      loading="lazy"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-ink group-hover:text-accent">
+                        {result.title}
+                      </p>
+                      <p className="truncate text-xs text-ink-muted">
+                        {result.channelTitle}
+                      </p>
+                    </div>
+                    {length && (
+                      <span className="shrink-0 font-mono text-xs text-ink-faint">
+                        {length}
+                      </span>
+                    )}
+                  </button>
+                )}
               </li>
             );
           })}

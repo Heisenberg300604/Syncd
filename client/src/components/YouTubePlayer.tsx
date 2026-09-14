@@ -11,6 +11,8 @@ interface YouTubePlayerProps {
   /** Null while the room socket is not connected. */
   onControl: ((action: PlaybackAction, position: number) => void) | null;
   onClear: () => void;
+  /** Called when the host's local player reaches the end of a track. */
+  onEnded?: () => void;
   syncError: string | null;
 }
 
@@ -48,6 +50,7 @@ export function YouTubePlayer({
   playback,
   onControl,
   onClear,
+  onEnded,
   syncError,
 }: YouTubePlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,13 +65,21 @@ export function YouTubePlayer({
 
   const handleLocalStateChange = useCallback(
     (state: PlayerState, at: number) => {
+      // "ended" is never an echo of a remote command — always fire it so the
+      // queue can advance. It does not need onControl to be set either (the
+      // host's socket may be momentarily reconnecting).
+      if (state === "ended") {
+        onEnded?.();
+        return;
+      }
+
       if (!onControl) return;
       if (!playback?.videoId) return;
       if (Date.now() < suppressEmitUntil.current) return;
       if (state === "playing") onControl("play", at);
       else if (state === "paused") onControl("pause", at);
     },
-    [onControl, playback?.videoId],
+    [onControl, onEnded, playback?.videoId],
   );
 
   const player = useYouTubePlayer(containerRef, {

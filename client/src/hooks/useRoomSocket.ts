@@ -8,6 +8,8 @@ import type {
   PresenceSnapshot,
   PresenceMember,
   YouTubeSearchResult,
+  QueueItem,
+  QueueSnapshot,
 } from "../services/types";
 import { clientConfig } from "../config/env";
 
@@ -24,17 +26,13 @@ interface RoomJoinAck {
   presence?: PresenceSnapshot;
   playback?: PlaybackSnapshot;
   messages?: ChatMessage[];
+  queue?: QueueSnapshot;
   message?: string;
 }
 
 interface PlaybackAck {
   ok: boolean;
   playback?: PlaybackSnapshot;
-  message?: string;
-}
-
-interface ChatSendAck {
-  ok: boolean;
   message?: string;
 }
 
@@ -88,6 +86,13 @@ export interface RoomSocket {
   chatError: string | null;
   chatSending: boolean;
   sendChatMessage: (content: string) => void;
+  // Queue
+  queue: QueueItem[];
+  addToQueue: (track: YouTubeSearchResult) => void;
+  removeFromQueue: (index: number) => void;
+  reorderQueue: (fromIndex: number, toIndex: number) => void;
+  clearQueue: () => void;
+  advanceQueue: () => void;
 }
 
 /**
@@ -114,6 +119,7 @@ export function useRoomSocket(
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatSending, setChatSending] = useState(false);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
   const socketRef = useRef<Socket | null>(null);
 
   // Clerk re-creates `getToken` on every token refresh; keeping it in a ref
@@ -143,6 +149,7 @@ export function useRoomSocket(
       }
       if (res.presence) setPresence(res.presence.members);
       if (res.playback) setPlayback(res.playback);
+      if (res.queue) setQueue(res.queue);
       // Merge rather than replace: a reconnect's history snapshot can race
       // with a `chat:new` for a message already appended live.
       if (res.messages)
@@ -188,6 +195,10 @@ export function useRoomSocket(
       socket.on("playback:update", (snapshot: PlaybackSnapshot) => {
         setPlayback(snapshot);
         setPlaybackError(null);
+      });
+
+      socket.on("queue:update", (snapshot: QueueSnapshot) => {
+        setQueue(snapshot);
       });
 
       socket.on("chat:new", (incoming: ChatMessage) => {
@@ -270,7 +281,7 @@ export function useRoomSocket(
       setMessages((prev) => mergeMessages(prev, [optimisticMsg]));
 
       setChatSending(true);
-      socket.emit("chat:send", { roomCode, content }, (res: ChatSendAck) => {
+      socket.emit("chat:send", { roomCode, content }, (res: { ok: boolean; message?: string }) => {
         setChatSending(false);
         if (!res?.ok) {
           // Roll back the optimistic message on failure.
@@ -284,6 +295,53 @@ export function useRoomSocket(
     [roomCode],
   );
 
+  // ---------------------------------------------------------------------------
+  // Queue callbacks — host-only by convention; the server enforces the boundary
+  // ---------------------------------------------------------------------------
+
+  const emitQueue = useCallback(
+    (event: string, payload: Record<string, unknown>) => {
+      const socket = socketRef.current;
+      if (!socket || !socket.connected) return;
+      socket.emit(event, payload);
+    },
+    [],
+  );
+
+  const addToQueue = useCallback(
+    (track: YouTubeSearchResult) => {
+      if (!roomCode) return;
+      emitQueue("queue:add", { roomCode, track });
+    },
+    [emitQueue, roomCode],
+  );
+
+  const removeFromQueue = useCallback(
+    (index: number) => {
+      if (!roomCode) return;
+      emitQueue("queue:remove", { roomCode, index });
+    },
+    [emitQueue, roomCode],
+  );
+
+  const reorderQueue = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (!roomCode) return;
+      emitQueue("queue:reorder", { roomCode, fromIndex, toIndex });
+    },
+    [emitQueue, roomCode],
+  );
+
+  const clearQueue = useCallback(() => {
+    if (!roomCode) return;
+    emitQueue("queue:clear", { roomCode });
+  }, [emitQueue, roomCode]);
+
+  const advanceQueue = useCallback(() => {
+    if (!roomCode) return;
+    emitQueue("queue:advance", { roomCode });
+  }, [emitQueue, roomCode]);
+
   return {
     presence,
     connectionStatus,
@@ -296,5 +354,11 @@ export function useRoomSocket(
     chatError,
     chatSending,
     sendChatMessage,
+    queue,
+    addToQueue,
+    removeFromQueue,
+    reorderQueue,
+    clearQueue,
+    advanceQueue,
   };
 }
