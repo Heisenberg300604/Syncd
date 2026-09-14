@@ -13,6 +13,7 @@ import {
   announceHostChange,
   clearPendingTransfer,
 } from "../../sockets/hostTransfer.js";
+import { evictUserFromRoom } from "../../sockets/roomBroadcast.js";
 import { logger } from "../../utils/logger.js";
 import type {
   CreateRoomResponse,
@@ -94,6 +95,15 @@ export const leaveRoomHandler = asyncHandler(
     }
 
     const result = await leaveRoom(userId, validation.value);
+
+    // Membership is gone, so the sockets this user still holds must stop
+    // receiving the room's events. The socket layer caches membership per
+    // connection, and this is what retires that cache.
+    if (result.leftUserId) {
+      evictUserFromRoom(validation.value, result.leftUserId).catch((err) =>
+        logger.error(`Socket eviction failed for ${validation.value}`, err),
+      );
+    }
 
     // A host leaving deliberately hands the room over inside `leaveRoom`; the
     // members who stayed learn about it here, since the REST layer has no

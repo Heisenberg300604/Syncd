@@ -1,14 +1,24 @@
-import type { PublicUser } from "../users/users.types.js";
+/**
+ * A person as seen by the rest of a room.
+ *
+ * Deliberately narrower than `PublicUser`: the Clerk identifier is an
+ * authentication-provider handle and only the account's own owner has any use
+ * for it, so it is not broadcast to everyone who holds a room code.
+ */
+export interface RoomUser {
+  id: string;
+  username: string;
+}
 
 export interface RoomMemberDTO {
-  user: PublicUser;
+  user: RoomUser;
   joinedAt: string;
 }
 
 export interface RoomDTO {
   id: string;
   roomCode: string;
-  host: PublicUser;
+  host: RoomUser;
   members: RoomMemberDTO[];
   currentVideoId: string | null;
   currentTitle: string | null;
@@ -47,6 +57,11 @@ export interface RoomPresenceData {
 
 export interface LeaveRoomResult {
   roomDeleted: boolean;
+  /**
+   * Set when a membership row was actually removed. The socket layer uses it
+   * to drop that user's connections out of the room's broadcast channel.
+   */
+  leftUserId?: string;
   /**
    * Present only when a departing host handed the room to someone else. The
    * socket layer uses it to announce the change to the members who stayed.

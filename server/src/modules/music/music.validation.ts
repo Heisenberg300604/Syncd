@@ -118,3 +118,40 @@ export function parseIso8601DurationToSeconds(raw: string): number | null {
   const total = days * 86400 + hours * 3600 + minutes * 60 + seconds;
   return total > 0 ? total : null;
 }
+
+/**
+ * Hosts YouTube serves thumbnail images from. Everything reaching the room's
+ * `thumbnailUrl` originates here, either from `music.service` or from the same
+ * payload echoed back by the client.
+ */
+const THUMBNAIL_HOST_SUFFIXES = ["ytimg.com", "ggpht.com", "youtube.com"];
+
+/**
+ * Thumbnail URLs arrive inside client-supplied socket payloads and are rendered
+ * as an `<img src>` in every room member's browser. Left unchecked, whoever
+ * holds the host role could point the whole room at an arbitrary URL and
+ * collect their IP addresses and user agents. Anything that is not an https
+ * YouTube image URL is dropped — the UI already copes with a missing thumbnail.
+ */
+export function sanitizeThumbnailUrl(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+
+  const value = raw.trim();
+  if (value.length === 0 || value.length > 500) return "";
+
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return "";
+  }
+
+  if (url.protocol !== "https:") return "";
+
+  const host = url.hostname.toLowerCase();
+  const allowed = THUMBNAIL_HOST_SUFFIXES.some(
+    (suffix) => host === suffix || host.endsWith(`.${suffix}`),
+  );
+
+  return allowed ? url.toString() : "";
+}

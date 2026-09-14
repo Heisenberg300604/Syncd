@@ -148,7 +148,16 @@ export function useYouTubePlayer(
           width: "100%",
           playerVars: {
             autoplay: 0,
-            controls: 1,
+            // SyncD owns playback: the room decides what plays, where the
+            // playhead is, and who may move it. YouTube's own control bar is a
+            // second, ungoverned input surface — anyone could drive their own
+            // player with it, silently diverging from the room — so it is off,
+            // along with the keyboard shortcuts and clickable annotations that
+            // do the same thing. Play, pause and seek all come from this app's
+            // controls instead.
+            controls: 0,
+            disablekb: 1,
+            iv_load_policy: 3,
             modestbranding: 1,
             rel: 0,
             playsinline: 1,

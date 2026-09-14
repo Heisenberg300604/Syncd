@@ -75,9 +75,15 @@ class QueueStore {
     return [...(this.queues.get(roomCode) ?? [])];
   }
 
-  /** Empty the queue for a room. Returns an empty array for convenience. */
+  /**
+   * Empty the queue for a room. Returns an empty array for convenience.
+   *
+   * Drops the entry rather than storing an empty array — `getQueue` answers
+   * the same either way, and holding the key would keep a slot alive for every
+   * room the process has ever seen.
+   */
   clearQueue(roomCode: string): QueueItem[] {
-    this.queues.set(roomCode, []);
+    this.queues.delete(roomCode);
     return [];
   }
 }

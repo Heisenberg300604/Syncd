@@ -19,15 +19,24 @@ export interface ApiError {
   authenticated?: boolean;
 }
 
+/**
+ * A person as the room API exposes them. Narrower than `PublicUser`: the server
+ * does not hand out other people's Clerk identifiers.
+ */
+export interface RoomUser {
+  id: string;
+  username: string;
+}
+
 export interface RoomMemberDTO {
-  user: PublicUser;
+  user: RoomUser;
   joinedAt: string;
 }
 
 export interface RoomDTO {
   id: string;
   roomCode: string;
-  host: PublicUser;
+  host: RoomUser;
   members: RoomMemberDTO[];
   currentVideoId: string | null;
   currentTitle: string | null;

@@ -1,11 +1,13 @@
-import { YOUTUBE_VIDEO_ID_REGEX } from "../music/music.validation.js";
+import {
+  YOUTUBE_VIDEO_ID_REGEX,
+  sanitizeThumbnailUrl,
+} from "../music/music.validation.js";
 import type {
   PlaybackAction,
   PlaybackTrackInput,
 } from "./playback.types.js";
 
 const TITLE_MAX_LENGTH = 300;
-const URL_MAX_LENGTH = 500;
 const DURATION_MAX_LENGTH = 20;
 const PLAYBACK_ACTIONS: PlaybackAction[] = ["play", "pause", "seek"];
 
@@ -18,8 +20,14 @@ function asBoundedString(raw: unknown, max: number): string {
 }
 
 /**
- * The socket payload is client-supplied, so nothing here is trusted. Only the
- * video id is enforced strictly; the display fields are clamped.
+ * The socket payload is client-supplied, so nothing here is trusted. The video
+ * id is enforced strictly, the thumbnail is checked against YouTube's image
+ * hosts (it becomes an `<img src>` in every member's browser), and the
+ * remaining display fields are clamped.
+ *
+ * Shared by `playback:set` and `queue:add` — a queued track is promoted to the
+ * room's current track verbatim, so both entry points have to validate to the
+ * same standard.
  */
 export function validateTrackInput(raw: unknown): TrackValidation {
   if (typeof raw !== "object" || raw === null) {
@@ -38,7 +46,7 @@ export function validateTrackInput(raw: unknown): TrackValidation {
     value: {
       videoId,
       title: asBoundedString(track["title"], TITLE_MAX_LENGTH),
-      thumbnailUrl: asBoundedString(track["thumbnailUrl"], URL_MAX_LENGTH),
+      thumbnailUrl: sanitizeThumbnailUrl(track["thumbnailUrl"]),
       duration: asBoundedString(track["duration"], DURATION_MAX_LENGTH),
     },
   };

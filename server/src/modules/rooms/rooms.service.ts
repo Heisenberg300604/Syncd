@@ -1,6 +1,5 @@
 import { prisma } from "../../config/prisma.js";
 import { Prisma } from "../../../generated/prisma/client.js";
-import type { PublicUser } from "../users/users.types.js";
 import { findUserByClerkId } from "../users/users.service.js";
 import { generateRoomCode, ROOM_CODE_MAX_RETRIES_OUT } from "./rooms.validation.js";
 import type {
@@ -8,43 +7,39 @@ import type {
   RoomDTO,
   RoomMemberDTO,
   RoomPresenceData,
+  RoomUser,
 } from "./rooms.types.js";
 import { AppError } from "../../utils/apiResponse.js";
 
 type RoomWithRelations = Prisma.RoomGetPayload<{
   include: {
-    host: { select: { id: true; clerkUserId: true; username: true } };
+    host: { select: { id: true; username: true } };
     members: {
       include: {
-        user: { select: { id: true; clerkUserId: true; username: true } };
+        user: { select: { id: true; username: true } };
       };
       orderBy: { joinedAt: "asc" };
     };
   };
 }>;
 
-function toPublicUser(user: {
-  id: string;
-  clerkUserId: string;
-  username: string;
-}): PublicUser {
+function toRoomUser(user: { id: string; username: string }): RoomUser {
   return {
     id: user.id,
-    clerkUserId: user.clerkUserId,
     username: user.username,
   };
 }
 
 function toRoomDTO(room: RoomWithRelations): RoomDTO {
   const members: RoomMemberDTO[] = room.members.map((m) => ({
-    user: toPublicUser(m.user),
+    user: toRoomUser(m.user),
     joinedAt: m.joinedAt.toISOString(),
   }));
 
   return {
     id: room.id,
     roomCode: room.roomCode,
-    host: toPublicUser(room.host),
+    host: toRoomUser(room.host),
     members,
     currentVideoId: room.currentVideoId,
     currentTitle: room.currentTitle,
@@ -59,10 +54,10 @@ function toRoomDTO(room: RoomWithRelations): RoomDTO {
 }
 
 const roomInclude = {
-  host: { select: { id: true, clerkUserId: true, username: true } },
+  host: { select: { id: true, username: true } },
   members: {
     include: {
-      user: { select: { id: true, clerkUserId: true, username: true } },
+      user: { select: { id: true, username: true } },
     },
     orderBy: { joinedAt: "asc" },
   },
@@ -102,7 +97,7 @@ export async function createRoomWithHost(
       });
 
       // Build the DTO from already-known data — no extra DB round-trip needed.
-      const hostPublic = toPublicUser(host);
+      const hostPublic = toRoomUser(host);
       const dto: RoomDTO = {
         id: roomId,
         roomCode: code,
@@ -212,6 +207,32 @@ export async function getRoomIdByCode(roomCode: string): Promise<string | null> 
 }
 
 /**
+ * The room's id, but only if `userId` is a member right now.
+ *
+ * The socket layer caches membership per connection at `room:join` time. That
+ * cache is the right call for high-frequency reads, but it must not be the
+ * authority for a write: a user who leaves the room keeps their socket, so
+ * chat re-checks membership here rather than trusting the connection's
+ * join-time state. Membership lives on the same query as the id, so this
+ * costs no more round-trips than `getRoomIdByCode` did.
+ */
+export async function getRoomIdIfMember(
+  roomCode: string,
+  userId: string,
+): Promise<string | null> {
+  const room = await prisma.room.findUnique({
+    where: { roomCode },
+    select: {
+      id: true,
+      members: { where: { userId }, select: { userId: true }, take: 1 },
+    },
+  });
+
+  if (!room || room.members.length === 0) return null;
+  return room.id;
+}
+
+/**
  * Members ordered oldest-first by `joinedAt`, alongside the room's current
  * host. The ordering is load-bearing: host succession picks the
  * longest-standing online member, so callers can walk this list in order.
@@ -311,7 +332,7 @@ export async function leaveRoom(
         },
       },
     });
-    return { roomDeleted: false };
+    return { roomDeleted: false, leftUserId: user.id };
   }
 
   // The host is leaving deliberately, so there is no grace period to wait on:
@@ -327,7 +348,7 @@ export async function leaveRoom(
   if (!successor) {
     // Deleting the room cascades to all room_members and messages
     await prisma.room.delete({ where: { id: room.id } });
-    return { roomDeleted: true };
+    return { roomDeleted: true, leftUserId: user.id };
   }
 
   // Promote before removing the membership so the room is never, even
@@ -349,6 +370,7 @@ export async function leaveRoom(
 
   return {
     roomDeleted: false,
+    leftUserId: user.id,
     hostHandover: {
       previousHostUserId: user.id,
       previousHostUsername: user.username,

@@ -6,7 +6,7 @@ import { findUserByClerkId } from "../modules/users/users.service.js";
 import { validateRoomCode } from "../modules/rooms/rooms.validation.js";
 import {
   getRoomHostId,
-  getRoomIdByCode,
+  getRoomIdIfMember,
   getRoomMembersForPresence,
   transferRoomHost,
 } from "../modules/rooms/rooms.service.js";
@@ -54,6 +54,7 @@ import {
   roomName,
   setRoomBroadcaster,
 } from "./roomBroadcast.js";
+import { reply } from "./ack.js";
 import { queueStore } from "./queueStore.js";
 import type {
   QueueAck,
@@ -65,6 +66,8 @@ import type {
   QueueReorderPayload,
   QueueSnapshot,
 } from "./queue.types.js";
+import { enforceSocketRateLimit } from "../middleware/rateLimit.js";
+import { SOCKET_RATE_LIMITS } from "../config/rateLimits.js";
 import { logger } from "../utils/logger.js";
 
 export function createSocketServer(httpServer: HttpServer): SocketIOServer {
@@ -73,6 +76,9 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       origin: config.corsOrigins,
       credentials: true,
     },
+    // The largest legitimate payload is a track object of a few hundred bytes;
+    // the 1 MB default is a free memory-amplification primitive.
+    maxHttpBufferSize: 100_000,
   });
 
   setRoomBroadcaster(io);
@@ -85,8 +91,12 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
     }
 
     try {
+      // `authorizedParties` pins the token to a frontend this API actually
+      // serves, so a session token minted for a different origin on the same
+      // Clerk instance cannot be replayed here.
       const payload = await verifyToken(token, {
         secretKey: config.clerkSecretKey,
+        authorizedParties: config.clerkAuthorizedParties,
       });
       const clerkUserId = payload.sub;
       if (!clerkUserId) {
@@ -104,6 +114,7 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       next();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Auth failed";
+      logger.warn("Socket authentication rejected", { reason: message });
       next(new Error(message));
     }
   });
@@ -128,11 +139,11 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
 
     socket.on(
       "room:join",
-      (payload: RoomJoinPayload, ack: (res: RoomJoinResponse) => void) => {
+      (payload: RoomJoinPayload, ack?: (res: RoomJoinResponse) => void) => {
         handleRoomJoin(io, socket, user, payload, ack, joinedRooms).catch(
           (err) => {
             const message = err instanceof Error ? err.message : "Join failed";
-            ack({ ok: false, message });
+            reply(ack, { ok: false, message });
           },
         );
       },
@@ -142,8 +153,8 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "playback:set",
       (payload: PlaybackSetPayload, ack?: (res: PlaybackAck) => void) => {
         handlePlaybackSet(io, user, payload, joinedRooms)
-          .then((playback) => ack?.({ ok: true, playback }))
-          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+          .then((playback) => reply(ack, { ok: true, playback }))
+          .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
       },
     );
 
@@ -151,8 +162,8 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "playback:control",
       (payload: PlaybackControlPayload, ack?: (res: PlaybackAck) => void) => {
         handlePlaybackControl(io, user, payload, joinedRooms)
-          .then((playback) => ack?.({ ok: true, playback }))
-          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+          .then((playback) => reply(ack, { ok: true, playback }))
+          .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
       },
     );
 
@@ -160,8 +171,8 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "playback:clear",
       (payload: PlaybackClearPayload, ack?: (res: PlaybackAck) => void) => {
         handlePlaybackClear(io, user, payload, joinedRooms)
-          .then((playback) => ack?.({ ok: true, playback }))
-          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+          .then((playback) => reply(ack, { ok: true, playback }))
+          .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
       },
     );
 
@@ -173,8 +184,8 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "queue:add",
       (payload: QueueAddPayload, ack?: (res: QueueAck) => void) => {
         handleQueueAdd(io, user, payload, joinedRooms)
-          .then((queue) => ack?.({ ok: true, queue }))
-          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+          .then((queue) => reply(ack, { ok: true, queue }))
+          .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
       },
     );
 
@@ -182,8 +193,8 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "queue:remove",
       (payload: QueueRemovePayload, ack?: (res: QueueAck) => void) => {
         handleQueueRemove(io, user, payload, joinedRooms)
-          .then((queue) => ack?.({ ok: true, queue }))
-          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+          .then((queue) => reply(ack, { ok: true, queue }))
+          .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
       },
     );
 
@@ -191,8 +202,8 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "queue:reorder",
       (payload: QueueReorderPayload, ack?: (res: QueueAck) => void) => {
         handleQueueReorder(io, user, payload, joinedRooms)
-          .then((queue) => ack?.({ ok: true, queue }))
-          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+          .then((queue) => reply(ack, { ok: true, queue }))
+          .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
       },
     );
 
@@ -200,8 +211,8 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "queue:advance",
       (payload: QueueAdvancePayload, ack?: (res: QueueAck) => void) => {
         handleQueueAdvance(io, user, payload, joinedRooms)
-          .then((queue) => ack?.({ ok: true, queue }))
-          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+          .then((queue) => reply(ack, { ok: true, queue }))
+          .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
       },
     );
 
@@ -209,8 +220,8 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "queue:clear",
       (payload: QueueClearPayload, ack?: (res: QueueAck) => void) => {
         handleQueueClear(io, user, payload, joinedRooms)
-          .then((queue) => ack?.({ ok: true, queue }))
-          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+          .then((queue) => reply(ack, { ok: true, queue }))
+          .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
       },
     );
 
@@ -218,9 +229,9 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "chat:send",
       (payload: ChatSendPayload, ack?: (res: ChatSendAck) => void) => {
         handleChatSend(io, user, payload, joinedRooms)
-          .then(() => ack?.({ ok: true }))
+          .then(() => reply(ack, { ok: true }))
           .catch((err) =>
-            ack?.({
+            reply(ack, {
               ok: false,
               message: messageOf(err, "Could not send message"),
             }),
@@ -232,9 +243,9 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "host:transfer",
       (payload: HostTransferPayload, ack?: (res: HostTransferAck) => void) => {
         handleHostTransfer(user, payload, joinedRooms)
-          .then(() => ack?.({ ok: true }))
+          .then(() => reply(ack, { ok: true }))
           .catch((err) =>
-            ack?.({
+            reply(ack, {
               ok: false,
               message: messageOf(err, "Could not transfer host"),
             }),
@@ -242,9 +253,20 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       },
     );
 
+    // The only listener whose body runs synchronously, so it carries its own
+    // guard: Socket.IO emits listeners from a `process.nextTick` with no
+    // try/catch of its own, and an escaping throw ends the process for every
+    // connected room, not just this socket.
     socket.on("room:leave", (payload: RoomJoinPayload, ack?: () => void) => {
-      handleRoomLeave(socket, user, payload.roomCode, joinedRooms);
-      ack?.();
+      try {
+        const validation = validateRoomCode(payload?.roomCode);
+        if (validation.ok) {
+          handleRoomLeave(socket, user, validation.value, joinedRooms);
+        }
+      } catch (err) {
+        logger.error("room:leave failed", err);
+      }
+      reply(ack, undefined);
     });
 
     socket.on("disconnect", (reason) => {
@@ -279,12 +301,19 @@ async function handleRoomJoin(
   socket: Socket,
   user: { id: string; clerkUserId: string; username: string },
   payload: RoomJoinPayload,
-  ack: (res: RoomJoinResponse) => void,
+  /**
+   * Socket.IO only supplies this when the client sends one. Every call site
+   * has to tolerate its absence: an ack invoked as a plain value throws, and a
+   * throw inside a socket listener takes the whole process down with it.
+   */
+  ack: ((res: RoomJoinResponse) => void) | undefined,
   joinedRooms: Map<string, string>,
 ): Promise<void> {
-  const validation = validateRoomCode(payload.roomCode);
+  enforceSocketRateLimit("socket:join", user.id, SOCKET_RATE_LIMITS.roomJoin);
+
+  const validation = validateRoomCode(payload?.roomCode);
   if (!validation.ok) {
-    ack({ ok: false, message: validation.message });
+    reply(ack, { ok: false, message: validation.message });
     return;
   }
 
@@ -292,13 +321,13 @@ async function handleRoomJoin(
 
   const roomData = await getRoomMembersForPresence(roomCode);
   if (!roomData) {
-    ack({ ok: false, message: "Room not found" });
+    reply(ack, { ok: false, message: "Room not found" });
     return;
   }
 
   const isMember = roomData.members.some((m) => m.userId === user.id);
   if (!isMember) {
-    ack({ ok: false, message: "Not a member of this room" });
+    reply(ack, { ok: false, message: "Not a member of this room" });
     return;
   }
 
@@ -342,7 +371,7 @@ async function handleRoomJoin(
   const messages = await getRecentMessages(roomData.roomId);
   const queue = queueStore.getQueue(roomCode);
 
-  ack({ ok: true, presence, messages, queue, ...(playback ? { playback } : {}) });
+  reply(ack, { ok: true, presence, messages, queue, ...(playback ? { playback } : {}) });
 
   if (wasNewUser) {
     broadcastPresence(roomCode);
@@ -375,6 +404,11 @@ function messageOf(err: unknown, fallback = "Playback update failed"): string {
  * `joinedRooms` is only populated by `handleRoomJoin`, which verifies
  * membership against the database. Reusing it keeps every playback event
  * authorized without a query per play/pause.
+ *
+ * It is a cache of what was true at join time, not the authority: a user can
+ * leave the room while holding the connection. Every event that writes
+ * re-reads the current state — `assertHost` for the host-only ones, and a
+ * membership lookup for chat.
  */
 function assertJoined(
   roomCode: unknown,
@@ -420,6 +454,12 @@ async function handleHostTransfer(
   payload: HostTransferPayload,
   joinedRooms: Map<string, string>,
 ): Promise<void> {
+  enforceSocketRateLimit(
+    "socket:hostTransfer",
+    user.id,
+    SOCKET_RATE_LIMITS.hostTransfer,
+  );
+
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id, "hand over the room");
 
@@ -471,6 +511,8 @@ async function handlePlaybackSet(
   payload: PlaybackSetPayload,
   joinedRooms: Map<string, string>,
 ): Promise<PlaybackSnapshot> {
+  enforceSocketRateLimit("socket:playback", user.id, SOCKET_RATE_LIMITS.playback);
+
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id);
 
@@ -493,6 +535,8 @@ async function handlePlaybackControl(
   payload: PlaybackControlPayload,
   joinedRooms: Map<string, string>,
 ): Promise<PlaybackSnapshot> {
+  enforceSocketRateLimit("socket:playback", user.id, SOCKET_RATE_LIMITS.playback);
+
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id);
 
@@ -516,6 +560,8 @@ async function handlePlaybackClear(
   payload: PlaybackClearPayload,
   joinedRooms: Map<string, string>,
 ): Promise<PlaybackSnapshot> {
+  enforceSocketRateLimit("socket:playback", user.id, SOCKET_RATE_LIMITS.playback);
+
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id);
   const playback = await clearRoomTrack(roomCode, user.id);
@@ -553,25 +599,20 @@ async function handleQueueAdd(
   payload: QueueAddPayload,
   joinedRooms: Map<string, string>,
 ): Promise<QueueSnapshot> {
+  enforceSocketRateLimit("socket:queue", user.id, SOCKET_RATE_LIMITS.queue);
+
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id);
 
-  const track = payload?.track;
-  if (
-    typeof track !== "object" ||
-    track === null ||
-    typeof (track as QueueItem).videoId !== "string" ||
-    (track as QueueItem).videoId.trim() === ""
-  ) {
-    throw new Error("Invalid track payload");
+  // A queued item is promoted to the room's current track verbatim by
+  // `queue:advance`, so it goes through exactly the same validation as
+  // `playback:set` rather than a looser clamp of its own.
+  const validation = validateTrackInput(payload?.track);
+  if (!validation.ok) {
+    throw new Error(validation.message);
   }
 
-  const item: QueueItem = {
-    videoId: String((track as QueueItem).videoId).slice(0, 20),
-    title: String((track as QueueItem).title ?? "").slice(0, 300),
-    thumbnailUrl: String((track as QueueItem).thumbnailUrl ?? "").slice(0, 500),
-    duration: String((track as QueueItem).duration ?? "").slice(0, 20),
-  };
+  const item: QueueItem = validation.value;
 
   const queue = queueStore.enqueue(roomCode, item);
   logger.info(`${user.username} queued ${item.videoId} in ${roomCode}`);
@@ -585,6 +626,8 @@ async function handleQueueRemove(
   payload: QueueRemovePayload,
   joinedRooms: Map<string, string>,
 ): Promise<QueueSnapshot> {
+  enforceSocketRateLimit("socket:queue", user.id, SOCKET_RATE_LIMITS.queue);
+
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id);
 
@@ -600,6 +643,8 @@ async function handleQueueReorder(
   payload: QueueReorderPayload,
   joinedRooms: Map<string, string>,
 ): Promise<QueueSnapshot> {
+  enforceSocketRateLimit("socket:queue", user.id, SOCKET_RATE_LIMITS.queue);
+
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id);
 
@@ -621,6 +666,8 @@ async function handleQueueAdvance(
   payload: QueueAdvancePayload,
   joinedRooms: Map<string, string>,
 ): Promise<QueueSnapshot> {
+  enforceSocketRateLimit("socket:queue", user.id, SOCKET_RATE_LIMITS.queue);
+
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id);
 
@@ -650,6 +697,8 @@ async function handleQueueClear(
   payload: QueueClearPayload,
   joinedRooms: Map<string, string>,
 ): Promise<QueueSnapshot> {
+  enforceSocketRateLimit("socket:queue", user.id, SOCKET_RATE_LIMITS.queue);
+
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id);
 
@@ -659,8 +708,8 @@ async function handleQueueClear(
 }
 
 /**
- * Any room member may chat — unlike playback, this only needs `assertJoined`,
- * not `assertHost`. The message is persisted before it is broadcast, so a
+ * Any room member may chat — unlike playback, this needs no `assertHost`, only
+ * current membership. The message is persisted before it is broadcast, so a
  * failed write never reaches other clients.
  */
 async function handleChatSend(
@@ -669,6 +718,8 @@ async function handleChatSend(
   payload: ChatSendPayload,
   joinedRooms: Map<string, string>,
 ): Promise<void> {
+  enforceSocketRateLimit("socket:chat", user.id, SOCKET_RATE_LIMITS.chatSend);
+
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
 
   const validation = validateMessageContent(payload?.content);
@@ -676,9 +727,12 @@ async function handleChatSend(
     throw new Error(validation.message);
   }
 
-  const roomId = await getRoomIdByCode(roomCode);
+  // Membership is re-read here rather than taken from the connection's
+  // join-time cache: a user who left the room through the REST endpoint still
+  // holds the socket they joined with, and must not be able to post with it.
+  const roomId = await getRoomIdIfMember(roomCode, user.id);
   if (!roomId) {
-    throw new Error("Room not found");
+    throw new Error("Not a member of this room");
   }
 
   const message = await createMessage(roomId, user.id, validation.value);

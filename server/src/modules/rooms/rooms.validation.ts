@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 export const ROOM_CODE_LENGTH = 6;
 // Unambiguous uppercase alphabet: no O/0/I/1/L to avoid confusion
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -39,13 +41,18 @@ export function validateRoomCode(raw: unknown): RoomCodeValidation {
   return { ok: true, value };
 }
 
+/**
+ * The room code is the only thing guarding a room — anyone holding it can join.
+ * That makes it a capability, so it comes from the CSPRNG: `Math.random()` is a
+ * seeded PRNG whose internal state can be recovered from a handful of observed
+ * outputs, which would let an attacker who creates a few rooms predict the
+ * codes handed to other users. `randomInt` is also rejection-sampled, so the
+ * 31-character alphabet stays uniform.
+ */
 export function generateRoomCode(): string {
   let code = "";
   for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
-    const idx = Math.floor(Math.random() * ROOM_CODE_ALPHABET.length);
-    if (idx >= 0 && idx < ROOM_CODE_ALPHABET.length) {
-      code += ROOM_CODE_ALPHABET[idx];
-    }
+    code += ROOM_CODE_ALPHABET.charAt(randomInt(ROOM_CODE_ALPHABET.length));
   }
   return code;
 }

@@ -146,17 +146,37 @@ export function YouTubePlayer({
     getCurrentTime,
   ]);
 
-  // Nudge the local playhead back in line if it drifts away from the room.
+  // Keep the local player matching the room — both whether it is playing and
+  // where the playhead is.
+  //
+  // A snapshot only arrives when the host acts, so a player that diverged in
+  // between would stay diverged until the host's next command: a blocked
+  // autoplay, a stalled buffer, a sleeping tab or a pause that arrived before
+  // the player was ready would all leave someone out of sync with no way back.
+  // Reconciling on a timer means the room's state always wins, eventually.
   useEffect(() => {
-    if (
-      !ready ||
-      !playback?.isPlaying ||
-      !playback?.videoId ||
-      player.state !== "playing"
-    )
-      return;
+    if (!ready || !playback?.videoId) return;
 
     const interval = setInterval(() => {
+      // Mid-load: the apply effect owns this until the new video has landed.
+      if (appliedVideoId.current !== playback.videoId) return;
+
+      if (!playback.isPlaying) {
+        if (player.state === "playing") {
+          suppressEmitUntil.current = Date.now() + ECHO_SUPPRESSION_MS;
+          pause();
+        }
+        return;
+      }
+
+      if (player.state === "paused" || player.state === "idle") {
+        suppressEmitUntil.current = Date.now() + ECHO_SUPPRESSION_MS;
+        play();
+        return;
+      }
+
+      if (player.state !== "playing") return;
+
       const current = anchor.current;
       if (!current) return;
       const expected = current.position + (Date.now() - current.atMs) / 1000;
@@ -167,12 +187,29 @@ export function YouTubePlayer({
     }, DRIFT_CHECK_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [ready, playback?.isPlaying, playback?.videoId, player.state, getCurrentTime, seekTo]);
+  }, [ready, playback, player.state, getCurrentTime, seekTo, play, pause]);
 
   const duration = player.duration || playback?.duration || 0;
   const displayedTime = scrubbing ?? player.currentTime;
   const isPlaying = player.state === "playing";
   const controlsDisabled = !ready || !videoId || !onControl;
+
+  // The room is playing but this player is not, which in practice means the
+  // browser refused to start audio without a gesture. The transport controls
+  // belong to the host, so everyone else needs a way back into sync that is
+  // not a room command.
+  const needsTapToPlay =
+    Boolean(videoId) &&
+    ready &&
+    playback?.isPlaying === true &&
+    (player.state === "paused" || player.state === "idle");
+
+  function handleTapToPlay() {
+    // Catch-up only: the room already believes this is playing, so this must
+    // not be echoed back to it as a new command.
+    suppressEmitUntil.current = Date.now() + ECHO_SUPPRESSION_MS;
+    play();
+  }
 
   function handleClear() {
     suppressEmitUntil.current = Date.now() + ECHO_SUPPRESSION_MS;
@@ -232,6 +269,28 @@ export function YouTubePlayer({
             ref={containerRef}
             className={`absolute inset-0 ${videoId ? "" : "invisible"}`}
           />
+
+          {/*
+            Covers the iframe so a click cannot toggle YouTube's own playback.
+            With the control bar disabled the video surface is the last way to
+            drive the embed directly, and a member doing that would silently
+            fall out of sync with the room.
+          */}
+          {videoId && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              {needsTapToPlay && (
+                <button
+                  onClick={handleTapToPlay}
+                  className="flex items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-lg transition-colors hover:bg-accent-hi"
+                >
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Tap to play
+                </button>
+              )}
+            </div>
+          )}
           {!videoId && (
             <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
               <svg

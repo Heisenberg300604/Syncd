@@ -56,3 +56,26 @@ export function broadcastPresence(roomCode: string): void {
       logger.error(`broadcastPresence failed for ${roomCode}`, err);
     });
 }
+
+/**
+ * Drops a user's sockets out of a room's broadcast channel.
+ *
+ * Called when someone leaves through the REST endpoint: their membership row
+ * is gone, so they must stop receiving the room's chat, playback and presence
+ * events. Without this the connection they joined with would keep delivering
+ * them for as long as they held it open.
+ */
+export async function evictUserFromRoom(
+  roomCode: string,
+  userId: string,
+): Promise<void> {
+  if (!io) return;
+
+  const channel = roomName(roomCode);
+  const sockets = await io.in(channel).fetchSockets();
+
+  for (const socket of sockets) {
+    const user = socket.data.user as { id?: string } | undefined;
+    if (user?.id === userId) socket.leave(channel);
+  }
+}
