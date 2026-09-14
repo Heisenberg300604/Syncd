@@ -63,7 +63,11 @@ export class PresenceStore {
     return sockets !== undefined && sockets.size > 0;
   }
 
-  getSnapshot(roomCode: string, allMembers: { userId: string; username: string }[]): PresenceSnapshot {
+  getSnapshot(
+    roomCode: string,
+    allMembers: { userId: string; username: string }[],
+    hostUserId: string,
+  ): PresenceSnapshot {
     const room = this.rooms.get(roomCode);
     const members: PresenceMember[] = allMembers.map((m) => ({
       userId: m.userId,
@@ -72,7 +76,7 @@ export class PresenceStore {
         ? (room.socketsByUserId.get(m.userId)?.size ?? 0) > 0
         : false,
     }));
-    return { members };
+    return { members, hostUserId };
   }
 
   removeUserFromAllRooms(userId: string, socketId: string): string[] {

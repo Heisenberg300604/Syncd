@@ -4,7 +4,7 @@ Last updated: 2026-09-14
 
 ## Current Phase
 
-Phase 8 — Queue
+Phase 9 — Host Transfer
 
 Status: COMPLETE
 
@@ -187,6 +187,45 @@ Status: COMPLETE
   already playing, results show "Play now" and "+ Queue" buttons instead of
   the default single-click play
 
+### Host Transfer (Phase 9)
+
+- `room.hostUserId` remains the only host record — no schema change. Because
+  `assertHost` re-reads it per event, a transfer takes effect immediately for
+  every playback and queue permission
+- `hostUserId` is now carried on every `presence:update` and on the
+  `room:join` ack, so clients track the live host instead of the value from
+  the initial REST room payload
+- Automatic transfer on host disconnect, behind a **30-second grace period**
+  (`HostTransferStore` — `Map<roomCode, Timeout>`, the same ephemeral pattern
+  as `presenceStore`/`queueStore`):
+  - Armed when the host's *last* socket for the room drops and at least one
+    other member is online; broadcasts `host:pending` with the deadline
+  - Cancelled by `room:join` if the host reconnects in time (a page refresh
+    or a brief network drop does not cost them the room)
+  - On expiry every precondition is re-checked before the write — 30 seconds
+    is long enough for the host to return or the successor to leave
+- Successor rule: the longest-standing **online** member.
+  `getRoomMembersForPresence` orders members by `joinedAt` ascending, so the
+  first online entry is the correct choice
+- All three transfer paths write through
+  `transferRoomHost(roomId, expectedHostUserId, newHostUserId)`, an
+  `updateMany` conditional on the current host. This is the concurrency guard:
+  a firing grace timer can race a manual transfer or a host leaving, and
+  exactly one wins
+- Manual transfer via the host-only `host:transfer` event; the target is
+  verified against `RoomMember` rather than trusted from the payload
+- `POST /rooms/:roomCode/leave` no longer deletes the room when the host
+  leaves. It hands the room to the longest-standing remaining member inside a
+  transaction (promote, then remove the membership, so `hostUserId` never
+  points at a non-member) and deletes the room only when the host was the last
+  member
+- `roomBroadcast.ts` holds the module-level Socket.IO handle so the REST leave
+  path can emit `host:update` and `presence:update` without threading `io`
+  through Express
+- UI: live `HOST` badge, a "MAKE HOST" action per online member in the people
+  dropdown (host only), a countdown banner while a transfer is pending, and a
+  dismissible notice naming the new host and why the change happened
+
 ---
 
 ## Important Architecture Decisions
@@ -282,8 +321,8 @@ joined after the page loaded never appeared until a manual refresh.
 - Drift correction is threshold-based (reseek past 2s drift, checked every
   5s), not frame-accurate — acceptable for casual co-watching, not for
   anything requiring sample-accurate sync
-- If the host disconnects, playback state freezes where it was; there is no
-  host transfer or automatic pause-on-host-leave yet
+- If the host disconnects and **no other member is online**, playback state
+  freezes where it was — there is nobody to transfer the room to
 - Track-change currently starts the track playing immediately
   (`isPlaying: true`) rather than loading paused
 - Chat history is capped at the 50 most recent messages per room with no
@@ -294,7 +333,13 @@ joined after the page loaded never appeared until a manual refresh.
 - Queue is in-memory only; it does not survive a server restart — all queued
   tracks are lost if the server process restarts
 - Only the host's client triggers `queue:advance`; if the host's tab is closed
-  mid-track the queue will not auto-advance until the host reconnects
+  mid-track the queue stalls until either the host reconnects or the 30-second
+  host-transfer grace period hands the room to another online member
+- Pending host-transfer countdowns live in memory; a server restart during the
+  grace window drops the timer, and the room keeps its existing host until the
+  next disconnect
+- Host transfer promotes a member to full host; there are no intermediate
+  roles (DJ, co-host) or free-for-all playback mode yet
 - No member voting, suggestion system, or queue visibility controls yet
 
 ---

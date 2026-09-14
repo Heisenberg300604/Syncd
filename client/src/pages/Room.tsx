@@ -71,6 +71,12 @@ export function Room() {
     reorderQueue,
     clearQueue,
     advanceQueue,
+    hostUserId,
+    hostNotice,
+    dismissHostNotice,
+    hostPending,
+    hostError,
+    transferHost,
   } = useRoomSocket(
     room ? room.roomCode : null,
     room ? room.members : [],
@@ -84,8 +90,18 @@ export function Room() {
   // only for UX (hiding controls); the server enforces the real boundary.
   const myUserId =
     currentUser.status === "authenticated" ? currentUser.me.user?.id : undefined;
-  const isHost = Boolean(room && myUserId && room.host.id === myUserId);
+  // The socket is the live source for the host: it changes mid-session when a
+  // host disconnects or hands the room over. `room.host.id` is only the seed
+  // from the initial REST load, used until the first presence snapshot lands.
+  const effectiveHostId = hostUserId ?? room?.host.id ?? null;
+  const isHost = Boolean(myUserId && effectiveHostId === myUserId);
   const canControlPlayback = socketReady && isHost;
+
+  useEffect(() => {
+    if (!hostNotice) return;
+    const timer = setTimeout(dismissHostNotice, 7000);
+    return () => clearTimeout(timer);
+  }, [hostNotice, dismissHostNotice]);
 
   async function handleCopyCode() {
     if (!room) return;
@@ -160,6 +176,45 @@ export function Room() {
       />
 
       <main className="w-full px-4 py-6 sm:px-6 sm:py-8">
+        {hostPending && (
+          <HostPendingBanner
+            key={hostPending.deadline}
+            hostUsername={hostPending.hostUsername}
+            successorUsername={hostPending.successorUsername}
+            deadline={hostPending.deadline}
+          />
+        )}
+
+        {hostNotice && (
+          <div className="mb-5 flex items-center gap-3 rounded-xl border border-accent/30 bg-accent-lo px-4 py-3">
+            <span aria-hidden="true">🎧</span>
+            <p className="flex-1 text-sm text-ink">
+              <span className="font-semibold">
+                {hostNotice.hostUserId === myUserId
+                  ? "You are"
+                  : `${hostNotice.hostUsername} is`}
+              </span>{" "}
+              now the host
+              {hostNotice.reason === "disconnect"
+                ? ` — ${hostNotice.previousHostUsername} disconnected.`
+                : hostNotice.reason === "left"
+                  ? ` — ${hostNotice.previousHostUsername} left the room.`
+                  : "."}
+            </p>
+            <button
+              onClick={dismissHostNotice}
+              className="rounded-full px-2 py-0.5 text-xs text-ink-muted transition-colors hover:bg-white/10 hover:text-ink"
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {hostError && (
+          <p className="mb-5 text-center text-sm text-danger">{hostError}</p>
+        )}
+
         {/* Main grid: player left, sidebar right */}
         <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
           <div className="min-w-0 space-y-5 lg:col-span-2">
@@ -193,7 +248,7 @@ export function Room() {
               >
                 <div className="flex -space-x-2.5">
                   {presence.slice(0, 5).map((member) => {
-                    const memberIsHost = member.userId === room.host.id;
+                    const memberIsHost = member.userId === effectiveHostId;
                     return (
                       <div
                         key={member.userId}
@@ -245,7 +300,7 @@ export function Room() {
                     </p>
                     <ul className="space-y-0.5">
                       {presence.map((member) => {
-                        const memberIsHost = member.userId === room.host.id;
+                        const memberIsHost = member.userId === effectiveHostId;
                         return (
                           <li
                             key={member.userId}
@@ -263,6 +318,19 @@ export function Room() {
                             <span className="flex-1 truncate text-sm font-medium">
                               {member.username}
                             </span>
+                            {/* Offering this only for online members is a UX
+                                choice; the server accepts any room member. */}
+                            {isHost && !memberIsHost && member.online && (
+                              <button
+                                onClick={() => {
+                                  transferHost(member.userId);
+                                  setPeopleOpen(false);
+                                }}
+                                className="rounded-full border border-line px-2 py-0.5 text-[9px] font-semibold text-ink-muted transition-colors hover:border-accent hover:text-accent"
+                              >
+                                MAKE HOST
+                              </button>
+                            )}
                             {memberIsHost && (
                               <span className="rounded-full bg-accent-lo px-1.5 py-0.5 text-[9px] font-semibold text-accent">
                                 HOST
@@ -305,6 +373,55 @@ export function Room() {
       </main>
     </div>
   );
+}
+
+/**
+ * Shown while a disconnected host's grace period runs. The countdown is derived
+ * from the server-sent deadline rather than counted locally from a duration, so
+ * a late-joining client still sees the correct remaining time.
+ */
+function HostPendingBanner({
+  hostUsername,
+  successorUsername,
+  deadline,
+}: {
+  hostUsername: string;
+  successorUsername?: string;
+  deadline?: string;
+}) {
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    remainingSeconds(deadline),
+  );
+
+  // The initial value comes from the lazy initializer above; the parent keys
+  // this component on `deadline`, so a new countdown remounts rather than
+  // needing a synchronous reset here.
+  useEffect(() => {
+    const timer = setInterval(
+      () => setSecondsLeft(remainingSeconds(deadline)),
+      1000,
+    );
+    return () => clearInterval(timer);
+  }, [deadline]);
+
+  return (
+    <div className="mb-5 flex items-center gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3">
+      <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning" />
+      <p className="text-sm text-ink">
+        <span className="font-semibold">{hostUsername}</span> lost connection.
+        {successorUsername
+          ? ` Handing the room to ${successorUsername}`
+          : " Waiting for them to return"}
+        {secondsLeft > 0 ? ` in ${secondsLeft}s…` : "…"}
+      </p>
+    </div>
+  );
+}
+
+function remainingSeconds(deadline?: string): number {
+  if (!deadline) return 0;
+  const ms = new Date(deadline).getTime() - Date.now();
+  return ms > 0 ? Math.ceil(ms / 1000) : 0;
 }
 
 function ConnectionBadge({ status }: { status: ConnectionStatus }) {

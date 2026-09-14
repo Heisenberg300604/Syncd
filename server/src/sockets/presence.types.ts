@@ -10,6 +10,12 @@ export interface PresenceMember {
 
 export interface PresenceSnapshot {
   members: PresenceMember[];
+  /**
+   * Authoritative host at the moment of the broadcast. Rides on presence so
+   * every existing presence emit (join ack, connect, disconnect) keeps clients
+   * in sync with `Room.hostUserId` without a second event.
+   */
+  hostUserId: string;
 }
 
 export interface RoomJoinPayload {

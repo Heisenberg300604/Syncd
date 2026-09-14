@@ -9,6 +9,11 @@ import {
   joinRoom,
   leaveRoom,
 } from "./rooms.service.js";
+import {
+  announceHostChange,
+  clearPendingTransfer,
+} from "../../sockets/hostTransfer.js";
+import { logger } from "../../utils/logger.js";
 import type {
   CreateRoomResponse,
   JoinRoomResponse,
@@ -89,6 +94,26 @@ export const leaveRoomHandler = asyncHandler(
     }
 
     const result = await leaveRoom(userId, validation.value);
+
+    // A host leaving deliberately hands the room over inside `leaveRoom`; the
+    // members who stayed learn about it here, since the REST layer has no
+    // socket of its own.
+    if (result.hostHandover) {
+      clearPendingTransfer(validation.value);
+      announceHostChange(
+        validation.value,
+        {
+          userId: result.hostHandover.previousHostUserId,
+          username: result.hostHandover.previousHostUsername,
+        },
+        "left",
+      ).catch((err) =>
+        logger.error(
+          `Host handover broadcast failed for ${validation.value}`,
+          err,
+        ),
+      );
+    }
 
     const body: LeaveRoomResponse = { left: true };
     res.status(200).json({ ...body, roomDeleted: result.roomDeleted });

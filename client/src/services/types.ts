@@ -63,6 +63,8 @@ export interface PresenceMember {
 
 export interface PresenceSnapshot {
   members: PresenceMember[];
+  /** Authoritative host at the time of the broadcast. */
+  hostUserId: string;
 }
 
 export interface YouTubeSearchResult {
@@ -121,3 +123,26 @@ export interface QueueItem {
 
 /** The full ordered queue as broadcast over Socket.IO. */
 export type QueueSnapshot = QueueItem[];
+
+/** Why the room's host changed. */
+export type HostChangeReason = "manual" | "disconnect" | "left";
+
+export interface HostUpdatePayload {
+  hostUserId: string;
+  hostUsername: string;
+  previousHostUserId: string;
+  previousHostUsername: string;
+  reason: HostChangeReason;
+}
+
+/**
+ * Sent when the host's connection drops (`pending: true`, with the deadline
+ * the automatic transfer fires at) and again if they return in time.
+ */
+export interface HostPendingPayload {
+  pending: boolean;
+  hostUserId: string;
+  hostUsername: string;
+  successorUsername?: string;
+  deadline?: string;
+}

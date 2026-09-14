@@ -3,7 +3,12 @@ import { Prisma } from "../../../generated/prisma/client.js";
 import type { PublicUser } from "../users/users.types.js";
 import { findUserByClerkId } from "../users/users.service.js";
 import { generateRoomCode, ROOM_CODE_MAX_RETRIES_OUT } from "./rooms.validation.js";
-import type { RoomDTO, RoomMemberDTO } from "./rooms.types.js";
+import type {
+  LeaveRoomResult,
+  RoomDTO,
+  RoomMemberDTO,
+  RoomPresenceData,
+} from "./rooms.types.js";
 import { AppError } from "../../utils/apiResponse.js";
 
 type RoomWithRelations = Prisma.RoomGetPayload<{
@@ -206,13 +211,19 @@ export async function getRoomIdByCode(roomCode: string): Promise<string | null> 
   return room?.id ?? null;
 }
 
+/**
+ * Members ordered oldest-first by `joinedAt`, alongside the room's current
+ * host. The ordering is load-bearing: host succession picks the
+ * longest-standing online member, so callers can walk this list in order.
+ */
 export async function getRoomMembersForPresence(
   roomCode: string,
-): Promise<{ roomId: string; members: { userId: string; username: string }[] } | null> {
+): Promise<RoomPresenceData | null> {
   const room = await prisma.room.findUnique({
     where: { roomCode },
     select: {
       id: true,
+      hostUserId: true,
       members: {
         select: {
           user: { select: { id: true, username: true } },
@@ -226,6 +237,7 @@ export async function getRoomMembersForPresence(
 
   return {
     roomId: room.id,
+    hostUserId: room.hostUserId,
     members: room.members.map((m) => ({
       userId: m.user.id,
       username: m.user.username,
@@ -233,10 +245,29 @@ export async function getRoomMembersForPresence(
   };
 }
 
+/**
+ * Moves the host role, but only if the room is still hosted by
+ * `expectedHostUserId`. The `where` clause is the concurrency guard: an
+ * automatic transfer firing after the grace period can race a manual transfer
+ * or a host leaving, and exactly one of them must win. Returns whether this
+ * caller was the one that applied the change.
+ */
+export async function transferRoomHost(
+  roomId: string,
+  expectedHostUserId: string,
+  newHostUserId: string,
+): Promise<boolean> {
+  const result = await prisma.room.updateMany({
+    where: { id: roomId, hostUserId: expectedHostUserId },
+    data: { hostUserId: newHostUserId },
+  });
+  return result.count === 1;
+}
+
 export async function leaveRoom(
   clerkUserId: string,
   roomCode: string,
-): Promise<{ roomDeleted: boolean }> {
+): Promise<LeaveRoomResult> {
   const user = await findUserByClerkId(clerkUserId);
   if (!user) {
     throw new AppError("User profile not found", 404);
@@ -269,16 +300,9 @@ export async function leaveRoom(
     return { roomDeleted: false };
   }
 
-  // If host leaves and others remain, the host must transfer ownership or
-  // the room closes. MVP decision: if the host leaves, the room is deleted
-  // (all remaining memberships cascade away). This avoids an invalid state
-  // where hostUserId points to a non-member. Host transfer is a future feature.
   const isHost = room.hostUserId === user.id;
 
-  if (isHost) {
-    // Deleting the room cascades to all room_members and messages
-    await prisma.room.delete({ where: { id: room.id } });
-  } else {
+  if (!isHost) {
     await prisma.roomMember.delete({
       where: {
         roomId_userId: {
@@ -287,7 +311,48 @@ export async function leaveRoom(
         },
       },
     });
+    return { roomDeleted: false };
   }
 
-  return { roomDeleted: isHost };
+  // The host is leaving deliberately, so there is no grace period to wait on:
+  // hand the room to the longest-standing remaining member immediately. Only
+  // when nobody is left does the room close — `hostUserId` must never point at
+  // a non-member.
+  const successor = await prisma.roomMember.findFirst({
+    where: { roomId: room.id, userId: { not: user.id } },
+    orderBy: { joinedAt: "asc" },
+    select: { userId: true },
+  });
+
+  if (!successor) {
+    // Deleting the room cascades to all room_members and messages
+    await prisma.room.delete({ where: { id: room.id } });
+    return { roomDeleted: true };
+  }
+
+  // Promote before removing the membership so the room is never, even
+  // momentarily, hosted by someone who is no longer a member.
+  await prisma.$transaction([
+    prisma.room.update({
+      where: { id: room.id },
+      data: { hostUserId: successor.userId },
+    }),
+    prisma.roomMember.delete({
+      where: {
+        roomId_userId: {
+          roomId: room.id,
+          userId: user.id,
+        },
+      },
+    }),
+  ]);
+
+  return {
+    roomDeleted: false,
+    hostHandover: {
+      previousHostUserId: user.id,
+      previousHostUsername: user.username,
+      newHostUserId: successor.userId,
+    },
+  };
 }

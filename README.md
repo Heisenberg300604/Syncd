@@ -731,8 +731,10 @@ Syncd/
   - [x] Automatic track advancement when the active video ends
   - [x] Queue snapshot bundled into the `room:join` ack for instant late-joiner sync
   - [x] Dual **Play now** / **+ Queue** buttons in search results when a track is playing
-- [ ] **Phase 9: Host Transfer & Collaborative DJ Mode**
-  - [ ] Host relinquishment / reassignment upon host disconnect
+- [x] **Phase 9: Host Transfer**
+  - [x] Automatic host transfer on disconnect, behind a 30-second grace period
+  - [x] Manual host promotion from the in-room people list
+  - [x] Host handover on deliberate leave — the room is no longer deleted
   - [ ] Free-for-all listening mode where any member can control playback
 - [ ] **Phase 10: Interactive Reactions & Production Scaling**
   - [ ] Ephemeral audio soundboard and floating emoji bursts
@@ -743,6 +745,26 @@ Syncd/
 ---
 
 ## 🚀 Recent Updates
+
+### 👑 Phase 9 Complete — Host Transfer
+
+* **⏱️ Automatic Transfer with a Grace Period:**
+  * When the host's last socket for a room drops, a **30-second** countdown is armed in `HostTransferStore` (`Map<roomCode, Timeout>` — the same in-memory pattern as `PresenceStore` and `QueueStore`, so no schema change was needed).
+  * Reconnecting inside the window cancels the countdown, so a page refresh or a brief network blip never costs the host their room.
+  * On expiry every precondition is re-checked — the host may have returned, the successor may have left — before anything is written.
+  * The successor is the **longest-standing online member**, taken from the existing `joinedAt`-ascending member ordering.
+* **🎚️ Manual Promotion:**
+  * New host-only `host:transfer` event; the target is validated against `RoomMember` server-side, never trusted from the payload.
+  * The people dropdown gains a **MAKE HOST** action next to each online member.
+* **🚪 Leaving No Longer Closes the Room:**
+  * `POST /rooms/:roomCode/leave` previously **deleted the entire room** when the host left. It now hands the room to the longest-standing remaining member in a transaction, and deletes the room only when the host was the last member.
+* **🔒 One Host, Always:**
+  * All three paths write through a single `updateMany` conditional on the current host, so an expiring timer racing a manual transfer or a departing host resolves to exactly one winner.
+  * `hostUserId` now rides on every `presence:update`, so clients follow the live host instead of the value from the initial REST load — and `assertHost` re-reads it per event, so playback and queue permissions move with the role instantly.
+* **🖥️ In-Room Feedback:** a countdown banner while a transfer is pending, and a notice naming the new host and why the change happened (`manual` / `disconnect` / `left`).
+* **⏭️ Side Benefit:** the queue no longer stalls when the host's tab closes mid-track — the new host's player takes over `ended → queue:advance`.
+
+<br/>
 
 ### 🎶 Phase 8 Complete — Shared Playback Queue
 * **🗂️ In-Memory Queue Store:**

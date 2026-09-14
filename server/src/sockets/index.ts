@@ -8,6 +8,7 @@ import {
   getRoomHostId,
   getRoomIdByCode,
   getRoomMembersForPresence,
+  transferRoomHost,
 } from "../modules/rooms/rooms.service.js";
 import { presenceStore } from "./presenceStore.js";
 import {
@@ -37,11 +38,22 @@ import type {
   ChatSendAck,
   ChatSendPayload,
 } from "../modules/messages/messages.types.js";
+import type { RoomJoinPayload, RoomJoinResponse } from "./presence.types.js";
 import type {
-  PresenceSnapshot,
-  RoomJoinPayload,
-  RoomJoinResponse,
-} from "./presence.types.js";
+  HostTransferAck,
+  HostTransferPayload,
+} from "./host.types.js";
+import {
+  announceHostChange,
+  cancelPendingTransferOnReturn,
+  clearPendingTransfer,
+  scheduleHostTransferIfHostLeft,
+} from "./hostTransfer.js";
+import {
+  broadcastPresence,
+  roomName,
+  setRoomBroadcaster,
+} from "./roomBroadcast.js";
 import { queueStore } from "./queueStore.js";
 import type {
   QueueAck,
@@ -55,9 +67,6 @@ import type {
 } from "./queue.types.js";
 import { logger } from "../utils/logger.js";
 
-const ROOM_PREFIX = "room:";
-const roomName = (roomCode: string) => `${ROOM_PREFIX}${roomCode}`;
-
 export function createSocketServer(httpServer: HttpServer): SocketIOServer {
   const io = new SocketIOServer(httpServer, {
     cors: {
@@ -65,6 +74,8 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       credentials: true,
     },
   });
+
+  setRoomBroadcaster(io);
 
   io.use(async (socket, next) => {
     const token = socket.handshake.auth["token"] as string | undefined;
@@ -217,8 +228,22 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       },
     );
 
+    socket.on(
+      "host:transfer",
+      (payload: HostTransferPayload, ack?: (res: HostTransferAck) => void) => {
+        handleHostTransfer(user, payload, joinedRooms)
+          .then(() => ack?.({ ok: true }))
+          .catch((err) =>
+            ack?.({
+              ok: false,
+              message: messageOf(err, "Could not transfer host"),
+            }),
+          );
+      },
+    );
+
     socket.on("room:leave", (payload: RoomJoinPayload, ack?: () => void) => {
-      handleRoomLeave(io, socket, user, payload.roomCode, joinedRooms);
+      handleRoomLeave(socket, user, payload.roomCode, joinedRooms);
       ack?.();
     });
 
@@ -235,7 +260,11 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
           socket.id,
         );
         if (nowOffline) {
-          broadcastPresence(io, roomCode);
+          broadcastPresence(roomCode);
+          scheduleHostTransferIfHostLeft(roomCode, user.id, user.username).catch(
+            (err) =>
+              logger.error(`Host transfer scheduling failed for ${roomCode}`, err),
+          );
         }
       }
       joinedRooms.clear();
@@ -279,7 +308,7 @@ async function handleRoomJoin(
     if (prevRoomCode !== roomCode) {
       socket.leave(prevRoomName);
       presenceStore.removeSocket(prevRoomCode, user.id, socket.id);
-      broadcastPresence(io, prevRoomCode);
+      broadcastPresence(prevRoomCode);
     }
   }
 
@@ -296,7 +325,19 @@ async function handleRoomJoin(
   socket.join(socketRoomName);
   joinedRooms.set(roomCode, socketRoomName);
 
-  const presence = presenceStore.getSnapshot(roomCode, roomData.members);
+  // A host who reconnects inside the grace window keeps the room.
+  cancelPendingTransferOnReturn(
+    roomCode,
+    user.id,
+    user.username,
+    roomData.hostUserId,
+  );
+
+  const presence = presenceStore.getSnapshot(
+    roomCode,
+    roomData.members,
+    roomData.hostUserId,
+  );
   const playback = await getRoomPlayback(roomCode);
   const messages = await getRecentMessages(roomData.roomId);
   const queue = queueStore.getQueue(roomCode);
@@ -304,12 +345,11 @@ async function handleRoomJoin(
   ack({ ok: true, presence, messages, queue, ...(playback ? { playback } : {}) });
 
   if (wasNewUser) {
-    broadcastPresence(io, roomCode);
+    broadcastPresence(roomCode);
   }
 }
 
 function handleRoomLeave(
-  io: SocketIOServer,
   socket: Socket,
   user: { id: string; clerkUserId: string; username: string },
   roomCode: string,
@@ -320,23 +360,11 @@ function handleRoomLeave(
   const nowOffline = presenceStore.removeSocket(roomCode, user.id, socket.id);
   joinedRooms.delete(roomCode);
   if (nowOffline) {
-    broadcastPresence(io, roomCode);
+    broadcastPresence(roomCode);
+    scheduleHostTransferIfHostLeft(roomCode, user.id, user.username).catch(
+      (err) => logger.error(`Host transfer scheduling failed for ${roomCode}`, err),
+    );
   }
-}
-
-function broadcastPresence(io: SocketIOServer, roomCode: string): void {
-  getRoomMembersForPresence(roomCode)
-    .then((roomData) => {
-      if (!roomData) return;
-      const snapshot: PresenceSnapshot = presenceStore.getSnapshot(
-        roomCode,
-        roomData.members,
-      );
-      io.to(roomName(roomCode)).emit("presence:update", snapshot);
-    })
-    .catch((err) => {
-      logger.error(`broadcastPresence failed for ${roomCode}`, err);
-    });
 }
 
 function messageOf(err: unknown, fallback = "Playback update failed"): string {
@@ -367,14 +395,74 @@ function assertJoined(
  * everyone else, but that is a UX nicety — this is the actual boundary, since
  * the socket payload is otherwise just a room code any member could send.
  */
-async function assertHost(roomCode: string, userId: string): Promise<void> {
+async function assertHost(
+  roomCode: string,
+  userId: string,
+  action = "control playback",
+): Promise<void> {
   const hostUserId = await getRoomHostId(roomCode);
   if (!hostUserId) {
     throw new Error("Room not found");
   }
   if (hostUserId !== userId) {
-    throw new Error("Only the host can control playback");
+    throw new Error(`Only the host can ${action}`);
   }
+}
+
+/**
+ * Manual promotion. The target is verified against `RoomMember` rather than
+ * trusted from the payload, and the write is conditional on the caller still
+ * being the host, so a promotion racing an automatic transfer cannot produce
+ * two hosts.
+ */
+async function handleHostTransfer(
+  user: { id: string; username: string },
+  payload: HostTransferPayload,
+  joinedRooms: Map<string, string>,
+): Promise<void> {
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  await assertHost(roomCode, user.id, "hand over the room");
+
+  const targetUserId =
+    typeof payload?.userId === "string" ? payload.userId.trim() : "";
+  if (!targetUserId) {
+    throw new Error("No member selected");
+  }
+  if (targetUserId === user.id) {
+    throw new Error("You are already the host");
+  }
+
+  const roomData = await getRoomMembersForPresence(roomCode);
+  if (!roomData) {
+    throw new Error("Room not found");
+  }
+
+  const target = roomData.members.find((m) => m.userId === targetUserId);
+  if (!target) {
+    throw new Error("That person is not a member of this room");
+  }
+
+  const applied = await transferRoomHost(
+    roomData.roomId,
+    user.id,
+    targetUserId,
+  );
+  if (!applied) {
+    throw new Error("The host changed — try again");
+  }
+
+  // The room has a live host again; any countdown is moot.
+  clearPendingTransfer(roomCode);
+
+  logger.info(
+    `Host transferred in ${roomCode}: ${user.username} → ${target.username} (manual)`,
+  );
+
+  await announceHostChange(
+    roomCode,
+    { userId: user.id, username: user.username },
+    "manual",
+  );
 }
 
 async function handlePlaybackSet(

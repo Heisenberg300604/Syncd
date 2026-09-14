@@ -308,7 +308,7 @@ model Message {
 | Edge Case | Failure Mode | Mitigation Strategy |
 | :--- | :--- | :--- |
 | **Mobile Autoplay Restrictions** | Mobile browsers block programmatic video play without a direct user interaction. | Display an explicit *"Tap to Unmute / Sync"* overlay on mobile devices that triggers a user-gesture playback initiation. |
-| **Host Closes Tab / Disconnects** | Room left without an active host to manage tracks. | Playback continues based on last authoritative snapshot. (Future Phase 9 will implement auto-host transfer). |
+| **Host Closes Tab / Disconnects** | Room left without an active host to manage tracks. | Playback continues from the last authoritative snapshot while a 30-second grace period runs; if the host does not return, the room transfers to the longest-standing online member (Phase 9). With nobody else online, the state simply stays frozen. |
 | **Network Lag Spike ($> 3000\text{ms}$)** | Client playhead lags behind the rest of the room. | Autonomous 5-second drift checker notices drift $>2.0\text{s}$ and immediately reseeks player forward to server-derived timestamp. |
 | **YouTube Embed Restricted Video** | Video plays on YouTube but errors in embedded IFrame. | Backend Link Resolver verifies `embeddable: true` and rejects non-embeddable videos before writing to playback state. |
 | **Stale Chat History Snapshot** | Reconnection payload might omit a message broadcasted during the brief reconnection race. | Client merges incoming history array with local state by unique `message.id` rather than blindly replacing the array. |
@@ -351,9 +351,10 @@ gantt
 - Host configuration toggle: *"Host Only Queue"* vs *"Democratic Queue"*.
 - Reordering, voting/upvoting tracks to push them up the queue.
 
-### Phase 9: Host Delegation & Transfer
-- Automatic host transfer to the longest-standing active member if the current host disconnects.
-- Manual host transfer: Host can promote any room member to Host or DJ.
+### Phase 9: Host Delegation & Transfer — **Delivered**
+- ✅ Automatic host transfer to the longest-standing active member if the current host disconnects (behind a 30-second reconnect grace period).
+- ✅ Manual host transfer: the host can promote any room member to Host.
+- ⬜ Intermediate DJ role and free-for-all playback mode — deferred; both need a role on `RoomMember` rather than the single `hostUserId` column.
 
 ### Phase 10: Rich Social Audio & Micro-Reactions
 - Floating soundboard audio reactions (applause, vinyl scratch, airhorn, bass drop).

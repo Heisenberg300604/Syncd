@@ -10,6 +10,8 @@ import type {
   YouTubeSearchResult,
   QueueItem,
   QueueSnapshot,
+  HostPendingPayload,
+  HostUpdatePayload,
 } from "../services/types";
 import { clientConfig } from "../config/env";
 
@@ -33,6 +35,11 @@ interface RoomJoinAck {
 interface PlaybackAck {
   ok: boolean;
   playback?: PlaybackSnapshot;
+  message?: string;
+}
+
+interface HostTransferAck {
+  ok: boolean;
   message?: string;
 }
 
@@ -93,6 +100,20 @@ export interface RoomSocket {
   reorderQueue: (fromIndex: number, toIndex: number) => void;
   clearQueue: () => void;
   advanceQueue: () => void;
+  // Host
+  /**
+   * Authoritative host from the socket layer. `null` until the first presence
+   * snapshot arrives — callers should fall back to the host from the room's
+   * REST payload until then.
+   */
+  hostUserId: string | null;
+  /** Set for a few seconds after the host changes, for an in-room notice. */
+  hostNotice: HostUpdatePayload | null;
+  dismissHostNotice: () => void;
+  /** Non-null while a disconnected host's grace period is counting down. */
+  hostPending: HostPendingPayload | null;
+  hostError: string | null;
+  transferHost: (userId: string) => void;
 }
 
 /**
@@ -120,6 +141,12 @@ export function useRoomSocket(
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatSending, setChatSending] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [hostUserId, setHostUserId] = useState<string | null>(null);
+  const [hostNotice, setHostNotice] = useState<HostUpdatePayload | null>(null);
+  const [hostPending, setHostPending] = useState<HostPendingPayload | null>(
+    null,
+  );
+  const [hostError, setHostError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   // Clerk re-creates `getToken` on every token refresh; keeping it in a ref
@@ -147,7 +174,10 @@ export function useRoomSocket(
         setPlaybackError(res.message ?? "Could not join the room");
         return;
       }
-      if (res.presence) setPresence(res.presence.members);
+      if (res.presence) {
+        setPresence(res.presence.members);
+        setHostUserId(res.presence.hostUserId);
+      }
       if (res.playback) setPlayback(res.playback);
       if (res.queue) setQueue(res.queue);
       // Merge rather than replace: a reconnect's history snapshot can race
@@ -190,6 +220,19 @@ export function useRoomSocket(
 
       socket.on("presence:update", (snapshot: PresenceSnapshot) => {
         setPresence(snapshot.members);
+        setHostUserId(snapshot.hostUserId);
+      });
+
+      socket.on("host:update", (payload: HostUpdatePayload) => {
+        setHostUserId(payload.hostUserId);
+        setHostNotice(payload);
+        // The room has a host again, so any countdown is over.
+        setHostPending(null);
+        setHostError(null);
+      });
+
+      socket.on("host:pending", (payload: HostPendingPayload) => {
+        setHostPending(payload.pending ? payload : null);
       });
 
       socket.on("playback:update", (snapshot: PlaybackSnapshot) => {
@@ -342,6 +385,31 @@ export function useRoomSocket(
     emitQueue("queue:advance", { roomCode });
   }, [emitQueue, roomCode]);
 
+  // ---------------------------------------------------------------------------
+  // Host transfer — host-only; the server re-checks membership and ownership
+  // ---------------------------------------------------------------------------
+
+  const transferHost = useCallback(
+    (userId: string) => {
+      const socket = socketRef.current;
+      if (!roomCode) return;
+      if (!socket || !socket.connected) {
+        setHostError("Not connected to the room yet");
+        return;
+      }
+      socket.emit(
+        "host:transfer",
+        { roomCode, userId },
+        (res: HostTransferAck) => {
+          setHostError(res?.ok ? null : (res?.message ?? "Could not transfer host"));
+        },
+      );
+    },
+    [roomCode],
+  );
+
+  const dismissHostNotice = useCallback(() => setHostNotice(null), []);
+
   return {
     presence,
     connectionStatus,
@@ -360,5 +428,11 @@ export function useRoomSocket(
     reorderQueue,
     clearQueue,
     advanceQueue,
+    hostUserId,
+    hostNotice,
+    dismissHostNotice,
+    hostPending,
+    hostError,
+    transferHost,
   };
 }
