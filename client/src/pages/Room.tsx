@@ -13,8 +13,6 @@ import { Card } from "../components/ui/Card";
 import { Avatar } from "../components/ui/Avatar";
 import type { RoomDTO } from "../services/types";
 
-const panelLabel = "text-xs font-semibold uppercase tracking-wider text-ink-faint";
-
 export function Room() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const { getToken } = useAuth();
