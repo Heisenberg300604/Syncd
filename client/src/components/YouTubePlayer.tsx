@@ -28,7 +28,7 @@ const stateLabels: Record<PlayerState, string> = {
 const DRIFT_TOLERANCE_SECONDS = 2;
 const DRIFT_CHECK_INTERVAL_MS = 5000;
 /** Ignore our own state changes for this long after applying a remote one. */
-const ECHO_SUPPRESSION_MS = 1000;
+const ECHO_SUPPRESSION_MS = 2000;
 
 /**
  * Derives the playhead at the instant the snapshot was produced.
@@ -63,29 +63,43 @@ export function YouTubePlayer({
   const handleLocalStateChange = useCallback(
     (state: PlayerState, at: number) => {
       if (!onControl) return;
+      if (!playback?.videoId) return;
       if (Date.now() < suppressEmitUntil.current) return;
       if (state === "playing") onControl("play", at);
       else if (state === "paused") onControl("pause", at);
     },
-    [onControl],
+    [onControl, playback?.videoId],
   );
 
   const player = useYouTubePlayer(containerRef, {
     onStateChange: handleLocalStateChange,
   });
 
-  const { ready, loadVideo, play, pause, seekTo, getCurrentTime } = player;
+  const {
+    ready,
+    loadVideo,
+    cueVideo,
+    play,
+    pause,
+    stopVideo,
+    seekTo,
+    getCurrentTime,
+  } = player;
   const videoId = playback?.videoId ?? null;
 
   // Apply the room's playback state to the local player.
   useEffect(() => {
-    if (!ready) return;
-
     if (!playback || !playback.videoId) {
-      appliedVideoId.current = null;
-      anchor.current = null;
+      if (appliedVideoId.current !== null) {
+        appliedVideoId.current = null;
+        anchor.current = null;
+        suppressEmitUntil.current = Date.now() + ECHO_SUPPRESSION_MS;
+        stopVideo();
+      }
       return;
     }
+
+    if (!ready) return;
 
     const target = positionAtSnapshot(playback);
     suppressEmitUntil.current = Date.now() + ECHO_SUPPRESSION_MS;
@@ -93,8 +107,13 @@ export function YouTubePlayer({
 
     if (appliedVideoId.current !== playback.videoId) {
       appliedVideoId.current = playback.videoId;
-      loadVideo(playback.videoId, target);
-      if (!playback.isPlaying) pause();
+      if (playback.isPlaying) {
+        loadVideo(playback.videoId, target);
+      } else {
+        // cueVideoById loads without auto-playing, avoiding the race where
+        // pause() fires before the player has buffered the new video.
+        cueVideo(playback.videoId, target);
+      }
       return;
     }
 
@@ -104,11 +123,27 @@ export function YouTubePlayer({
 
     if (playback.isPlaying) play();
     else pause();
-  }, [ready, playback, loadVideo, play, pause, seekTo, getCurrentTime]);
+  }, [
+    ready,
+    playback,
+    loadVideo,
+    cueVideo,
+    play,
+    pause,
+    stopVideo,
+    seekTo,
+    getCurrentTime,
+  ]);
 
   // Nudge the local playhead back in line if it drifts away from the room.
   useEffect(() => {
-    if (!ready || !playback?.isPlaying || player.state !== "playing") return;
+    if (
+      !ready ||
+      !playback?.isPlaying ||
+      !playback?.videoId ||
+      player.state !== "playing"
+    )
+      return;
 
     const interval = setInterval(() => {
       const current = anchor.current;
@@ -121,16 +156,27 @@ export function YouTubePlayer({
     }, DRIFT_CHECK_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [ready, playback?.isPlaying, player.state, getCurrentTime, seekTo]);
+  }, [ready, playback?.isPlaying, playback?.videoId, player.state, getCurrentTime, seekTo]);
 
   const duration = player.duration || playback?.duration || 0;
   const displayedTime = scrubbing ?? player.currentTime;
   const isPlaying = player.state === "playing";
   const controlsDisabled = !ready || !videoId || !onControl;
 
+  function handleClear() {
+    suppressEmitUntil.current = Date.now() + ECHO_SUPPRESSION_MS;
+    appliedVideoId.current = null;
+    anchor.current = null;
+    stopVideo();
+    onClear();
+  }
+
   function handleToggle() {
     if (!onControl) return;
     const at = getCurrentTime();
+    // Suppress the onStateChange echo that play()/pause() will trigger below,
+    // so only the single explicit onControl() call is emitted to the server.
+    suppressEmitUntil.current = Date.now() + ECHO_SUPPRESSION_MS;
     if (isPlaying) {
       pause();
       onControl("pause", at);
@@ -151,8 +197,8 @@ export function YouTubePlayer({
   const message = syncError ?? player.error;
 
   return (
-    <Card className="p-5 sm:p-6">
-      <div className="mb-4 flex items-center justify-between">
+    <Card className="p-4">
+      <div className="mb-3 flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-faint">
           Now playing
         </h2>
@@ -164,7 +210,7 @@ export function YouTubePlayer({
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {/*
           The container is always mounted. Rendering it only when a video is
           selected leaves the ref null when the player effect runs, and the
@@ -205,7 +251,7 @@ export function YouTubePlayer({
               <img
                 src={playback.thumbnailUrl}
                 alt=""
-                className="h-16 w-24 shrink-0 rounded-md bg-white/5 object-cover"
+                className="h-12 w-16 shrink-0 rounded-md bg-white/5 object-cover"
               />
             )}
             <div className="min-w-0 flex-1">
@@ -217,7 +263,7 @@ export function YouTubePlayer({
               </p>
             </div>
             <button
-              onClick={onClear}
+              onClick={handleClear}
               disabled={!onControl}
               className="shrink-0 text-xs text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
             >
@@ -227,18 +273,18 @@ export function YouTubePlayer({
         )}
 
         {videoId && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-3">
               <button
                 onClick={handleToggle}
                 disabled={controlsDisabled}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-accent-ink transition-colors hover:bg-accent-hi disabled:opacity-50 disabled:pointer-events-none"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent text-accent-ink transition-colors hover:bg-accent-hi disabled:opacity-50 disabled:pointer-events-none"
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? (
-                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+                  <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
                 ) : (
-                  <svg className="ml-0.5 h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  <svg className="ml-0.5 h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                 )}
               </button>
 
@@ -256,7 +302,20 @@ export function YouTubePlayer({
                 onChange={(e) => setScrubbing(Number(e.target.value))}
                 onMouseUp={(e) => commitSeek(Number(e.currentTarget.value))}
                 onTouchEnd={(e) => commitSeek(Number(e.currentTarget.value))}
-                onKeyUp={(e) => commitSeek(Number(e.currentTarget.value))}
+                onKeyUp={(e) => {
+                  // Only commit on keys that actually move the playhead.
+                  // This prevents arrow-key autorepeat from flooding the server
+                  // with seek events on every keyup.
+                  const key = e.key;
+                  if (
+                    key === "ArrowLeft" ||
+                    key === "ArrowRight" ||
+                    key === "Home" ||
+                    key === "End"
+                  ) {
+                    commitSeek(Number(e.currentTarget.value));
+                  }
+                }}
                 className="syncd-range flex-1"
                 aria-label="Seek"
               />

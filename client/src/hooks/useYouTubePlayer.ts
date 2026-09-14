@@ -78,9 +78,13 @@ export interface YouTubePlayerHandle {
   error: string | null;
   currentTime: number;
   duration: number;
+  /** Load and auto-play a video from the given start position. */
   loadVideo: (videoId: string, startSeconds?: number) => void;
+  /** Load a video in a paused/cued state without auto-playing. */
+  cueVideo: (videoId: string, startSeconds?: number) => void;
   play: () => void;
   pause: () => void;
+  stopVideo: () => void;
   seekTo: (seconds: number) => void;
   getCurrentTime: () => number;
 }
@@ -107,9 +111,11 @@ export function useYouTubePlayer(
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const pendingVideo = useRef<{ videoId: string; startSeconds: number } | null>(
-    null,
-  );
+  const pendingVideo = useRef<{
+    videoId: string;
+    startSeconds: number;
+    paused: boolean;
+  } | null>(null);
 
   const onStateChangeRef = useRef(options.onStateChange);
   useEffect(() => {
@@ -158,10 +164,17 @@ export function useYouTubePlayer(
               const pending = pendingVideo.current;
               if (pending) {
                 pendingVideo.current = null;
-                playerRef.current?.loadVideoById(
-                  pending.videoId,
-                  pending.startSeconds,
-                );
+                if (pending.paused) {
+                  playerRef.current?.cueVideoById(
+                    pending.videoId,
+                    pending.startSeconds,
+                  );
+                } else {
+                  playerRef.current?.loadVideoById(
+                    pending.videoId,
+                    pending.startSeconds,
+                  );
+                }
               }
             },
             onStateChange: (e: YT.OnStateChangeEvent) => {
@@ -216,6 +229,7 @@ export function useYouTubePlayer(
       disposed = true;
       setReady(false);
       try {
+        playerRef.current?.stopVideo();
         playerRef.current?.destroy();
       } catch {
         // The iframe may already be gone; nothing to clean up.
@@ -256,8 +270,32 @@ export function useYouTubePlayer(
     }
 
     // Player not constructed yet — onReady drains this.
-    pendingVideo.current = { videoId, startSeconds };
+    pendingVideo.current = { videoId, startSeconds, paused: false };
     setState("buffering");
+  }, []);
+
+  /**
+   * Like `loadVideo` but loads the video into a paused/cued state without
+   * auto-playing. Maps to `cueVideoById` in the YouTube IFrame API.
+   * Use this whenever the room's `isPlaying` is false on a fresh load so the
+   * video doesn't start playing before a `pause()` call can reach the player.
+   */
+  const cueVideo = useCallback((videoId: string, startSeconds = 0) => {
+    setError(null);
+    setCurrentTime(startSeconds);
+    setDuration(0);
+
+    const player = playerRef.current;
+    if (player) {
+      // cueVideoById puts the player in CUED state — no auto-play.
+      setState("idle");
+      player.cueVideoById(videoId, startSeconds);
+      return;
+    }
+
+    // Player not constructed yet — onReady drains this with paused: true.
+    pendingVideo.current = { videoId, startSeconds, paused: true };
+    setState("idle");
   }, []);
 
   const play = useCallback(() => {
@@ -270,6 +308,20 @@ export function useYouTubePlayer(
 
   const pause = useCallback(() => {
     try {
+      playerRef.current?.pauseVideo();
+    } catch {
+      // Ignore commands sent while the player is tearing down.
+    }
+  }, []);
+
+  const stopVideo = useCallback(() => {
+    pendingVideo.current = null;
+    setError(null);
+    setCurrentTime(0);
+    setDuration(0);
+    setState("idle");
+    try {
+      playerRef.current?.stopVideo();
       playerRef.current?.pauseVideo();
     } catch {
       // Ignore commands sent while the player is tearing down.
@@ -294,8 +346,10 @@ export function useYouTubePlayer(
     currentTime,
     duration,
     loadVideo,
+    cueVideo,
     play,
     pause,
+    stopVideo,
     seekTo,
     getCurrentTime,
   };
