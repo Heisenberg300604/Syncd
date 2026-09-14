@@ -1,10 +1,10 @@
 # SyncD — Current State
 
-Last updated: 2026-08-29
+Last updated: 2026-09-14
 
 ## Current Phase
 
-Phase 7 — Real-Time Chat + Room UI Refinement
+Phase 8 — Queue
 
 Status: COMPLETE
 
@@ -152,6 +152,41 @@ Status: COMPLETE
   creation response, instead of relying on a second `/me` round trip that
   could race the redirect to `/home`
 
+### Queue (Phase 8)
+
+- In-memory per-room queue (`queueStore.ts`), keyed by room code — same
+  ephemeral pattern as `presenceStore`; no schema migration required
+- `QueueItem` shape: `{ videoId, title, thumbnailUrl, duration }` — same
+  fields as `PlaybackTrackInput`
+- Queue capacity capped at 50 items server-side
+- Socket.IO events following the existing `domain:action` convention:
+  - `queue:add` (host) — appends a track; broadcasts `queue:update`
+  - `queue:remove` (host) — removes item at index; broadcasts `queue:update`
+  - `queue:reorder` (host) — moves item fromIndex to toIndex; broadcasts `queue:update`
+  - `queue:advance` (host) — pops the front item, calls `setRoomTrack`; if
+    empty calls `clearRoomTrack`; broadcasts `playback:update` + `queue:update`
+  - `queue:clear` (host) — empties the queue; broadcasts `queue:update`
+  - `queue:update` (broadcast) — authoritative queue snapshot for all members
+- `playback:clear` now also calls `queueStore.clearQueue` as a side-effect,
+  so stopping playback atomically empties the queue
+- Queue snapshot included in the `room:join` ack alongside presence, playback,
+  and messages — late joiners and reconnects receive the full queue immediately
+- Host-only authorization enforced server-side (`assertHost`) for all
+  mutating queue events; the frontend hides controls for non-hosts as a UX
+  nicety, not the security boundary
+- Auto-advance: the host's YouTube player detects the `ended` state and emits
+  `queue:advance`; the server broadcasts the next track via `playback:update`
+  — no server-side polling needed
+- `onEnded` callback in `YouTubePlayer` fires unconditionally before echo-
+  suppression and `onControl` guards, preventing queue stall during the 2s
+  echo-suppression window or while the host socket reconnects
+- `QueuePanel` component: numbered list with thumbnail, title, duration, and
+  "Up next" label; host-only drag-to-reorder (HTML5 DnD), arrow-button
+  fallback, per-item remove, Skip, and Clear all
+- `MusicSearch` extended with `canQueue`/`onQueue` props: when a track is
+  already playing, results show "Play now" and "+ Queue" buttons instead of
+  the default single-click play
+
 ---
 
 ## Important Architecture Decisions
@@ -238,7 +273,6 @@ joined after the page loaded never appeared until a manual refresh.
 
 ## Not Started
 
-- Queue implementation
 - Security hardening
 - UI polish
 - Deployment
@@ -257,6 +291,11 @@ joined after the page loaded never appeared until a manual refresh.
   PostgreSQL)
 - No typing indicators, reactions, edits, or deletion — out of scope for this
   MVP by design
+- Queue is in-memory only; it does not survive a server restart — all queued
+  tracks are lost if the server process restarts
+- Only the host's client triggers `queue:advance`; if the host's tab is closed
+  mid-track the queue will not auto-advance until the host reconnects
+- No member voting, suggestion system, or queue visibility controls yet
 
 ---
 

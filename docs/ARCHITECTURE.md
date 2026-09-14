@@ -77,10 +77,11 @@ SyncD/
 
 1. **Server-Authoritative State:** The `Room` row in PostgreSQL is the single source of truth for playback (`isPlaying`, `playbackPosition`, `playbackUpdatedAt`). Clients never dictate state directly to peers.
 2. **Zero-Trust Client Identity:** Identity and roles are cryptographically derived from Clerk JWTs on every REST request and socket handshake. Client-sent `userId` or host flags are ignored.
-3. **Host-Only Playback Control:** Only `room.hostUserId` may mutate playback (`playback:set`, `playback:control`, `playback:clear`). Enforced server-side via `assertHost`.
+3. **Host-Only Playback & Queue Control:** Only `room.hostUserId` may mutate playback (`playback:set`, `playback:control`, `playback:clear`) or the queue (`queue:add`, `queue:remove`, `queue:reorder`, `queue:advance`, `queue:clear`). Enforced server-side via `assertHost`.
 4. **Ephemerality vs. Persistence:**
    - **PostgreSQL / Prisma:** Persistent records (`User`, `Room`, `RoomMember`, `Message`).
    - **Socket.IO Memory (`PresenceStore`):** Live connections and multi-tab socket sets. Online/offline state is never written to PostgreSQL.
+   - **Socket.IO Memory (`QueueStore`):** Per-room ordered queue. Ephemeral by design — cleared on server restart. No schema change required.
 5. **Session Cache:** `/me` is fetched once per session via `CurrentUserProvider`, never refetched on each route guard.
 
 ---
@@ -104,6 +105,18 @@ Tracked in-memory via `Map<roomCode, RoomPresence>`:
 - `socketsByUserId: Map<userId, Set<socketId>>` handles multi-tab browsing without duplicate presence entries.
 - User is online if their socket set `size > 0`.
 - Handshake carries Clerk JWT; `room:join` validates DB membership before admitting socket into `room:<roomCode>`.
+
+---
+
+## 5.5. Queue (`QueueStore`)
+
+Tracked in-memory via `Map<roomCode, QueueItem[]>`, following the same ephemeral pattern as `PresenceStore`:
+- Each `QueueItem` carries `{ videoId, title, thumbnailUrl, duration }` — the same shape as a `PlaybackTrackInput`.
+- Maximum 50 items per room (enforced in `enqueue`).
+- Queue state survives host socket reconnects (store is keyed by `roomCode`, not `socketId`).
+- Queue is cleared when `playback:clear` fires (atomic with stopping the player) or when `queue:clear` / `queue:advance` (empty) is received.
+- Full queue snapshot is included in the `room:join` ack, so late joiners receive it in the same round-trip as presence, playback, and chat history.
+- **Auto-advance flow:** host client detects `ended` state → emits `queue:advance` → server calls `setRoomTrack` (or `clearRoomTrack`) → broadcasts `playback:update` + `queue:update` to the room.
 
 ---
 
@@ -165,11 +178,17 @@ erDiagram
 
 | Event | Direction | Scope / Auth | Description |
 | :--- | :--- | :--- | :--- |
-| `room:join` | Client $\to$ Server | Member | Joins room channel. Ack returns presence, playback, & last 50 messages. |
+| `room:join` | Client $\to$ Server | Member | Joins room channel. Ack returns presence, playback, last 50 messages, **and queue snapshot**. |
 | `presence:update` | Server $\to$ Room | Broadcast | Renders live member roster. |
 | `playback:set` | Client $\to$ Server | Host Only | Sets new track, persists to DB, broadcasts update. |
 | `playback:control` | Client $\to$ Server | Host Only | Play/pause/seek, persists to DB, broadcasts update. |
-| `playback:clear` | Client $\to$ Server | Host Only | Clears current track, persists to DB, broadcasts update. |
+| `playback:clear` | Client $\to$ Server | Host Only | Clears current track **and queue**, persists to DB, broadcasts update. |
 | `playback:update` | Server $\to$ Room | Broadcast | Authoritative playhead & state snapshot. |
 | `chat:send` | Client $\to$ Server | Member | Validates (max 500 chars), persists to DB, broadcasts. |
 | `chat:new` | Server $\to$ Room | Broadcast | New message delivery. |
+| `queue:add` | Client $\to$ Server | Host Only | Appends a track to the in-memory queue; broadcasts `queue:update`. |
+| `queue:remove` | Client $\to$ Server | Host Only | Removes item at index; broadcasts `queue:update`. |
+| `queue:reorder` | Client $\to$ Server | Host Only | Moves item fromIndex → toIndex; broadcasts `queue:update`. |
+| `queue:advance` | Client $\to$ Server | Host Only | Pops front item, sets as current track (or clears if empty); broadcasts `playback:update` + `queue:update`. |
+| `queue:clear` | Client $\to$ Server | Host Only | Empties the queue; broadcasts `queue:update`. |
+| `queue:update` | Server $\to$ Room | Broadcast | Authoritative ordered queue snapshot. |

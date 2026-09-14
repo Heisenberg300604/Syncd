@@ -42,6 +42,17 @@ import type {
   RoomJoinPayload,
   RoomJoinResponse,
 } from "./presence.types.js";
+import { queueStore } from "./queueStore.js";
+import type {
+  QueueAck,
+  QueueAddPayload,
+  QueueAdvancePayload,
+  QueueClearPayload,
+  QueueItem,
+  QueueRemovePayload,
+  QueueReorderPayload,
+  QueueSnapshot,
+} from "./queue.types.js";
 import { logger } from "../utils/logger.js";
 
 const ROOM_PREFIX = "room:";
@@ -143,6 +154,55 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       },
     );
 
+    // -----------------------------------------------------------------------
+    // Queue events — host-only mutations, all members receive queue:update
+    // -----------------------------------------------------------------------
+
+    socket.on(
+      "queue:add",
+      (payload: QueueAddPayload, ack?: (res: QueueAck) => void) => {
+        handleQueueAdd(io, user, payload, joinedRooms)
+          .then((queue) => ack?.({ ok: true, queue }))
+          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+      },
+    );
+
+    socket.on(
+      "queue:remove",
+      (payload: QueueRemovePayload, ack?: (res: QueueAck) => void) => {
+        handleQueueRemove(io, user, payload, joinedRooms)
+          .then((queue) => ack?.({ ok: true, queue }))
+          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+      },
+    );
+
+    socket.on(
+      "queue:reorder",
+      (payload: QueueReorderPayload, ack?: (res: QueueAck) => void) => {
+        handleQueueReorder(io, user, payload, joinedRooms)
+          .then((queue) => ack?.({ ok: true, queue }))
+          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+      },
+    );
+
+    socket.on(
+      "queue:advance",
+      (payload: QueueAdvancePayload, ack?: (res: QueueAck) => void) => {
+        handleQueueAdvance(io, user, payload, joinedRooms)
+          .then((queue) => ack?.({ ok: true, queue }))
+          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+      },
+    );
+
+    socket.on(
+      "queue:clear",
+      (payload: QueueClearPayload, ack?: (res: QueueAck) => void) => {
+        handleQueueClear(io, user, payload, joinedRooms)
+          .then((queue) => ack?.({ ok: true, queue }))
+          .catch((err) => ack?.({ ok: false, message: messageOf(err) }));
+      },
+    );
+
     socket.on(
       "chat:send",
       (payload: ChatSendPayload, ack?: (res: ChatSendAck) => void) => {
@@ -239,8 +299,9 @@ async function handleRoomJoin(
   const presence = presenceStore.getSnapshot(roomCode, roomData.members);
   const playback = await getRoomPlayback(roomCode);
   const messages = await getRecentMessages(roomData.roomId);
+  const queue = queueStore.getQueue(roomCode);
 
-  ack({ ok: true, presence, messages, ...(playback ? { playback } : {}) });
+  ack({ ok: true, presence, messages, queue, ...(playback ? { playback } : {}) });
 
   if (wasNewUser) {
     broadcastPresence(io, roomCode);
@@ -370,7 +431,11 @@ async function handlePlaybackClear(
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id);
   const playback = await clearRoomTrack(roomCode, user.id);
+  // Clearing the track also empties the queue — no point keeping queued
+  // items when the host explicitly stops playback.
+  const emptyQueue = queueStore.clearQueue(roomCode);
   broadcastPlayback(io, roomCode, playback);
+  broadcastQueue(io, roomCode, emptyQueue);
   return playback;
 }
 
@@ -380,6 +445,129 @@ function broadcastPlayback(
   playback: PlaybackSnapshot,
 ): void {
   io.to(roomName(roomCode)).emit("playback:update", playback);
+}
+
+function broadcastQueue(
+  io: SocketIOServer,
+  roomCode: string,
+  queue: QueueSnapshot,
+): void {
+  io.to(roomName(roomCode)).emit("queue:update", queue);
+}
+
+// ---------------------------------------------------------------------------
+// Queue handlers
+// ---------------------------------------------------------------------------
+
+async function handleQueueAdd(
+  io: SocketIOServer,
+  user: { id: string; username: string },
+  payload: QueueAddPayload,
+  joinedRooms: Map<string, string>,
+): Promise<QueueSnapshot> {
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  await assertHost(roomCode, user.id);
+
+  const track = payload?.track;
+  if (
+    typeof track !== "object" ||
+    track === null ||
+    typeof (track as QueueItem).videoId !== "string" ||
+    (track as QueueItem).videoId.trim() === ""
+  ) {
+    throw new Error("Invalid track payload");
+  }
+
+  const item: QueueItem = {
+    videoId: String((track as QueueItem).videoId).slice(0, 20),
+    title: String((track as QueueItem).title ?? "").slice(0, 300),
+    thumbnailUrl: String((track as QueueItem).thumbnailUrl ?? "").slice(0, 500),
+    duration: String((track as QueueItem).duration ?? "").slice(0, 20),
+  };
+
+  const queue = queueStore.enqueue(roomCode, item);
+  logger.info(`${user.username} queued ${item.videoId} in ${roomCode}`);
+  broadcastQueue(io, roomCode, queue);
+  return queue;
+}
+
+async function handleQueueRemove(
+  io: SocketIOServer,
+  user: { id: string; username: string },
+  payload: QueueRemovePayload,
+  joinedRooms: Map<string, string>,
+): Promise<QueueSnapshot> {
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  await assertHost(roomCode, user.id);
+
+  const index = Number(payload?.index);
+  const queue = queueStore.remove(roomCode, index);
+  broadcastQueue(io, roomCode, queue);
+  return queue;
+}
+
+async function handleQueueReorder(
+  io: SocketIOServer,
+  user: { id: string; username: string },
+  payload: QueueReorderPayload,
+  joinedRooms: Map<string, string>,
+): Promise<QueueSnapshot> {
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  await assertHost(roomCode, user.id);
+
+  const fromIndex = Number(payload?.fromIndex);
+  const toIndex = Number(payload?.toIndex);
+  const queue = queueStore.reorder(roomCode, fromIndex, toIndex);
+  broadcastQueue(io, roomCode, queue);
+  return queue;
+}
+
+/**
+ * Host client detected that the current track ended (or explicitly skipped).
+ * Pop the next item from the queue and set it as the room's current track.
+ * If the queue is empty, clear playback.
+ */
+async function handleQueueAdvance(
+  io: SocketIOServer,
+  user: { id: string; username: string },
+  payload: QueueAdvancePayload,
+  joinedRooms: Map<string, string>,
+): Promise<QueueSnapshot> {
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  await assertHost(roomCode, user.id);
+
+  const next = queueStore.dequeue(roomCode);
+  const queue = queueStore.getQueue(roomCode);
+
+  if (next) {
+    const playback = await setRoomTrack(roomCode, user.id, next);
+    logger.info(
+      `${user.username} advanced queue → ${next.videoId} in ${roomCode}`,
+    );
+    broadcastPlayback(io, roomCode, playback);
+  } else {
+    // Queue exhausted — stop playback.
+    const playback = await clearRoomTrack(roomCode, user.id);
+    logger.info(`${user.username} queue exhausted in ${roomCode}`);
+    broadcastPlayback(io, roomCode, playback);
+  }
+
+  broadcastQueue(io, roomCode, queue);
+  return queue;
+}
+
+async function handleQueueClear(
+  io: SocketIOServer,
+  user: { id: string; username: string },
+  payload: QueueClearPayload,
+  joinedRooms: Map<string, string>,
+): Promise<QueueSnapshot> {
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  await assertHost(roomCode, user.id);
+
+  const queue = queueStore.clearQueue(roomCode);
+  broadcastQueue(io, roomCode, queue);
+  return queue;
 }
 
 /**

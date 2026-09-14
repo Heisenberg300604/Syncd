@@ -7,6 +7,7 @@ import { useCurrentUser } from "../hooks/useCurrentUser";
 import { MusicSearch } from "../components/MusicSearch";
 import { YouTubePlayer } from "../components/YouTubePlayer";
 import { ChatPanel } from "../components/ChatPanel";
+import { QueuePanel } from "../components/QueuePanel";
 import { AppHeader } from "../components/ui/AppHeader";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
@@ -64,6 +65,12 @@ export function Room() {
     chatError,
     chatSending,
     sendChatMessage,
+    queue,
+    addToQueue,
+    removeFromQueue,
+    reorderQueue,
+    clearQueue,
+    advanceQueue,
   } = useRoomSocket(
     room ? room.roomCode : null,
     room ? room.members : [],
@@ -160,7 +167,16 @@ export function Room() {
               playback={playback}
               onControl={canControlPlayback ? sendControl : null}
               onClear={clearTrack}
+              onEnded={isHost ? advanceQueue : undefined}
               syncError={playbackError}
+            />
+            <QueuePanel
+              queue={queue}
+              isHost={isHost}
+              onRemove={removeFromQueue}
+              onReorder={reorderQueue}
+              onClear={clearQueue}
+              onSkip={advanceQueue}
             />
           </div>
 
@@ -274,6 +290,8 @@ export function Room() {
             <MusicSearch
               onSelect={setTrack}
               disabled={!canControlPlayback}
+              canQueue={canControlPlayback && !!playback?.videoId}
+              onQueue={addToQueue}
               disabledMessage={
                 !socketReady
                   ? "Connecting to the room — playback controls will be available in a moment."

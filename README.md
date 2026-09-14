@@ -27,7 +27,8 @@
   <b>⚡ Server-Authoritative Playback</b> &nbsp;•&nbsp;
   <b>🔄 Dynamic Drift Correction (&lt; 2s)</b> &nbsp;•&nbsp;
   <b>🛡️ Host-Guarded Governance</b> &nbsp;•&nbsp;
-  <b>💬 Ephemeral Presence &amp; Real-Time Chat</b>
+  <b>💬 Ephemeral Presence &amp; Real-Time Chat</b> &nbsp;•&nbsp;
+  <b>🎶 Shared Playback Queue</b>
 </p>
 
 <p align="center">
@@ -138,6 +139,20 @@ SyncD organizes the collaborative listening experience across dedicated full-sta
 
 </td>
 </tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🎶 7. Shared Playback Queue
+* **In-Memory Per-Room Queue:** Ephemeral `QueueStore` (same pattern as `PresenceStore`) — no schema migration required, capped at 50 items per room.
+* **Drag-to-Reorder & Controls:** Host-only `QueuePanel` with thumbnail list, drag-and-drop reorder (HTML5 DnD), arrow-button fallback, per-item remove, Skip, and Clear all.
+* **Smart Search Integration:** When a track is already playing, `MusicSearch` shows dual **Play now** / **+ Queue** buttons instead of the default single-click play.
+* **Auto-Advance:** When the host's player reaches the `ended` state it emits `queue:advance`; the server pops the front item and broadcasts the next track to all members via the standard `playback:update` path — no polling needed.
+
+</td>
+<td width="50%" valign="top">
+
+</td>
+</tr>
 </table>
 
 <br/>
@@ -156,11 +171,17 @@ SyncD utilizes Socket.IO over WebSockets with Clerk JWT handshake verification. 
 | `room:leave` | Client → Server | Joined Socket | Leaves current room channel | `{ roomCode: string }` |
 | `playback:set` | Client → Server | **Host Only** | Loads a new track and initiates playback | `{ roomCode: string, track: TrackPayload }` |
 | `playback:control` | Client → Server | **Host Only** | Dispatches `play`, `pause`, or `seek` | `{ roomCode: string, action: string, position: number }` |
-| `playback:clear` | Client → Server | **Host Only** | Clears the active track from the room | `{ roomCode: string }` |
+| `playback:clear` | Client → Server | **Host Only** | Clears the active track **and queue** | `{ roomCode: string }` |
 | `chat:send` | Client → Server | Verified Member | Sends a room chat message (max 500 chars) | `{ roomCode: string, content: string }` |
+| `queue:add` | Client → Server | **Host Only** | Appends a track to the in-memory queue | `{ roomCode: string, track: TrackPayload }` |
+| `queue:remove` | Client → Server | **Host Only** | Removes item at the given index | `{ roomCode: string, index: number }` |
+| `queue:reorder` | Client → Server | **Host Only** | Moves item from one index to another | `{ roomCode: string, fromIndex: number, toIndex: number }` |
+| `queue:advance` | Client → Server | **Host Only** | Pops front item and plays it (or clears if empty) | `{ roomCode: string }` |
+| `queue:clear` | Client → Server | **Host Only** | Empties the entire queue | `{ roomCode: string }` |
 | `playback:update` | Server → Room | Room Channel | Broadcasts updated server-authoritative playback | `PlaybackSnapshot` |
 | `presence:update` | Server → Room | Room Channel | Broadcasts online/offline member list | `PresenceSnapshot` |
 | `chat:new` | Server → Room | Room Channel | Broadcasts newly persisted chat message | `ChatMessageDTO` |
+| `queue:update` | Server → Room | Room Channel | Broadcasts authoritative ordered queue snapshot | `QueueItem[]` |
 
 <br/>
 
@@ -190,6 +211,13 @@ interface RoomJoinResponse {
     username: string;
     content: string;
     createdAt: string;
+  }>;
+  // Phase 8 — in-memory queue snapshot
+  queue?: Array<{
+    videoId: string;
+    title: string;
+    thumbnailUrl: string;
+    duration: string; // ISO 8601, e.g. "PT3M45S"
   }>;
   message?: string;
 }
@@ -231,6 +259,7 @@ graph TB
         PLAYBACK_SVC["Playback Service (Host Authoritative Engine)"]
         MSG_SVC["Messages Service (Chat Persistence)"]
         PRESENCE_STORE["In-Memory Ephemeral Presence Store"]
+        QUEUE_STORE["In-Memory Ephemeral Queue Store"]
     end
 
     subgraph DataLayer ["Persistence & External Services"]
@@ -264,6 +293,7 @@ graph TB
     SOCKET_SERVER --> PLAYBACK_SVC
     SOCKET_SERVER --> MSG_SVC
     SOCKET_SERVER --> PRESENCE_STORE
+    SOCKET_SERVER --> QUEUE_STORE
 
     USERS_MOD --> PRISMA
     ROOMS_MOD --> PRISMA
@@ -334,9 +364,10 @@ sequenceDiagram
     Socket->>DB: Verify membership in RoomMember table
     Socket->>Presence: addSocket(roomCode, userId, socketId)
     Socket->>DB: Fetch Room Playback & Top 50 Messages
-    Socket-->>Client: ack({ ok: true, presence, playback, messages })
+    Socket->>Socket: Load Queue Snapshot from QueueStore
+    Socket-->>Client: ack({ ok: true, presence, playback, messages, queue })
     Socket->>Socket: broadcast("presence:update") to other members
-    Client->>Client: Hydrate Player, Render Chat & Mark Host Online
+    Client->>Client: Hydrate Player, Render Chat, Queue & Mark Host Online
 ```
 
 <br/>
@@ -592,6 +623,7 @@ Syncd/
 │   │   │   ├── 📄 ChatPanel.tsx       # Live room chat panel with auto-scroll management
 │   │   │   ├── 📄 MusicSearch.tsx     # YouTube search query input & video link resolver
 │   │   │   ├── 📄 ProtectedRoute.tsx  # Auth & Onboarding route guards
+│   │   │   ├── 📄 QueuePanel.tsx      # Host queue list: thumbnails, drag-reorder & controls
 │   │   │   └── 📄 YouTubePlayer.tsx   # Synchronized YouTube iframe container
 │   │   ├── 📁 config/                 # Environment configuration loader
 │   │   │   └── 📄 env.ts              # API & Socket URL configurations
@@ -636,8 +668,10 @@ Syncd/
 │   │   │   └── 📄 index.ts            # Mounts /api routes
 │   │   ├── 📁 sockets/                # Real-time WebSocket handlers
 │   │   │   ├── 📄 index.ts            # Socket.IO server, JWT middleware & event dispatchers
-│   │   │   ├── 📄 presence.types.ts   # Real-time presence type declarations
-│   │   │   └── 📄 presenceStore.ts    # In-memory ephemeral socket presence store
+│   │   │   ├── 📄 presence.types.ts   # Real-time presence & join-ack type declarations
+│   │   │   ├── 📄 presenceStore.ts    # In-memory ephemeral socket presence store
+│   │   │   ├── 📄 queue.types.ts      # Queue item, snapshot & event payload types
+│   │   │   └── 📄 queueStore.ts       # In-memory ephemeral per-room queue store
 │   │   ├── 📁 utils/                  # Shared backend utilities
 │   │   │   ├── 📄 logger.ts           # Structured logging utility
 │   │   │   └── 📄 roomCode.ts         # 6-character room code generator
@@ -691,9 +725,12 @@ Syncd/
   - [x] Chat history delivery bundled into the initial `room:join` socket ack
   - [x] Responsive two-column lounge layout (left: video/controls, right: presence/chat)
   - [x] Independent chat scrolling with "↓ New messages" pill for unread messages
-- [ ] **Phase 8: Shared Media Queue**
-  - [ ] Upvote-based collaborative queueing system
-  - [ ] Automatic track advancement when the active video ends
+- [x] **Phase 8: Shared Media Queue**
+  - [x] In-memory per-room queue with 50-item cap (no schema change)
+  - [x] Host-only queue operations: add, remove, reorder (drag & drop), skip, clear
+  - [x] Automatic track advancement when the active video ends
+  - [x] Queue snapshot bundled into the `room:join` ack for instant late-joiner sync
+  - [x] Dual **Play now** / **+ Queue** buttons in search results when a track is playing
 - [ ] **Phase 9: Host Transfer & Collaborative DJ Mode**
   - [ ] Host relinquishment / reassignment upon host disconnect
   - [ ] Free-for-all listening mode where any member can control playback
@@ -706,6 +743,20 @@ Syncd/
 ---
 
 ## 🚀 Recent Updates
+
+### 🎶 Phase 8 Complete — Shared Playback Queue
+* **🗂️ In-Memory Queue Store:**
+  * Implemented `QueueStore` using the same ephemeral `Map<roomCode, QueueItem[]>` pattern as `PresenceStore` — no database schema change required.
+  * Queue is capped at **50 items per room** and cleared automatically when `playback:clear` fires.
+  * Full queue snapshot bundled into the `room:join` ack — late joiners and reconnects receive it in the same round-trip as presence, playback, and chat history.
+* **🎛️ Host Queue Controls:**
+  * Five new host-only socket events: `queue:add`, `queue:remove`, `queue:reorder`, `queue:advance`, `queue:clear` — all enforced server-side via `assertHost`.
+  * New `QueuePanel` component: numbered thumbnail list, drag-to-reorder (HTML5 DnD), arrow-button fallback, per-item remove, Skip to next, and Clear all.
+  * `MusicSearch` now shows dual **Play now** / **+ Queue** buttons when a track is already playing.
+* **⏭️ Auto-Advance:**
+  * When the host's YouTube player fires the `ended` event it emits `queue:advance` to the server.
+  * The server pops the front queue item, calls `setRoomTrack` (or `clearRoomTrack` if empty), and broadcasts `playback:update` + `queue:update` to the whole room — no polling, no client-side timers.
+  * The `onEnded` callback fires unconditionally before echo-suppression guards, preventing queue stall during reconnects.
 
 ### 🌟 Phase 7 Complete — Real-Time Chat & Room UI Refinement
 * **💬 Integrated Room Chat Engine:**
