@@ -1,5 +1,6 @@
 import { Section, SectionHeading } from "./Section";
 import { ScrollReveal, ParallaxImage } from "../ui/ScrollReveal";
+import { SplitFlapText } from "../ui/SplitFlapText";
 
 const steps = [
   {
@@ -77,8 +78,13 @@ export function HowItWorks() {
               {step.description}
             </p>
             {step.code && (
-              <div className="mt-4 rounded-md border border-line bg-surface/80 px-4 py-2 font-mono text-sm tracking-[0.2em] text-accent backdrop-blur-md">
-                {step.code}
+              <div className="mt-5 flex flex-col items-center gap-1.5">
+                <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-ink-faint">
+                  Room code
+                </span>
+                <div className="flex items-center gap-[2px] rounded-md border border-white/10 bg-[#0c0a08] px-3 py-2 ring-1 ring-black/40">
+                  <SplitFlapText text={step.code} />
+                </div>
               </div>
             )}
           </ScrollReveal>

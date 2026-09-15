@@ -1,3 +1,4 @@
+import { useAlbumArt } from "../../hooks/useAlbumArt";
 import { Section } from "./Section";
 import { Card } from "../ui/Card";
 import { Avatar } from "../ui/Avatar";
@@ -12,6 +13,7 @@ const devices = [
 ];
 
 export function SyncDifferentiator() {
+  const art = useAlbumArt("Midnight City", "M83");
   return (
     <Section id="sync-differentiator" raised>
       <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
@@ -42,7 +44,16 @@ export function SyncDifferentiator() {
               {/* Shared track */}
               <div className="text-center">
                 <div className="relative mx-auto grid h-20 w-20 place-items-center overflow-hidden rounded-lg bg-[linear-gradient(160deg,#4a2a1c,#241228)]">
-                  <EqualizerBars className="h-6" />
+                  {art ? (
+                    <img
+                      src={art}
+                      alt="Midnight City – M83 album art"
+                      className="h-full w-full object-cover"
+                      draggable={false}
+                    />
+                  ) : (
+                    <EqualizerBars className="h-6" />
+                  )}
                 </div>
                 <p className="mt-3 text-sm font-medium text-ink">
                   Midnight City — M83

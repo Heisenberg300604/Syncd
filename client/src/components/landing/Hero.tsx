@@ -2,6 +2,8 @@ import { Button } from "../ui/Button";
 import { Avatar } from "../ui/Avatar";
 import { EqualizerBars } from "../ui/EqualizerBars";
 import { ScrollReveal, ParallaxImage } from "../ui/ScrollReveal";
+import { useAlbumArt } from "../../hooks/useAlbumArt";
+import { MagneticButton } from "../ui/MagneticButton";
 
 /* -------------------------------------------------------------------------- */
 /*  Data                                                                       */
@@ -118,7 +120,22 @@ function ListenerNode({ name, city }: { name: string; city: string }) {
 /*  Music player                                                               */
 /* -------------------------------------------------------------------------- */
 
-function AlbumArt() {
+/** Fetches real cover art from the iTunes Search API (no API key required). */
+function AlbumArt({ src }: { src: string | null }) {
+  if (src) {
+    return (
+      <div className="relative aspect-square w-24 shrink-0 overflow-hidden rounded-md ring-1 ring-line-strong sm:w-28">
+        <img
+          src={src}
+          alt="Midnight City – M83 album art"
+          className="h-full w-full object-cover"
+          draggable={false}
+        />
+      </div>
+    );
+  }
+
+  // Fallback gradient while loading or if fetch fails
   return (
     <div className="relative aspect-square w-24 shrink-0 overflow-hidden rounded-md ring-1 ring-line-strong sm:w-28">
       <div className="absolute inset-0 bg-[linear-gradient(160deg,#4a2a1c_0%,#241228_45%,#0a0908_100%)]" />
@@ -131,7 +148,17 @@ function AlbumArt() {
   );
 }
 
+const TRACK = {
+  title: "Midnight City",
+  artist: "M83",
+  album: "Hurry Up, We're Dreaming",
+  duration: "4:03",
+  elapsed: "1:42",
+};
+
 function MusicPlayerCard() {
+  const artUrl = useAlbumArt(TRACK.title, TRACK.artist);
+
   return (
     <div className="relative w-full max-w-[380px] rounded-xl border border-line-strong bg-surface/85 p-5 shadow-lg backdrop-blur-xl">
       <div className="flex items-center justify-between">
@@ -149,11 +176,11 @@ function MusicPlayerCard() {
       </div>
 
       <div className="mt-4 flex items-start gap-4">
-        <AlbumArt />
+        <AlbumArt src={artUrl} />
         <div className="min-w-0 flex-1 pt-1">
-          <h3 className="truncate text-[15px] font-semibold text-ink">Midnight City</h3>
+          <h3 className="truncate text-[15px] font-semibold text-ink">{TRACK.title}</h3>
           <p className="mt-0.5 truncate text-xs text-ink-muted">
-            M83 · Hurry Up, We're Dreaming
+            {TRACK.artist} · {TRACK.album}
           </p>
 
           <div className="mt-3 flex h-9 items-center gap-[2px]">
@@ -168,8 +195,8 @@ function MusicPlayerCard() {
             ))}
           </div>
           <div className="mt-1.5 flex justify-between font-mono text-[10px] text-ink-faint">
-            <span>1:42</span>
-            <span>4:03</span>
+            <span>{TRACK.elapsed}</span>
+            <span>{TRACK.duration}</span>
           </div>
         </div>
       </div>
@@ -295,21 +322,23 @@ export function Hero() {
 
           <ScrollReveal animation="fade-up" distance={18} duration={850} delay={300}>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button to="/enter" size="lg" variant="light" pill glow className="group">
-                <svg
-                  className="h-4 w-4 text-canvas"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.4}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                Create a room
-              </Button>
+              <MagneticButton>
+                <Button to="/enter" size="lg" variant="light" pill glow className="group">
+                  <svg
+                    className="h-4 w-4 text-canvas"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.4}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Create a room
+                </Button>
+              </MagneticButton>
               <Button to="/enter" size="lg" variant="secondary" pill className="group">
                 <svg
                   className="h-4 w-4 text-accent transition-transform duration-200 group-hover:scale-110"
@@ -439,6 +468,29 @@ export function Hero() {
             {f.label}
           </div>
         ))}
+      </div>
+      {/* Scroll indicator — bottom centre */}
+      <div
+        className="pointer-events-none absolute bottom-7 left-1/2 hidden -translate-x-1/2 flex-col items-center gap-1.5 sm:flex"
+        aria-hidden="true"
+        style={{ animation: "syncd-scroll-cue 0.7s ease both 1.6s" }}
+      >
+        <span className="text-[9px] font-semibold uppercase tracking-[0.22em] text-ink-faint">
+          Scroll
+        </span>
+        {/* Bouncing chevron */}
+        <svg
+          className="h-4 w-4 text-ink-faint"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ animation: "syncd-scroll-bounce 1.4s ease-in-out infinite" }}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </div>
     </section>
   );
