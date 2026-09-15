@@ -9,3 +9,5 @@ build/
 .env
 .env.*
 !.env.example
+.agent
+sli.md

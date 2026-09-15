@@ -54,10 +54,6 @@ export function FinalCTA() {
               </div>
             </div>
 
-            <div className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-4 py-1.5 text-sm text-ink-muted backdrop-blur-md">
-              <span className="h-1.5 w-1.5 rounded-full bg-online" />
-              Ready to listen together?
-            </div>
 
             <h2 className="mt-8 text-balance text-3xl font-bold leading-tight tracking-tight text-ink sm:text-4xl lg:text-5xl drop-shadow-[0_2px_14px_rgba(0,0,0,0.9)]">
               Create a room, invite your people, press play.

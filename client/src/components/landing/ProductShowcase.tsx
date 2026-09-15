@@ -1,3 +1,4 @@
+import { useAlbumArt } from "../../hooks/useAlbumArt";
 import { Section, SectionHeading } from "./Section";
 import { Card } from "../ui/Card";
 import { Avatar } from "../ui/Avatar";
@@ -36,6 +37,44 @@ const chatMessages = [
 
 const sectionLabel =
   "text-xs font-semibold uppercase tracking-wider text-ink-faint";
+
+/** Small square album thumbnail used in the queue list. */
+function QueueThumb({ title, artist }: { title: string; artist: string }) {
+  const art = useAlbumArt(title, artist);
+  return (
+    <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md">
+      {art ? (
+        <img src={art} alt={`${title} cover`} className="h-full w-full object-cover" draggable={false} />
+      ) : (
+        <div className="h-full w-full bg-[linear-gradient(150deg,#2a2420,#12100e)]" />
+      )}
+    </div>
+  );
+}
+
+/** Large album art for the now-playing card. */
+function NowPlayingArt({ title, artist }: { title: string; artist: string }) {
+  const art = useAlbumArt(title, artist);
+  return (
+    <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-md sm:h-36 sm:w-36">
+      {art ? (
+        <img src={art} alt={`${title} cover`} className="h-full w-full object-cover" draggable={false} />
+      ) : (
+        <>
+          <div className="absolute inset-0 bg-[linear-gradient(160deg,#4a2a1c_0%,#241228_50%,#0a0908_100%)]" />
+          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-[radial-gradient(ellipse_at_bottom,var(--color-accent-lo),transparent_70%)]" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="grid h-14 w-14 place-items-center rounded-full bg-accent-lo text-accent ring-1 ring-accent/30">
+              <EqualizerBars className="h-5" />
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+
 
 function ProductShowcaseBackground() {
   return (
@@ -80,15 +119,7 @@ export function ProductShowcase() {
         >
           <Card className="p-6 bg-surface/85 backdrop-blur-xl border border-line-strong/60 shadow-xl">
             <div className="flex flex-col items-start gap-6 sm:flex-row">
-              <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-md sm:h-36 sm:w-36">
-                <div className="absolute inset-0 bg-[linear-gradient(160deg,#4a2a1c_0%,#241228_50%,#0a0908_100%)]" />
-                <div className="absolute inset-x-0 bottom-0 h-1/2 bg-[radial-gradient(ellipse_at_bottom,var(--color-accent-lo),transparent_70%)]" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="grid h-14 w-14 place-items-center rounded-full bg-accent-lo text-accent ring-1 ring-accent/30">
-                    <EqualizerBars className="h-5" />
-                  </span>
-                </div>
-              </div>
+              <NowPlayingArt title={currentTrack.title} artist={currentTrack.artist} />
 
               <div className="min-w-0 flex-1 pt-1">
                 <h3 className="truncate text-xl font-bold text-ink">
@@ -150,7 +181,7 @@ export function ProductShowcase() {
                   <span className="w-5 text-right font-mono text-xs text-ink-faint">
                     {i + 2}
                   </span>
-                  <div className="h-9 w-9 shrink-0 rounded-md bg-[linear-gradient(150deg,#2a2420,#12100e)]" />
+                  <QueueThumb title={track.title} artist={track.artist} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-ink">
                       {track.title}
