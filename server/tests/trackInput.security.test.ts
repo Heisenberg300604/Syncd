@@ -1,6 +1,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
+  isPlaylistUrl,
+  parseYouTubePlaylistId,
   parseYouTubeVideoId,
   sanitizeThumbnailUrl,
 } from "../src/modules/music/music.validation.js";
@@ -146,5 +148,64 @@ describe("YouTube link parsing", () => {
         `expected ${String(link)} to be rejected`,
       );
     }
+  });
+});
+
+describe("YouTube playlist link parsing", () => {
+  const VALID_PLAYLIST_ID = "PL1234567890abcdef";
+
+  test("extracts playlist id from supported YouTube link formats", () => {
+    for (const link of [
+      VALID_PLAYLIST_ID,
+      `https://www.youtube.com/playlist?list=${VALID_PLAYLIST_ID}`,
+      `https://youtube.com/watch?v=dQw4w9WgXcQ&list=${VALID_PLAYLIST_ID}`,
+      `https://youtu.be/dQw4w9WgXcQ?list=${VALID_PLAYLIST_ID}`,
+      `https://music.youtube.com/playlist?list=${VALID_PLAYLIST_ID}`,
+      `https://m.youtube.com/playlist?list=${VALID_PLAYLIST_ID}`,
+    ]) {
+      const result = parseYouTubePlaylistId(link);
+      assert.ok(result.ok, `expected ${link} to parse`);
+      assert.equal(result.value, VALID_PLAYLIST_ID);
+    }
+  });
+
+  test("refuses to resolve playlist links on non-YouTube hosts or invalid inputs", () => {
+    for (const link of [
+      "http://attacker.example/playlist?list=" + VALID_PLAYLIST_ID,
+      "https://youtube.com.attacker.example/playlist?list=" + VALID_PLAYLIST_ID,
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      "https://www.youtube.com/playlist?list=",
+      "file:///etc/passwd",
+      "",
+      null,
+      undefined,
+    ]) {
+      assert.equal(
+        parseYouTubePlaylistId(link).ok,
+        false,
+        `expected ${String(link)} to be rejected`,
+      );
+    }
+  });
+
+  test("isPlaylistUrl correctly identifies YouTube URLs with a list parameter", () => {
+    assert.equal(
+      isPlaylistUrl(`https://www.youtube.com/playlist?list=${VALID_PLAYLIST_ID}`),
+      true,
+    );
+    assert.equal(
+      isPlaylistUrl(`https://youtu.be/dQw4w9WgXcQ?list=${VALID_PLAYLIST_ID}`),
+      true,
+    );
+    assert.equal(
+      isPlaylistUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+      false,
+    );
+    assert.equal(
+      isPlaylistUrl(`https://attacker.example/playlist?list=${VALID_PLAYLIST_ID}`),
+      false,
+    );
+    assert.equal(isPlaylistUrl("not a url"), false);
+    assert.equal(isPlaylistUrl(null), false);
   });
 });

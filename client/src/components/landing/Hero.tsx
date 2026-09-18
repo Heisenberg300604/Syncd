@@ -4,6 +4,7 @@ import { EqualizerBars } from "../ui/EqualizerBars";
 import { ScrollReveal, ParallaxImage } from "../ui/ScrollReveal";
 import { useAlbumArt } from "../../hooks/useAlbumArt";
 import { MagneticButton } from "../ui/MagneticButton";
+import { HeroIconFlipper } from "./HeroIconFlipper";
 
 /* -------------------------------------------------------------------------- */
 /*  Data                                                                       */
@@ -324,18 +325,7 @@ export function Hero() {
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <MagneticButton>
                 <Button to="/enter" size="lg" variant="light" pill glow className="group">
-                  <svg
-                    className="h-4 w-4 text-canvas"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2.4}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
+                  <HeroIconFlipper />
                   Create a room
                 </Button>
               </MagneticButton>

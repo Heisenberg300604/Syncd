@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth, UserButton } from "@clerk/react";
 import { getRoom, leaveRoom } from "../services/api";
 import { useRoomSocket, type ConnectionStatus } from "../hooks/useRoomSocket";
 import { useCurrentUser } from "../hooks/useCurrentUser";
-import { MusicSearch } from "../components/MusicSearch";
+import { RoomNavbarSearch } from "../components/RoomNavbarSearch";
 import { YouTubePlayer } from "../components/YouTubePlayer";
 import { ChatPanel } from "../components/ChatPanel";
 import { QueuePanel } from "../components/QueuePanel";
@@ -12,7 +12,7 @@ import { AppHeader } from "../components/ui/AppHeader";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { Avatar } from "../components/ui/Avatar";
-import type { RoomDTO } from "../services/types";
+import type { RoomDTO, YouTubeSearchResult } from "../services/types";
 
 export function Room() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -67,6 +67,7 @@ export function Room() {
     sendChatMessage,
     queue,
     addToQueue,
+    prependToQueue,
     removeFromQueue,
     reorderQueue,
     clearQueue,
@@ -85,6 +86,52 @@ export function Room() {
 
   const socketReady = connectionStatus === "connected";
 
+  // Previous video navigation history (last 30 tracks played)
+  const [previousTracks, setPreviousTracks] = useState<YouTubeSearchResult[]>([]);
+  const [prevRoomCode, setPrevRoomCode] = useState(roomCode);
+  if (roomCode !== prevRoomCode) {
+    setPrevRoomCode(roomCode);
+    setPreviousTracks([]);
+  }
+  const lastActiveVideoRef = useRef<YouTubeSearchResult | null>(null);
+  const isNavigatingPreviousRef = useRef(false);
+
+  // Clear previous track history if room changes
+  useEffect(() => {
+    lastActiveVideoRef.current = null;
+    isNavigatingPreviousRef.current = false;
+  }, [roomCode]);
+
+  // Track playback history for returning to previous video
+  useEffect(() => {
+    if (!playback?.videoId) {
+      lastActiveVideoRef.current = null;
+      return;
+    }
+
+    const currentVideo: YouTubeSearchResult = {
+      videoId: playback.videoId,
+      title: playback.title || "Untitled",
+      channelTitle: "",
+      thumbnailUrl: playback.thumbnailUrl || "",
+      duration: playback.duration ? `PT${playback.duration}S` : "",
+    };
+
+    if (
+      lastActiveVideoRef.current &&
+      lastActiveVideoRef.current.videoId !== playback.videoId
+    ) {
+      if (!isNavigatingPreviousRef.current) {
+        const prev = lastActiveVideoRef.current;
+        setPreviousTracks((history) => [...history.slice(-29), prev]);
+      } else {
+        isNavigatingPreviousRef.current = false;
+      }
+    }
+
+    lastActiveVideoRef.current = currentVideo;
+  }, [playback?.videoId, playback?.title, playback?.thumbnailUrl, playback?.duration]);
+
   // Room mounts inside ProtectedRoute, so by the time it renders the guard has
   // already confirmed the viewer is authenticated and onboarded — this is
   // only for UX (hiding controls); the server enforces the real boundary.
@@ -96,6 +143,22 @@ export function Room() {
   const effectiveHostId = hostUserId ?? room?.host.id ?? null;
   const isHost = Boolean(myUserId && effectiveHostId === myUserId);
   const canControlPlayback = socketReady && isHost;
+
+  const handlePreviousTrack = useCallback(() => {
+    if (!canControlPlayback || previousTracks.length === 0) return;
+    const newHistory = [...previousTracks];
+    const trackToPlay = newHistory.pop();
+    if (!trackToPlay) return;
+
+    isNavigatingPreviousRef.current = true;
+    setPreviousTracks(newHistory);
+
+    if (lastActiveVideoRef.current) {
+      prependToQueue(lastActiveVideoRef.current);
+    }
+
+    setTrack(trackToPlay);
+  }, [canControlPlayback, previousTracks, prependToQueue, setTrack]);
 
   useEffect(() => {
     if (!hostNotice) return;
@@ -161,6 +224,8 @@ export function Room() {
   return (
     <div className="min-h-screen bg-canvas text-ink antialiased">
       <AppHeader
+        maxWidth="w-full"
+        containerClassName="px-4 sm:px-6 lg:px-8"
         actions={
           <div className="flex items-center gap-3">
             <Button
@@ -173,7 +238,19 @@ export function Room() {
             <UserButton />
           </div>
         }
-      />
+      >
+        <RoomNavbarSearch
+          onSelect={setTrack}
+          disabled={!canControlPlayback}
+          canQueue={canControlPlayback && !!playback?.videoId}
+          onQueue={addToQueue}
+          disabledMessage={
+            !socketReady
+              ? "Connecting to the room — playback controls will be available in a moment."
+              : "Only the host can add music to this room."
+          }
+        />
+      </AppHeader>
 
       <main className="w-full px-4 py-6 sm:px-6 sm:py-8">
         {hostPending && (
@@ -223,15 +300,11 @@ export function Room() {
               onControl={canControlPlayback ? sendControl : null}
               onClear={clearTrack}
               onEnded={isHost ? advanceQueue : undefined}
+              onSkip={isHost ? advanceQueue : undefined}
+              onPrevious={isHost ? handlePreviousTrack : undefined}
+              canPrevious={isHost && previousTracks.length > 0}
+              hasQueue={queue.length > 0}
               syncError={playbackError}
-            />
-            <QueuePanel
-              queue={queue}
-              isHost={isHost}
-              onRemove={removeFromQueue}
-              onReorder={reorderQueue}
-              onClear={clearQueue}
-              onSkip={advanceQueue}
             />
           </div>
 
@@ -355,16 +428,13 @@ export function Room() {
               onSend={sendChatMessage}
             />
 
-            <MusicSearch
-              onSelect={setTrack}
-              disabled={!canControlPlayback}
-              canQueue={canControlPlayback && !!playback?.videoId}
-              onQueue={addToQueue}
-              disabledMessage={
-                !socketReady
-                  ? "Connecting to the room — playback controls will be available in a moment."
-                  : "Only the host can add music to this room."
-              }
+            <QueuePanel
+              queue={queue}
+              isHost={isHost}
+              onRemove={removeFromQueue}
+              onReorder={reorderQueue}
+              onClear={clearQueue}
+              onSkip={advanceQueue}
             />
           </div>
         </div>

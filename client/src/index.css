@@ -73,6 +73,53 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Themed Scrollbar                                                          */
+/*                                                                            */
+/*  Slim, rounded scrollbars adhering to the dark warm-charcoal and amber     */
+/*  palette. Replaces the harsh default OS scrollbars across the application. */
+/* -------------------------------------------------------------------------- */
+
+/* Standard CSS (Firefox) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 243, 240, 0.2) transparent;
+}
+
+*:hover {
+  scrollbar-color: rgba(247, 162, 59, 0.45) transparent;
+}
+
+/* WebKit / Chromium (Chrome, Edge, Brave, Opera, Safari) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(245, 243, 240, 0.18);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(247, 162, 59, 0.45);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--color-accent);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* --- Clerk sign-in / sign-up widget ------------------------------------------ */
 /* Clerk's `appearance` prop does not reliably produce a full dark theme, so the
    visual treatment is forced here. Targets Clerk's stable `cl-*` classes. */
@@ -294,6 +341,40 @@ body {
   opacity: 1;
   transform: translate3d(0, 0, 0);
   filter: blur(0);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Hero CTA Icon Flip Animations                                             */
+/* -------------------------------------------------------------------------- */
+
+@keyframes iconFlipExit {
+  0% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+}
+
+@keyframes iconFlipEnter {
+  0% {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-icon-flip-exit {
+  animation: iconFlipExit 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.animate-icon-flip-enter {
+  animation: iconFlipEnter 220ms cubic-bezier(0, 0, 0.2, 1) forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

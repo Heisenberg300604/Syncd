@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/react";
-import { resolveYouTubeLink, searchMusic } from "../services/api";
+import {
+  resolveYouTubeLink,
+  resolveYouTubePlaylist,
+  searchMusic,
+} from "../services/api";
 import { formatIsoDuration } from "../utils/duration";
 import type { YouTubeSearchResult } from "../services/types";
 import { Card } from "./ui/Card";
@@ -16,12 +20,29 @@ interface MusicSearchProps {
   disabledMessage?: string;
 }
 
+interface VideoPreview {
+  type: "video";
+  track: YouTubeSearchResult;
+}
+
+interface PlaylistPreview {
+  type: "playlist";
+  title: string;
+  tracks: YouTubeSearchResult[];
+}
+
+type LinkPreview = VideoPreview | PlaylistPreview;
+
 /** Matches any youtube.com / youtu.be URL, with or without a scheme. */
 const YOUTUBE_LINK_REGEX =
   /(^|\/\/|\s)((www|m|music)\.)?(youtube(-nocookie)?\.com|youtu\.be)\//i;
 
 function isYouTubeLink(value: string): boolean {
   return YOUTUBE_LINK_REGEX.test(value);
+}
+
+function isYouTubePlaylistLink(value: string): boolean {
+  return isYouTubeLink(value) && /[?&]list=/.test(value);
 }
 
 export function MusicSearch({
@@ -38,22 +59,149 @@ export function MusicSearch({
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Link preview state
+  const [linkPreview, setLinkPreview] = useState<LinkPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  // Automatically fetch preview when a YouTube link or playlist is pasted/entered
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!isYouTubeLink(trimmed)) {
+      const timer = setTimeout(() => {
+        setLinkPreview(null);
+        setPreviewLoading(false);
+        setPreviewError(null);
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      setPreviewLoading(true);
+      setPreviewError(null);
+      try {
+        if (isYouTubePlaylistLink(trimmed)) {
+          const res = await resolveYouTubePlaylist(getToken, trimmed);
+          if (cancelled) return;
+          if (res.results.length === 0) {
+            setPreviewError("No playable videos found in this playlist");
+            setLinkPreview(null);
+          } else {
+            setLinkPreview({
+              type: "playlist",
+              title: res.playlistTitle || "YouTube Playlist",
+              tracks: res.results,
+            });
+          }
+        } else {
+          const res = await resolveYouTubeLink(getToken, trimmed);
+          if (cancelled) return;
+          setLinkPreview({
+            type: "video",
+            track: res.result,
+          });
+        }
+      } catch (err) {
+        if (cancelled) return;
+        const msg =
+          err instanceof Error ? err.message : "Failed to load preview";
+        setPreviewError(msg);
+        setLinkPreview(null);
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, getToken]);
+
+  function handlePlayVideo(track: YouTubeSearchResult) {
+    onSelect(track);
+    setQuery("");
+    setLinkPreview(null);
+    setResults([]);
+    setHasSearched(false);
+  }
+
+  function handleQueueVideo(track: YouTubeSearchResult) {
+    onQueue?.(track);
+    setQuery("");
+    setLinkPreview(null);
+    setResults([]);
+    setHasSearched(false);
+  }
+
+  function handlePlayPlaylist(playlist: PlaylistPreview) {
+    if (playlist.tracks.length === 0) return;
+    onSelect(playlist.tracks[0]);
+    if (onQueue) {
+      for (const t of playlist.tracks.slice(1)) {
+        onQueue(t);
+      }
+    }
+    setQuery("");
+    setLinkPreview(null);
+    setResults([]);
+    setHasSearched(false);
+  }
+
+  function handleQueueAllPlaylist(playlist: PlaylistPreview) {
+    if (onQueue) {
+      for (const t of playlist.tracks) {
+        onQueue(t);
+      }
+    }
+    setQuery("");
+    setLinkPreview(null);
+    setResults([]);
+    setHasSearched(false);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = query.trim();
     if (trimmed.length === 0) return;
 
+    // If preview is already resolved, use it directly
+    if (linkPreview) {
+      if (linkPreview.type === "playlist") {
+        handlePlayPlaylist(linkPreview);
+      } else {
+        handlePlayVideo(linkPreview.track);
+      }
+      return;
+    }
+
     setBusy(true);
     setError(null);
 
     try {
-      // A pasted link goes straight to the room; a phrase runs a search.
+      if (isYouTubePlaylistLink(trimmed)) {
+        const { results: playlistVideos, playlistTitle } =
+          await resolveYouTubePlaylist(getToken, trimmed);
+        if (playlistVideos.length === 0) {
+          setError("No playable videos found in this playlist");
+          return;
+        }
+
+        handlePlayPlaylist({
+          type: "playlist",
+          title: playlistTitle || "YouTube Playlist",
+          tracks: playlistVideos,
+        });
+        return;
+      }
+
       if (isYouTubeLink(trimmed)) {
         const { result } = await resolveYouTubeLink(getToken, trimmed);
         setResults([result]);
         setHasSearched(false);
         setQuery("");
-        // If there's nothing playing yet, play immediately.
         if (!canQueue) {
           onSelect(result);
           setResults([]);
@@ -73,7 +221,13 @@ export function MusicSearch({
     }
   }
 
-  const submitLabel = isYouTubeLink(query.trim()) ? "Play link" : "Search";
+  const isLink = isYouTubeLink(query.trim());
+  const isPlaylist = isYouTubePlaylistLink(query.trim());
+  const submitLabel = isPlaylist
+    ? "Play playlist"
+    : isLink
+      ? "Play link"
+      : "Search";
 
   return (
     <Card className="p-5 sm:p-6">
@@ -81,7 +235,7 @@ export function MusicSearch({
         Add music
       </h2>
       <p className="mt-1 text-xs text-ink-faint">
-        Search for a song, or paste a YouTube link to play it for the whole room.
+        Search for a song, or paste a YouTube link (video or playlist) to play it for the whole room.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-4 flex gap-2">
@@ -102,6 +256,193 @@ export function MusicSearch({
           {busy ? "Loading…" : submitLabel}
         </button>
       </form>
+
+      {/* Live Preview Loading Indicator */}
+      {previewLoading && (
+        <div className="mt-3.5 flex items-center gap-2.5 rounded-xl border border-line bg-white/3 p-3.5 text-xs text-ink-muted animate-pulse">
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent border-t-transparent shrink-0" />
+          <span>
+            Resolving {isPlaylist ? "playlist" : "video"} preview…
+          </span>
+        </div>
+      )}
+
+      {/* Link Preview Error */}
+      {previewError && (
+        <div className="mt-3.5 flex items-center justify-between rounded-xl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-xs text-danger">
+          <span>{previewError}</span>
+          <button
+            type="button"
+            onClick={() => setPreviewError(null)}
+            className="text-xs text-danger hover:opacity-80"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Video Preview Card */}
+      {linkPreview && linkPreview.type === "video" && (
+        <div className="relative mt-3.5 overflow-hidden rounded-xl border border-line-strong bg-white/4 p-3.5 shadow-xl backdrop-blur-sm transition-all">
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setLinkPreview(null);
+            }}
+            className="absolute top-2.5 right-2.5 rounded-full p-1 text-xs text-ink-faint hover:bg-white/10 hover:text-ink transition-colors"
+            title="Dismiss preview"
+          >
+            ✕
+          </button>
+
+          <div className="flex items-start gap-3 pr-6">
+            <div className="relative shrink-0 overflow-hidden rounded-lg bg-black/40 shadow-md">
+              <img
+                src={linkPreview.track.thumbnailUrl}
+                alt=""
+                className="h-16 w-24 object-cover"
+              />
+              {linkPreview.track.duration && (
+                <span className="absolute bottom-1 right-1 rounded bg-black/85 px-1 py-0.5 font-mono text-[9px] font-semibold text-white">
+                  {formatIsoDuration(linkPreview.track.duration)}
+                </span>
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h4 className="line-clamp-2 text-xs font-semibold text-ink leading-snug">
+                {linkPreview.track.title}
+              </h4>
+              <p className="mt-1 truncate text-[11px] text-ink-muted">
+                {linkPreview.track.channelTitle || "YouTube"}
+              </p>
+
+              <div className="mt-2.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePlayVideo(linkPreview.track)}
+                  disabled={disabled}
+                  className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition-all hover:bg-accent-hi active:scale-95 shadow-md shadow-accent/20 disabled:opacity-50"
+                >
+                  <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6.5 5.11c0-.94 1.02-1.53 1.83-1.05l11.05 6.39a1.22 1.22 0 0 1 0 2.1l-11.05 6.39c-.81.48-1.83-.11-1.83-1.05V5.11Z" />
+                  </svg>
+                  Play now
+                </button>
+
+                {canQueue && onQueue && (
+                  <button
+                    type="button"
+                    onClick={() => handleQueueVideo(linkPreview.track)}
+                    disabled={disabled}
+                    className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent transition-all hover:bg-accent/20 active:scale-95 disabled:opacity-50"
+                  >
+                    <span>+</span>
+                    Add to queue
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Playlist Preview Card */}
+      {linkPreview && linkPreview.type === "playlist" && (
+        <div className="mt-3.5 overflow-hidden rounded-xl border border-line-strong bg-white/4 p-3.5 shadow-xl backdrop-blur-sm transition-all">
+          <div className="mb-2.5 flex items-center justify-between">
+            <span className="text-xs text-ink-muted font-medium">
+              {linkPreview.tracks.length}{" "}
+              {linkPreview.tracks.length === 1 ? "track" : "tracks"}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setLinkPreview(null);
+              }}
+              className="rounded-full p-1 text-xs text-ink-faint hover:bg-white/10 hover:text-ink transition-colors"
+              title="Dismiss preview"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="mb-3">
+            <h3 className="font-semibold text-sm text-ink truncate">
+              {linkPreview.title}
+            </h3>
+            <p className="mt-0.5 text-[11px] text-ink-faint">
+              1st video plays immediately, remaining{" "}
+              {linkPreview.tracks.length - 1} queued for the room.
+            </p>
+          </div>
+
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handlePlayPlaylist(linkPreview)}
+              disabled={disabled}
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-accent-ink transition-all hover:bg-accent-hi active:scale-95 shadow-md shadow-accent/20 disabled:opacity-50"
+            >
+              <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M6.5 5.11c0-.94 1.02-1.53 1.83-1.05l11.05 6.39a1.22 1.22 0 0 1 0 2.1l-11.05 6.39c-.81.48-1.83-.11-1.83-1.05V5.11Z" />
+              </svg>
+              Play playlist
+            </button>
+
+            {canQueue && onQueue && (
+              <button
+                type="button"
+                onClick={() => handleQueueAllPlaylist(linkPreview)}
+                disabled={disabled}
+                className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs font-semibold text-accent transition-all hover:bg-accent/20 active:scale-95 disabled:opacity-50"
+              >
+                <span>+</span>
+                Queue all ({linkPreview.tracks.length})
+              </button>
+            )}
+          </div>
+
+          {/* Scrollable list of playlist videos */}
+          <div className="space-y-1 max-h-44 overflow-y-auto syncd-scrollbar border-t border-line/50 pt-2 pr-1">
+            {linkPreview.tracks.map((t, idx) => {
+              const len = formatIsoDuration(t.duration);
+              return (
+                <div
+                  key={t.videoId + idx}
+                  className="flex items-center gap-2.5 rounded-lg px-2 py-1 text-xs transition-colors hover:bg-white/5"
+                >
+                  <span className="w-4 shrink-0 font-mono text-[10px] text-ink-faint text-center">
+                    {idx + 1}
+                  </span>
+                  <img
+                    src={t.thumbnailUrl}
+                    alt=""
+                    className="h-7 w-11 shrink-0 rounded bg-black/40 object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-medium text-ink">
+                      {t.title}
+                    </p>
+                    {t.channelTitle && (
+                      <p className="truncate text-[10px] text-ink-muted">
+                        {t.channelTitle}
+                      </p>
+                    )}
+                  </div>
+                  {len && (
+                    <span className="shrink-0 font-mono text-[10px] text-ink-faint">
+                      {len}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {disabled && (
         <p className="mt-3 text-xs text-warning">

@@ -190,6 +190,15 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
     );
 
     socket.on(
+      "queue:prepend",
+      (payload: QueueAddPayload, ack?: (res: QueueAck) => void) => {
+        handleQueuePrepend(io, user, payload, joinedRooms)
+          .then((queue) => reply(ack, { ok: true, queue }))
+          .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
+      },
+    );
+
+    socket.on(
       "queue:remove",
       (payload: QueueRemovePayload, ack?: (res: QueueAck) => void) => {
         handleQueueRemove(io, user, payload, joinedRooms)
@@ -616,6 +625,30 @@ async function handleQueueAdd(
 
   const queue = queueStore.enqueue(roomCode, item);
   logger.info(`${user.username} queued ${item.videoId} in ${roomCode}`);
+  broadcastQueue(io, roomCode, queue);
+  return queue;
+}
+
+async function handleQueuePrepend(
+  io: SocketIOServer,
+  user: { id: string; username: string },
+  payload: QueueAddPayload,
+  joinedRooms: Map<string, string>,
+): Promise<QueueSnapshot> {
+  enforceSocketRateLimit("socket:queue", user.id, SOCKET_RATE_LIMITS.queue);
+
+  const roomCode = assertJoined(payload?.roomCode, joinedRooms);
+  await assertHost(roomCode, user.id);
+
+  const validation = validateTrackInput(payload?.track);
+  if (!validation.ok) {
+    throw new Error(validation.message);
+  }
+
+  const item: QueueItem = validation.value;
+
+  const queue = queueStore.prepend(roomCode, item);
+  logger.info(`${user.username} prepended ${item.videoId} in ${roomCode}`);
   broadcastQueue(io, roomCode, queue);
   return queue;
 }

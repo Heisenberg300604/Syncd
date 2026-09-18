@@ -21,6 +21,8 @@ export const REST_RATE_LIMITS = {
   musicSearch: { limit: 30, windowMs: 60_000 },
   /** Resolving a link costs 1 unit, so it can be looser than search. */
   musicVideo: { limit: 60, windowMs: 60_000 },
+  /** Resolving a playlist costs 2 units and fetches up to 50 videos. */
+  musicPlaylist: { limit: 15, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export const SOCKET_RATE_LIMITS = {
@@ -30,6 +32,7 @@ export const SOCKET_RATE_LIMITS = {
   chatSend: { limit: 15, windowMs: 10_000 },
   /** Play/pause/seek are discrete user actions plus player state echoes. */
   playback: { limit: 40, windowMs: 10_000 },
-  queue: { limit: 40, windowMs: 10_000 },
+  /** Accommodates bulk-enqueuing up to 50 tracks when importing a playlist. */
+  queue: { limit: 100, windowMs: 10_000 },
   hostTransfer: { limit: 10, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;

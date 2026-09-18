@@ -6,6 +6,7 @@ import type {
   MeResponse,
   ProfileResponse,
   RoomResponse,
+  YouTubePlaylistResponse,
   YouTubeSearchResponse,
   YouTubeVideoResponse,
 } from "./types";
@@ -125,6 +126,17 @@ export function resolveYouTubeLink(
 ): Promise<YouTubeVideoResponse> {
   return request<YouTubeVideoResponse>(
     `/music/video?url=${encodeURIComponent(urlOrId)}`,
+    getToken,
+    { method: "GET" },
+  );
+}
+
+export function resolveYouTubePlaylist(
+  getToken: GetToken,
+  urlOrId: string,
+): Promise<YouTubePlaylistResponse> {
+  return request<YouTubePlaylistResponse>(
+    `/music/playlist?url=${encodeURIComponent(urlOrId)}`,
     getToken,
     { method: "GET" },
   );

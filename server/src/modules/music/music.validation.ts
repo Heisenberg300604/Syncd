@@ -99,6 +99,73 @@ export function parseYouTubeVideoId(raw: unknown): VideoIdValidation {
   return { ok: true, value: candidate };
 }
 
+export const YOUTUBE_PLAYLIST_ID_REGEX = /^[A-Za-z0-9_-]{2,100}$/;
+
+export type PlaylistIdValidation =
+  | { ok: true; value: string }
+  | { ok: false; message: string };
+
+/**
+ * Returns true if a URL contains a `list=` parameter on a YouTube hostname.
+ */
+export function isPlaylistUrl(raw: unknown): boolean {
+  if (typeof raw !== "string") return false;
+  const value = raw.trim();
+  if (!value) return false;
+
+  try {
+    const url = new URL(value.includes("://") ? value : `https://${value}`);
+    const host = url.hostname.toLowerCase();
+    if (!YOUTUBE_HOSTNAMES.has(host) && !YOUTUBE_SHORT_HOSTNAMES.has(host)) {
+      return false;
+    }
+    return url.searchParams.has("list");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Accepts a YouTube playlist URL (e.g. /playlist?list=PLxxx, /watch?v=...&list=PLxxx, youtu.be/...&list=PLxxx)
+ * or a bare playlist id, and returns the playlist id.
+ */
+export function parseYouTubePlaylistId(raw: unknown): PlaylistIdValidation {
+  if (typeof raw !== "string") {
+    return { ok: false, message: "A YouTube playlist link is required" };
+  }
+
+  const value = raw.trim();
+  if (value.length === 0) {
+    return { ok: false, message: "A YouTube playlist link is required" };
+  }
+
+  if (/^(PL|UU|LL|FL|RD|OLAK)[A-Za-z0-9_-]{10,}$/.test(value)) {
+    return { ok: true, value };
+  }
+
+  let url: URL;
+  try {
+    url = new URL(value.includes("://") ? value : `https://${value}`);
+  } catch {
+    return { ok: false, message: "That does not look like a YouTube link" };
+  }
+
+  const host = url.hostname.toLowerCase();
+  if (!YOUTUBE_HOSTNAMES.has(host) && !YOUTUBE_SHORT_HOSTNAMES.has(host)) {
+    return { ok: false, message: "Only YouTube links are supported" };
+  }
+
+  const candidate = url.searchParams.get("list");
+  if (!candidate || !YOUTUBE_PLAYLIST_ID_REGEX.test(candidate)) {
+    return {
+      ok: false,
+      message: "Could not find a playlist id in that link",
+    };
+  }
+
+  return { ok: true, value: candidate };
+}
+
 const ISO_8601_DURATION_REGEX =
   /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
 

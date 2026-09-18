@@ -121,7 +121,7 @@ export function QueuePanel({
         )}
       </div>
 
-      <ul className="max-h-72 space-y-1 overflow-y-auto pr-1">
+      <ul className="max-h-72 space-y-1 overflow-y-auto syncd-scrollbar pr-2">
         {queue.map((item, index) => {
           const length = formatIsoDuration(item.duration);
           const isFirst = index === 0;
@@ -180,37 +180,82 @@ export function QueuePanel({
 
               {/* Host controls */}
               {isHost && (
-                <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex shrink-0 items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                   <button
-                    onClick={() => moveUp(index)}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveUp(index);
+                    }}
                     disabled={index === 0}
-                    className="rounded p-0.5 text-ink-faint transition-colors hover:text-ink disabled:pointer-events-none disabled:opacity-30"
-                    aria-label="Move up"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-ink-muted transition-all hover:bg-white/10 hover:text-ink active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+                    aria-label="Move up in queue"
                     title="Move up"
                   >
-                    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M7 14l5-5 5 5z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.2}
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 10l7-7m0 0l7 7m-7-7v18"
+                      />
                     </svg>
                   </button>
                   <button
-                    onClick={() => moveDown(index)}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveDown(index);
+                    }}
                     disabled={index === queue.length - 1}
-                    className="rounded p-0.5 text-ink-faint transition-colors hover:text-ink disabled:pointer-events-none disabled:opacity-30"
-                    aria-label="Move down"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-ink-muted transition-all hover:bg-white/10 hover:text-ink active:scale-95 disabled:pointer-events-none disabled:opacity-20"
+                    aria-label="Move down in queue"
                     title="Move down"
                   >
-                    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M7 10l5 5 5-5z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.2}
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                      />
                     </svg>
                   </button>
                   <button
-                    onClick={() => onRemove(index)}
-                    className="rounded p-0.5 text-ink-faint transition-colors hover:text-danger"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(index);
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-ink-muted transition-all hover:bg-danger/15 hover:text-danger active:scale-95"
                     aria-label={`Remove ${item.title} from queue`}
-                    title="Remove"
+                    title="Remove from queue"
                   >
-                    <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.2}
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>

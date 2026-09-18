@@ -96,6 +96,7 @@ export interface RoomSocket {
   // Queue
   queue: QueueItem[];
   addToQueue: (track: YouTubeSearchResult) => void;
+  prependToQueue: (track: YouTubeSearchResult) => void;
   removeFromQueue: (index: number) => void;
   reorderQueue: (fromIndex: number, toIndex: number) => void;
   clearQueue: () => void;
@@ -359,6 +360,14 @@ export function useRoomSocket(
     [emitQueue, roomCode],
   );
 
+  const prependToQueue = useCallback(
+    (track: YouTubeSearchResult) => {
+      if (!roomCode) return;
+      emitQueue("queue:prepend", { roomCode, track });
+    },
+    [emitQueue, roomCode],
+  );
+
   const removeFromQueue = useCallback(
     (index: number) => {
       if (!roomCode) return;
@@ -424,6 +433,7 @@ export function useRoomSocket(
     sendChatMessage,
     queue,
     addToQueue,
+    prependToQueue,
     removeFromQueue,
     reorderQueue,
     clearQueue,

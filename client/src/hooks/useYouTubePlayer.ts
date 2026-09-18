@@ -87,6 +87,22 @@ export interface YouTubePlayerHandle {
   stopVideo: () => void;
   seekTo: (seconds: number) => void;
   getCurrentTime: () => number;
+  setVolume: (volume: number) => void;
+  getVolume: () => number;
+  mute: () => void;
+  unMute: () => void;
+  isMuted: () => boolean;
+  setPlaybackRate: (rate: number) => void;
+  getPlaybackRate: () => number;
+  setPlaybackQuality: (quality: string) => void;
+  getPlaybackQuality: () => string;
+  /**
+   * The quality level YouTube has actually chosen for the current stream.
+   * Read-only — YouTube controls this based on network and player size.
+   * Updated in real time via the `onPlaybackQualityChange` IFrame API event.
+   */
+  playbackQuality: string;
+  availableQualityLevels: string[];
 }
 
 export interface YouTubePlayerOptions {
@@ -111,6 +127,8 @@ export function useYouTubePlayer(
   const [error, setError] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackQuality, setPlaybackQualityState] = useState<string>("auto");
+  const [availableQualityLevels, setAvailableQualityLevels] = useState<string[]>([]);
   const pendingVideo = useRef<{
     videoId: string;
     startSeconds: number;
@@ -170,6 +188,15 @@ export function useYouTubePlayer(
               setError(null);
               setState("idle");
 
+              try {
+                const q = playerRef.current?.getPlaybackQuality();
+                if (q) setPlaybackQualityState(q);
+                const levels = playerRef.current?.getAvailableQualityLevels();
+                if (levels && levels.length > 0) setAvailableQualityLevels(levels);
+              } catch {
+                // Ignore
+              }
+
               const pending = pendingVideo.current;
               if (pending) {
                 pendingVideo.current = null;
@@ -186,6 +213,16 @@ export function useYouTubePlayer(
                 }
               }
             },
+            onPlaybackQualityChange: (e: YT.OnPlaybackQualityChangeEvent) => {
+              if (disposed) return;
+              if (e?.data) setPlaybackQualityState(e.data);
+              try {
+                const levels = playerRef.current?.getAvailableQualityLevels();
+                if (levels && levels.length > 0) setAvailableQualityLevels(levels);
+              } catch {
+                // Ignore
+              }
+            },
             onStateChange: (e: YT.OnStateChangeEvent) => {
               if (disposed) return;
 
@@ -193,6 +230,14 @@ export function useYouTubePlayer(
               switch (e.data) {
                 case YT.PlayerState.PLAYING:
                   next = "playing";
+                  try {
+                    const q = playerRef.current?.getPlaybackQuality();
+                    if (q) setPlaybackQualityState(q);
+                    const levels = playerRef.current?.getAvailableQualityLevels();
+                    if (levels && levels.length > 0) setAvailableQualityLevels(levels);
+                  } catch {
+                    // Ignore
+                  }
                   break;
                 case YT.PlayerState.PAUSED:
                   next = "paused";
@@ -348,6 +393,79 @@ export function useYouTubePlayer(
 
   const getCurrentTime = useCallback(() => readCurrentTime(playerRef), []);
 
+  const setVolume = useCallback((volume: number) => {
+    try {
+      playerRef.current?.setVolume(volume);
+    } catch {
+      // Ignore commands sent while the player is tearing down.
+    }
+  }, []);
+
+  const getVolume = useCallback(() => {
+    try {
+      return playerRef.current?.getVolume() ?? 100;
+    } catch {
+      return 100;
+    }
+  }, []);
+
+  const mute = useCallback(() => {
+    try {
+      playerRef.current?.mute();
+    } catch {
+      // Ignore commands sent while the player is tearing down.
+    }
+  }, []);
+
+  const unMute = useCallback(() => {
+    try {
+      playerRef.current?.unMute();
+    } catch {
+      // Ignore commands sent while the player is tearing down.
+    }
+  }, []);
+
+  const isMuted = useCallback(() => {
+    try {
+      return playerRef.current?.isMuted() ?? false;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const setPlaybackRate = useCallback((rate: number) => {
+    try {
+      playerRef.current?.setPlaybackRate(rate);
+    } catch {
+      // Ignore commands sent while the player is tearing down.
+    }
+  }, []);
+
+  const getPlaybackRate = useCallback(() => {
+    try {
+      return playerRef.current?.getPlaybackRate() ?? 1;
+    } catch {
+      return 1;
+    }
+  }, []);
+
+  const setPlaybackQuality = useCallback((quality: string) => {
+    try {
+      playerRef.current?.setPlaybackQuality(quality as YT.SuggestedVideoQuality);
+      setPlaybackQualityState(quality);
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  const getPlaybackQuality = useCallback(() => {
+    try {
+      return playerRef.current?.getPlaybackQuality() ?? playbackQuality;
+    } catch {
+      return playbackQuality;
+    }
+  }, [playbackQuality]);
+
   return {
     state,
     ready,
@@ -361,5 +479,16 @@ export function useYouTubePlayer(
     stopVideo,
     seekTo,
     getCurrentTime,
+    setVolume,
+    getVolume,
+    mute,
+    unMute,
+    isMuted,
+    setPlaybackRate,
+    getPlaybackRate,
+    setPlaybackQuality,
+    getPlaybackQuality,
+    playbackQuality,
+    availableQualityLevels,
   };
 }

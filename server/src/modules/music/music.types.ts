@@ -12,3 +12,8 @@ export interface YouTubeSearchResponse {
 export interface YouTubeVideoResponse {
   result: YouTubeSearchResult;
 }
+
+export interface YouTubePlaylistResponse {
+  results: YouTubeSearchResult[];
+  playlistTitle?: string;
+}
