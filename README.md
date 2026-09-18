@@ -89,9 +89,11 @@ SyncD organizes the collaborative listening experience across dedicated full-sta
 <td width="50%" valign="top">
 
 ### 🌅 1. Cinematic Landing & Brand Showcase
-* **Warm Sunset Design Tokens:** Immersive dark charcoal canvas (`#0a0908`), glowing amber accents (`#f7a23b`), and hairline borders (`white/8`).
-* **Live Equalizer & Vinyl Showcase:** Animated multi-bar SVG equalizer with staggered delay rhythms and realistic interactive vinyl turntable preview.
-* **Responsive Storytelling:** Clean breakdown of features, synchronized listening benefits, and social listening workflows.
+* **Three.js WebGL FloatingLines Shader:** Ambient GPU-rendered sunset wave lines with reactive mouse curvature, parallax physics, and warm amber gradients.
+* **Tactile Spring Physics:** Magnetic cursor attraction on primary CTA buttons (`MagneticButton`) and airport-style split-flap departure board animations (`SplitFlapText`).
+* **Hero CTA Icon Flipper:** Fluid 3D flipping icon cycling between action and YouTube marks in the main entrance button (`HeroIconFlipper`).
+* **Live Vinyl Turntable & Album Art:** High-fidelity vinyl grooves, tone arm tracking, and real-time album artwork hydration (`useAlbumArt`).
+* **Themed Micro-Interactions:** Slim custom dark-charcoal & amber scrollbars conforming across WebKit and Firefox browsers.
 
 </td>
 <td width="50%" valign="top">
@@ -114,20 +116,23 @@ SyncD organizes the collaborative listening experience across dedicated full-sta
 </td>
 <td width="50%" valign="top">
 
-### 🔍 4. YouTube Music Search & URL Resolver
+### 🔍 4. YouTube Search, URL Resolver & Playlist Importer
+* **Full Playlist Import Engine:** Resolves up to 50 playable tracks from YouTube playlists via `GET /api/music/playlist`, preserving track order while filtering private/unembeddable videos.
+* **Instant Live Previews:** Debounced auto-preview cards in search and header navbar inputs for pasted YouTube video and playlist links before playing or enqueuing.
 * **Server-Side API Proxy:** YouTube Data API v3 queries proxy securely through Express, keeping credentials hidden from client bundles.
-* **Universal URL Parsing:** Resolves YouTube Shorts, standard watch links (`v=`), embeds, live streams, and `youtu.be` links.
-* **Embed Safety Checks:** Flags and filters videos blocked by content owners from third-party IFrame playback before loading.
+* **Universal URL Parsing:** Resolves YouTube Shorts, standard watch links (`v=`), embeds, live streams, shortlinks (`youtu.be`), and playlist links (`list=`).
 
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 
-### 🎚️ 5. Server-Authoritative Playback Engine
+### 🎚️ 5. Server-Authoritative Playback & Pro Controls
 * **Timestamp-Based Playhead:** Clients compute live playback position as `playbackPosition + (now - playbackUpdatedAt)` to eliminate network latency lag.
-* **Automatic Drift Reseeking:** A 5-second background interval evaluates local vs expected playhead; if drift > 2s, the player seamlessly reseeks.
-* **Echo-Loop Suppression:** Distinguishes user-triggered playback events from remote broadcasts to prevent infinite state re-emission.
+* **Sub-2-Second Drift Reseeking:** A 5-second background interval evaluates local vs expected playhead; if drift > 2s, the player seamlessly reseeks.
+* **30-Track Playback History & Rewind:** Client-side track history allowing hosts to return to previous tracks with instant `queue:prepend` for uninterrupted queue flow.
+* **Pro Audio Controls:** Local volume & mute slider with `localStorage` persistence, variable speed selector (0.5x–2x), and read-only dynamic video stream quality badge (4K, 1080p, 720p, etc.).
+* **Single-Track Looper:** Instant loop toggle overriding auto-advance for focused listening sessions.
 
 </td>
 <td width="50%" valign="top">
@@ -144,12 +149,37 @@ SyncD organizes the collaborative listening experience across dedicated full-sta
 
 ### 🎶 7. Shared Playback Queue
 * **In-Memory Per-Room Queue:** Ephemeral `QueueStore` (same pattern as `PresenceStore`) — no schema migration required, capped at 50 items per room.
-* **Drag-to-Reorder & Controls:** Host-only `QueuePanel` with thumbnail list, drag-and-drop reorder (HTML5 DnD), arrow-button fallback, per-item remove, Skip, and Clear all.
-* **Smart Search Integration:** When a track is already playing, `MusicSearch` shows dual **Play now** / **+ Queue** buttons instead of the default single-click play.
-* **Auto-Advance:** When the host's player reaches the `ended` state it emits `queue:advance`; the server pops the front item and broadcasts the next track to all members via the standard `playback:update` path — no polling needed.
+* **Drag-to-Reorder & Mobile Controls:** Host-only `QueuePanel` with thumbnail list, drag-and-drop reorder (HTML5 DnD), smooth chevron buttons, per-item remove, Skip, and Clear all.
+* **Dual Play/Queue Actions:** Search and playlist previews offer one-click "Play now", "+ Queue", or bulk "Queue all (N)" operations.
+* **Zero-Poll Auto-Advance:** When the host's player emits `ended`, the server pops the front item and broadcasts the next track to all room members.
 
 </td>
 <td width="50%" valign="top">
+
+### 👑 8. Host Transfer & Room Continuity
+* **Grace Period Disconnect Protection:** 30-second server countdown arms when host drops; reconnecting within the window cancels the transfer, preserving ownership across refreshes.
+* **Longest-Standing Member Succession:** Automatically promotes the earliest-joined online member when the grace period expires.
+* **Manual Host Promotion:** Host-only `host:transfer` event from the people dropdown allows instant role delegation.
+* **Safe Room Exits:** Host leaving hands over ownership in an atomic transaction; rooms are deleted only when the final member exits.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🛡️ 9. Enterprise Security & Multi-Tier Rate Limiting
+* **Multi-Tier Rate Limiting:** Token-bucket rate limiting across Express REST routes (`joinRoom`, `createRoom`, `musicSearch`, `musicPlaylist`) and Socket.IO events (`chat`, `playback`, `queue`).
+* **Brute-Force & Quota Defense:** Limits room code attempts (30 per 5 min against $31^6$ space) and search queries (30/min) to safeguard YouTube API quotas.
+* **Strict SSRF & Input Sanitization:** Image thumbnail URLs strictly validated against YouTube CDN domains (`i.ytimg.com`, `ytimg.com`), rejecting external links.
+* **34 Automated Security Tests:** Comprehensive native Node test suite verifying rate limiter isolation, CSPRNG room code entropy, socket acks, and schema boundaries.
+
+</td>
+<td width="50%" valign="top">
+
+### 🎹 10. Integrated Navbar Search & Keyboard Shortcuts
+* **Pill Navbar Search (`RoomNavbarSearch`):** Integrated directly into `AppHeader` with brand logo and magnifying glass trigger for distraction-free navigation.
+* **Global Keyboard Shortcuts Cheatsheet:** In-room modal with single-key triggers for Space (Play/Pause), M (Mute), F (Fullscreen), Arrow Left/Right (±5s Seek), J/L (±10s Seek), Arrow Up/Down (Volume), Y (Previous Track), and N (Next Track).
+* **Surface Click Ripples:** Animated visual ripples confirming play/pause actions on the player viewport.
 
 </td>
 </tr>
@@ -174,14 +204,18 @@ SyncD utilizes Socket.IO over WebSockets with Clerk JWT handshake verification. 
 | `playback:clear` | Client → Server | **Host Only** | Clears the active track **and queue** | `{ roomCode: string }` |
 | `chat:send` | Client → Server | Verified Member | Sends a room chat message (max 500 chars) | `{ roomCode: string, content: string }` |
 | `queue:add` | Client → Server | **Host Only** | Appends a track to the in-memory queue | `{ roomCode: string, track: TrackPayload }` |
+| `queue:prepend` | Client → Server | **Host Only** | Prepends a track to the front of the queue | `{ roomCode: string, track: TrackPayload }` |
 | `queue:remove` | Client → Server | **Host Only** | Removes item at the given index | `{ roomCode: string, index: number }` |
 | `queue:reorder` | Client → Server | **Host Only** | Moves item from one index to another | `{ roomCode: string, fromIndex: number, toIndex: number }` |
 | `queue:advance` | Client → Server | **Host Only** | Pops front item and plays it (or clears if empty) | `{ roomCode: string }` |
 | `queue:clear` | Client → Server | **Host Only** | Empties the entire queue | `{ roomCode: string }` |
+| `host:transfer` | Client → Server | **Host Only** | Promotes a member to room host | `{ roomCode: string, newHostUserId: string }` |
 | `playback:update` | Server → Room | Room Channel | Broadcasts updated server-authoritative playback | `PlaybackSnapshot` |
-| `presence:update` | Server → Room | Room Channel | Broadcasts online/offline member list | `PresenceSnapshot` |
+| `presence:update` | Server → Room | Room Channel | Broadcasts online/offline member list and host ID | `PresenceSnapshot` |
 | `chat:new` | Server → Room | Room Channel | Broadcasts newly persisted chat message | `ChatMessageDTO` |
 | `queue:update` | Server → Room | Room Channel | Broadcasts authoritative ordered queue snapshot | `QueueItem[]` |
+| `host:pending` | Server → Room | Room Channel | Broadcasts pending host transfer countdown deadline | `{ deadline: number }` |
+| `host:update` | Server → Room | Room Channel | Broadcasts host promotion notification & reason | `{ hostUserId: string, reason: string }` |
 
 <br/>
 
@@ -191,6 +225,7 @@ SyncD utilizes Socket.IO over WebSockets with Clerk JWT handshake verification. 
 // Join Acknowledgement payload received by joining client
 interface RoomJoinResponse {
   ok: boolean;
+  hostUserId?: string;
   presence?: {
     members: Array<{ userId: string; username: string; online: boolean }>;
   };
@@ -212,7 +247,7 @@ interface RoomJoinResponse {
     content: string;
     createdAt: string;
   }>;
-  // Phase 8 — in-memory queue snapshot
+  // Ephemeral queue snapshot
   queue?: Array<{
     videoId: string;
     title: string;
@@ -389,6 +424,7 @@ All protected REST routes require a valid Clerk Bearer JWT passed in the `Author
 | `POST` | `/api/rooms/:roomCode/leave` | Authenticated | Removes user from permanent room membership | `{ success: true }` |
 | `GET` | `/api/music/search` | Authenticated | Searches YouTube for music and video tracks | `{ results: YouTubeSearchResult[] }` |
 | `GET` | `/api/music/video` | Authenticated | Resolves pasted YouTube URL or ID to playable track | `{ result: YouTubeSearchResult }` |
+| `GET` | `/api/music/playlist` | Authenticated | Resolves YouTube playlist link/ID to up to 50 playable tracks | `{ results: YouTubeSearchResult[], playlistTitle?: string }` |
 
 <br/>
 
@@ -564,6 +600,19 @@ Visit [`http://localhost:5173`](http://localhost:5173) in your browser to start 
 
 <br/>
 
+### 5. Run Automated Unit & Security Test Suite
+
+Validate rate limiting, socket acknowledgements, SSRF defenses, room shortcode entropy, and input schemas:
+
+```bash
+# Run all backend unit & security tests
+npm test
+# or directly from server workspace:
+cd server && npm test
+```
+
+<br/>
+
 ---
 
 ## ⚙️ Configuration & Environment
@@ -617,22 +666,36 @@ Syncd/
 │   ├── 📁 src/                        # Client source code
 │   │   ├── 📁 assets/                 # Local media assets
 │   │   ├── 📁 components/             # Reusable UI & Feature components
-│   │   │   ├── 📁 landing/            # Landing page sections (Hero, Features, Showcase)
-│   │   │   ├── 📁 ui/                 # Atomic design controls (Button, Card, Avatar, Equalizer)
+│   │   │   ├── 📁 icons/              # Scalable SVG brand & provider icons (YouTubeIcon)
+│   │   │   ├── 📁 landing/            # Landing page sections & WebGL shader modules
+│   │   │   │   ├── 📄 FloatingLines.tsx # Three.js WebGL GPU shader background
+│   │   │   │   ├── 📄 Hero.tsx        # Cinematic Hero with equalizer & turntable
+│   │   │   │   ├── 📄 HeroIconFlipper.tsx # 3D rotating action/YouTube mark flipper
+│   │   │   │   ├── 📄 ProductShowcase.tsx # Real-time album art & device mockup
+│   │   │   │   └── 📄 FinalCTA.tsx    # Interactive closing section with FloatingLines
+│   │   │   ├── 📁 ui/                 # Atomic design controls & tactile micro-interactions
+│   │   │   │   ├── 📄 MagneticButton.tsx # Spring-physics magnetic cursor follower
+│   │   │   │   ├── 📄 SplitFlapText.tsx  # Departure-board character ticker animation
+│   │   │   │   ├── 📄 EqualizerBars.tsx  # Dynamic SVG equalizer rhythm bars
+│   │   │   │   ├── 📄 AppHeader.tsx      # Shared sticky header with pill search bar
+│   │   │   │   ├── 📄 Button.tsx         # Pill buttons with amber glow & variants
+│   │   │   │   └── 📄 Card.tsx           # Glassmorphism container primitives
 │   │   │   ├── 📄 AuthStatusScreen.tsx# Full-page auth error & retry screen
 │   │   │   ├── 📄 ChatPanel.tsx       # Live room chat panel with auto-scroll management
 │   │   │   ├── 📄 MusicSearch.tsx     # YouTube search query input & video link resolver
 │   │   │   ├── 📄 ProtectedRoute.tsx  # Auth & Onboarding route guards
 │   │   │   ├── 📄 QueuePanel.tsx      # Host queue list: thumbnails, drag-reorder & controls
-│   │   │   └── 📄 YouTubePlayer.tsx   # Synchronized YouTube iframe container
+│   │   │   ├── 📄 RoomNavbarSearch.tsx# Header-mounted pill search with live preview dropdown
+│   │   │   └── 📄 YouTubePlayer.tsx   # Pro synchronized player with speed, volume & shortcuts
 │   │   ├── 📁 config/                 # Environment configuration loader
 │   │   │   └── 📄 env.ts              # API & Socket URL configurations
 │   │   ├── 📁 hooks/                  # Custom React reactive hooks
+│   │   │   ├── 📄 useAlbumArt.ts      # Real-time album cover fetcher & cache
 │   │   │   ├── 📄 useCurrentUser.ts   # Cached user profile consumer hook
 │   │   │   ├── 📄 useRoomSocket.ts    # Socket.IO lifecycle, presence, chat & playback state
 │   │   │   └── 📄 useYouTubePlayer.ts # Low-level YouTube IFrame API control hook
 │   │   ├── 📁 pages/                  # Page-level route views
-│   │   │   ├── 📄 Home.tsx            # User dashboard & Room creator/joiner
+│   │   │   ├── 📄 Home.tsx            # User dashboard with FloatingLines & room actions
 │   │   │   ├── 📄 Landing.tsx         # High-conversion marketing landing page
 │   │   │   ├── 📄 Onboarding.tsx      # Username creation wizard
 │   │   │   ├── 📄 Room.tsx            # Two-column synchronized listening lounge
@@ -643,7 +706,7 @@ Syncd/
 │   │   │   ├── 📄 api.ts              # Fetch wrappers for /api/* REST endpoints
 │   │   │   └── 📄 types.ts            # Client-side domain and protocol type definitions
 │   │   ├── 📄 App.tsx                 # Root application routes & Clerk appearance theme
-│   │   ├── 📄 index.css               # Tailwind CSS v4 design tokens & keyframes
+│   │   ├── 📄 index.css               # Tailwind CSS v4 design tokens & themed scrollbars
 │   │   └── 📄 main.tsx                # Client entrypoint with ClerkProvider
 │   ├── 📄 package.json                # Frontend dependencies & Vite scripts
 │   └── 📄 vite.config.ts              # Vite configuration with React Compiler plugin
@@ -654,31 +717,45 @@ Syncd/
 │   ├── 📁 src/                        # Backend TypeScript sources
 │   │   ├── 📁 config/                 # Server environment variables & Prisma client
 │   │   │   ├── 📄 db.ts               # Prisma client initialization with pg adapter
-│   │   │   └── 📄 env.ts              # Typed environment variable loader
+│   │   │   ├── 📄 env.ts              # Typed environment variable loader
+│   │   │   └── 📄 rateLimits.ts       # Multi-tier REST & Socket rate limit definitions
 │   │   ├── 📁 middleware/             # Express middlewares
 │   │   │   ├── 📄 errorHandler.ts     # Centralized error handling & 404 responses
+│   │   │   ├── 📄 rateLimit.ts        # In-memory token bucket rate limiting middleware
 │   │   │   └── 📄 requireAuth.ts      # Clerk authentication enforcement middleware
 │   │   ├── 📁 modules/                # Feature-based domain modules
 │   │   │   ├── 📁 messages/           # Chat persistence & 500-char validation
-│   │   │   ├── 📁 music/              # YouTube search & URL parsing controllers
+│   │   │   ├── 📁 music/              # YouTube search, video resolver & playlist importer
 │   │   │   ├── 📁 playback/           # Host-authoritative playback services
 │   │   │   ├── 📁 rooms/              # Room creation, code validation & membership
 │   │   │   └── 📁 users/              # User profile retrieval & username onboarding
 │   │   ├── 📁 routes/                 # Express API router aggregator
 │   │   │   └── 📄 index.ts            # Mounts /api routes
 │   │   ├── 📁 sockets/                # Real-time WebSocket handlers
+│   │   │   ├── 📄 ack.ts              # Safe acknowledgement reply wrappers
+│   │   │   ├── 📄 host.types.ts       # Host transfer event & payload interfaces
+│   │   │   ├── 📄 hostTransfer.ts     # In-memory grace period timer & succession logic
 │   │   │   ├── 📄 index.ts            # Socket.IO server, JWT middleware & event dispatchers
 │   │   │   ├── 📄 presence.types.ts   # Real-time presence & join-ack type declarations
 │   │   │   ├── 📄 presenceStore.ts    # In-memory ephemeral socket presence store
 │   │   │   ├── 📄 queue.types.ts      # Queue item, snapshot & event payload types
-│   │   │   └── 📄 queueStore.ts       # In-memory ephemeral per-room queue store
+│   │   │   ├── 📄 queueStore.ts       # In-memory ephemeral per-room queue store
+│   │   │   └── 📄 roomBroadcast.ts    # Module-level Socket.IO broadcast dispatcher
 │   │   ├── 📁 utils/                  # Shared backend utilities
 │   │   │   ├── 📄 logger.ts           # Structured logging utility
-│   │   │   └── 📄 roomCode.ts         # 6-character room code generator
+│   │   │   └── 📄 roomCode.ts         # 6-character room code generator (CSPRNG)
 │   │   ├── 📄 app.ts                  # Express application setup & middleware chain
 │   │   └── 📄 server.ts               # HTTP & Socket.IO server entrypoint (Port 5000)
+│   ├── 📁 tests/                      # Automated Unit & Security Test Suites (34 Tests)
+│   │   ├── 📄 rateLimit.security.test.ts # Rate limiter token bucket behavior
+│   │   ├── 📄 rateLimitMiddleware.security.test.ts # Express 429 response enforcement
+│   │   ├── 📄 roomCode.security.test.ts  # CSPRNG entropy & code validation
+│   │   ├── 📄 socketAck.security.test.ts # Forged & missing socket ack safety
+│   │   ├── 📄 trackInput.security.test.ts# YouTube link/playlist parser & SSRF defense
+│   │   └── 📄 userInput.security.test.ts # Username sanitize & proto-pollution defense
 │   ├── 📄 package.json                # Backend dependencies & Prisma scripts
-│   └── 📄 tsconfig.json               # Backend TypeScript configuration
+│   ├── 📄 tsconfig.json               # Backend TypeScript configuration
+│   └── 📄 tsconfig.test.json          # TypeScript test runner configuration
 ├── 📁 docs/                           # Architecture documentation & phase logs
 │   ├── 📄 ARCHITECTURE.md             # System architecture & boundary definitions
 │   └── 📄 CURRENT_STATE.md            # Detailed phase completion changelog & limitations
@@ -731,20 +808,121 @@ Syncd/
   - [x] Automatic track advancement when the active video ends
   - [x] Queue snapshot bundled into the `room:join` ack for instant late-joiner sync
   - [x] Dual **Play now** / **+ Queue** buttons in search results when a track is playing
-- [x] **Phase 9: Host Transfer**
+- [x] **Phase 9: Host Transfer & Room Continuity**
   - [x] Automatic host transfer on disconnect, behind a 30-second grace period
   - [x] Manual host promotion from the in-room people list
   - [x] Host handover on deliberate leave — the room is no longer deleted
-  - [ ] Free-for-all listening mode where any member can control playback
-- [ ] **Phase 10: Interactive Reactions & Production Scaling**
+- [x] **Phase 10: Enterprise Security Hardening & Multi-Tier Rate Limiting**
+  - [x] Multi-tier in-memory token bucket rate limiting on REST endpoints and WebSocket events
+  - [x] Room shortcode brute-force defense (30 attempts / 5 min against $31^6$ namespace)
+  - [x] SSRF defense with strict YouTube CDN domain whitelisting (`i.ytimg.com`, `ytimg.com`)
+  - [x] Prototype pollution defense, input sanitization, and Helmet HTTP security headers
+  - [x] 34 automated unit and security tests in `server/tests/`
+- [x] **Phase 11: YouTube Playlist Importer & Instant Live Previews**
+  - [x] Full playlist import endpoint (`GET /api/music/playlist`) fetching up to 50 playable tracks
+  - [x] Real-time debounced preview cards for pasted video and playlist URLs in search & navbar
+  - [x] Bulk playlist playback and queue operations ("Play playlist" and "Queue all (N)")
+- [x] **Phase 12: Pro Lounge Controls, Playback History & WebGL Visual Physics**
+  - [x] 30-track client-side playback history with instant `queue:prepend` for returning to previous tracks
+  - [x] Independent local volume & mute controls with `localStorage` persistence
+  - [x] Multi-speed playback selector (0.5x to 2x) with rate-adjusted drift compensation
+  - [x] Dynamic video stream quality badge (4K, 1080p, 720p, etc.) hooked to IFrame quality events
+  - [x] Global keyboard shortcuts popover and hotkeys (Space, M, F, J/L, Arrows, Y, N)
+  - [x] Header-integrated pill search bar (`RoomNavbarSearch`)
+  - [x] Three.js WebGL FloatingLines GPU shader background in Home and Final CTA
+  - [x] Split-flap departure board room code typography and spring-physics magnetic buttons
+- [ ] **Phase 13: Interactive Reactions & Production Scaling**
   - [ ] Ephemeral audio soundboard and floating emoji bursts
   - [ ] Redis Adapter for multi-instance Socket.IO cluster scaling
+  - [ ] Free-for-all listening mode where any member can control playback
 
 <br/>
 
 ---
 
 ## 🚀 Recent Updates
+
+### 🛡️ Enterprise Security Hardening, Multi-Tier Rate Limiting & SSRF Defense
+
+* **⏱️ Multi-Tier Rate Limiting Architecture:**
+  * Implemented robust in-memory token bucket rate limiters protecting all REST API endpoints and Socket.IO real-time events.
+  * Configured abuse ceilings designed to block scripted exhaustion while keeping regular human usage unrestricted (`server/src/config/rateLimits.ts`):
+    * `joinRoom`: 30 attempts per 5 minutes — effectively eliminates brute-force room shortcode guessing across the $31^6$ space.
+    * `musicSearch`: 30 requests per minute — prevents malicious burning of the Google Cloud YouTube Data API quota.
+    * `musicPlaylist`: 15 requests per minute — bounds heavy multi-video batch calls.
+    * `createRoom` (15 / 5m), `createProfile` (10 / 10m), `/me` (60 / 1m).
+    * Socket rate limits: `roomJoin` (20/m), `chatSend` (15 / 10s), `playback` (40 / 10s), `queue` (100 / 10s — handles bulk playlist enqueues), `hostTransfer` (10/m).
+* **🔒 SSRF Defense & Payload Sanitization:**
+  * **Strict Thumbnail Sanitization:** Rejects arbitrary external image URLs in track payloads; strictly enforces official YouTube CDN domains (`i.ytimg.com`, `*.ytimg.com`) to prevent SSRF and IP tracking of room members.
+  * **Video ID Validation:** Enforces strict 11-character alphanumeric YouTube ID patterns (`^[a-zA-Z0-9_-]{11}$`).
+  * **Username & Chat Guardrails:** Normalizes and trims display handles, defends against prototype pollution (`__proto__`), and enforces a strict 500-character ceiling on chat messages.
+  * **Helmet HTTP Headers:** Adds standard HTTP security headers (X-Content-Type-Options, X-Frame-Options, etc.).
+* **🧪 34 Automated Unit & Security Tests:**
+  * Implemented an end-to-end native test suite executed via `npm test` (`tests/*.security.test.ts`), verifying rate limiter token depletion, caller isolation, CSPRNG room code randomness, socket ack safety, and playlist link parsing.
+
+<br/>
+
+### 📑 YouTube Playlist Import & Instant Link Previews
+
+* **🎵 Full-Stack Playlist Import Engine:**
+  * Added `GET /api/music/playlist?url=<link>` endpoint resolving entire YouTube playlists using the YouTube Data API v3 `playlistItems` and `videos` endpoints.
+  * Automatically filters out private and unembeddable tracks while preserving original track sequencing, returning up to 50 playable tracks in a single batch.
+* **⚡ Debounced Live Preview Cards:**
+  * `RoomNavbarSearch` and `MusicSearch` automatically detect pasted YouTube video or playlist links with a 400ms debounce.
+  * Displays high-resolution thumbnail, video/playlist title, channel attribution, duration, and track count *before* adding to the room.
+* **🚀 Bulk Playlist Actions:**
+  * **Play playlist:** Starts playing the first track immediately and enqueues all subsequent tracks.
+  * **Queue all (N):** Appends all tracks from the playlist directly to the shared room queue with one click.
+
+<br/>
+
+### 🎛️ Pro Lounge Player: Playback History, Speed, Volume & Shortcuts
+
+* **⏪ 30-Track Playback History & Rewind Navigation:**
+  * Client-side history tracks the last 30 played songs in the room.
+  * Host can click "Previous track" (or press <kbd>Y</kbd>) to return to the preceding song.
+  * Automatically prepends the currently playing track to the front of the queue (`queue:prepend` socket event), ensuring playheads are never lost during navigation.
+* **🔊 Persistent Local Volume & Mute:**
+  * Independent volume slider and mute toggle that control only the local user's player without altering room state.
+  * Volume and mute states persist seamlessly across page reloads and room transitions via `localStorage` (`syncd_volume`, `syncd_muted`).
+* **⏩ Multi-Rate Playback Engine:**
+  * Choose between 0.5x, 0.75x, 1x, 1.25x, 1.5x, and 2x playback rates.
+  * Drift calculation dynamically compensates for the playback rate (`((now - atMs) / 1000) * playbackRate`), maintaining synchrony across speed changes.
+* **📺 Read-Only Video Stream Quality Badge:**
+  * Real-time stream resolution indicator (4K, 1440p, 1080p, 720p, 480p, Auto) updated directly from YouTube's `onPlaybackQualityChange` IFrame API event.
+* **🔁 Single-Track Looper:**
+  * Toggle infinite looping on the active track; seeks back to 00:00 on video end instead of auto-advancing the queue.
+* **🎹 Global In-Room Keyboard Shortcuts:**
+  * Built-in cheatsheet popover with intuitive hotkeys:
+    * <kbd>Space</kbd> / <kbd>K</kbd>: Play / Pause
+    * <kbd>M</kbd>: Mute / Unmute
+    * <kbd>F</kbd>: Toggle Fullscreen
+    * <kbd>←</kbd> / <kbd>→</kbd>: Seek backward / forward 5 seconds
+    * <kbd>J</kbd> / <kbd>L</kbd>: Seek backward / forward 10 seconds
+    * <kbd>↑</kbd> / <kbd>↓</kbd>: Adjust volume ±5%
+    * <kbd>Y</kbd>: Navigate to previous video
+    * <kbd>N</kbd>: Skip to next video in queue
+* **🔍 Header-Mounted Pill Search Bar:**
+  * Replaced bulky in-page search forms with a streamlined, pill-shaped `RoomNavbarSearch` mounted in `AppHeader`.
+  * Preserves screen space for the synchronized video player, real-time chat, and queue list.
+
+<br/>
+
+### ✨ WebGL Shader & Tactile Landing Physics
+
+* **🌊 Three.js WebGL FloatingLines Shader:**
+  * Interactive GPU-rendered sunset wave shader background mounted on the Landing page and Dashboard (`Home.tsx`).
+  * Real-time cursor proximity curvature, wave displacement, parallax physics, and warm amber color ramps.
+* **🧲 Spring-Physics Magnetic Buttons:**
+  * `MagneticButton` wrapper adds tactile cursor attraction to primary call-to-action buttons.
+* **🔤 Split-Flap Departure Board Typography:**
+  * `SplitFlapText` simulates mechanical flip-card character animations for room shortcode previews and interactive text reveals.
+* **🔄 Hero 3D CTA Icon Flipper:**
+  * `HeroIconFlipper` cycles smoothly between plus and YouTube iconography with 3D entry/exit transforms.
+* **💿 Real Album Art Hydration:**
+  * Integrated `useAlbumArt` hook fetching verified cover artwork for showcase vinyl turntables and interactive previews.
+
+<br/>
 
 ### 👑 Phase 9 Complete — Host Transfer
 

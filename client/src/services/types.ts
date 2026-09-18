@@ -92,6 +92,11 @@ export interface YouTubeVideoResponse {
   result: YouTubeSearchResult;
 }
 
+export interface YouTubePlaylistResponse {
+  results: YouTubeSearchResult[];
+  playlistTitle?: string;
+}
+
 /**
  * The room's shared playback state, broadcast over Socket.IO.
  *

@@ -2,7 +2,11 @@ import { Router } from "express";
 import { requireAuth } from "../../middleware/requireAuth.js";
 import { rateLimit } from "../../middleware/rateLimit.js";
 import { REST_RATE_LIMITS } from "../../config/rateLimits.js";
-import { resolveVideo, searchMusic } from "./music.controller.js";
+import {
+  resolvePlaylist,
+  resolveVideo,
+  searchMusic,
+} from "./music.controller.js";
 
 const router = Router();
 
@@ -17,6 +21,12 @@ router.get(
   requireAuth,
   rateLimit("musicVideo", REST_RATE_LIMITS.musicVideo),
   resolveVideo,
+);
+router.get(
+  "/music/playlist",
+  requireAuth,
+  rateLimit("musicPlaylist", REST_RATE_LIMITS.musicPlaylist),
+  resolvePlaylist,
 );
 
 export default router;

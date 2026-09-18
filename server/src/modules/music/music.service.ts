@@ -234,3 +234,167 @@ export async function getYouTubeVideoById(
     duration: item.contentDetails.duration,
   };
 }
+
+interface YouTubePlaylistItem {
+  snippet?: {
+    title: string;
+    resourceId?: {
+      kind: string;
+      videoId?: string;
+    };
+  };
+  status?: {
+    privacyStatus?: string;
+  };
+}
+
+interface YouTubePlaylistItemsResponse {
+  items: YouTubePlaylistItem[];
+}
+
+/**
+ * Resolves up to 50 videos from a YouTube playlist into YouTubeSearchResult items,
+ * skipping private and non-embeddable videos while preserving the playlist order.
+ */
+export async function getYouTubePlaylistVideos(
+  playlistId: string,
+): Promise<YouTubeSearchResult[]> {
+  const apiKey = config.youtubeApiKey;
+  if (!apiKey) {
+    logger.error("YouTube API key is not configured");
+    throw new AppError("YouTube links are not available", 503);
+  }
+
+  const playlistUrl = new URL(
+    "https://www.googleapis.com/youtube/v3/playlistItems",
+  );
+  playlistUrl.searchParams.set("part", "snippet,status");
+  playlistUrl.searchParams.set("playlistId", playlistId);
+  playlistUrl.searchParams.set("maxResults", "50");
+  playlistUrl.searchParams.set("key", apiKey);
+
+  let playlistResponse: Response;
+  try {
+    playlistResponse = await fetch(playlistUrl.toString(), {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+  } catch {
+    logger.error("YouTube playlist request failed — network error");
+    throw new AppError("YouTube is temporarily unavailable", 502);
+  }
+
+  if (playlistResponse.status === 404) {
+    throw new AppError("Playlist not found or is private", 404);
+  }
+
+  if (playlistResponse.status === 403 || playlistResponse.status === 400) {
+    logger.error("YouTube API quota exceeded or API key invalid", {
+      status: playlistResponse.status,
+    });
+    throw new AppError("YouTube is temporarily unavailable", 503);
+  }
+
+  if (!playlistResponse.ok) {
+    logger.error("YouTube playlist API error", {
+      status: playlistResponse.status,
+    });
+    throw new AppError("Could not load that playlist", 502);
+  }
+
+  let playlistBody: YouTubePlaylistItemsResponse;
+  try {
+    playlistBody =
+      (await playlistResponse.json()) as YouTubePlaylistItemsResponse;
+  } catch {
+    throw new AppError("Could not load that playlist — invalid response", 502);
+  }
+
+  const videoIds: string[] = [];
+  for (const item of playlistBody.items ?? []) {
+    if (item.status?.privacyStatus === "private") continue;
+    const videoId = item.snippet?.resourceId?.videoId;
+    if (videoId && item.snippet?.resourceId?.kind === "youtube#video") {
+      videoIds.push(videoId);
+    }
+  }
+
+  if (videoIds.length === 0) {
+    throw new AppError("No playable videos found in this playlist", 404);
+  }
+
+  const videosUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+  videosUrl.searchParams.set("part", "snippet,contentDetails,status");
+  videosUrl.searchParams.set("id", videoIds.join(","));
+  videosUrl.searchParams.set("key", apiKey);
+
+  let videosResponse: Response;
+  try {
+    videosResponse = await fetch(videosUrl.toString(), {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+  } catch {
+    logger.error("YouTube videos details request failed — network error");
+    throw new AppError("YouTube is temporarily unavailable", 502);
+  }
+
+  if (videosResponse.status === 403 || videosResponse.status === 400) {
+    logger.error("YouTube API quota exceeded or API key invalid", {
+      status: videosResponse.status,
+    });
+    throw new AppError("YouTube is temporarily unavailable", 503);
+  }
+
+  if (!videosResponse.ok) {
+    logger.error("YouTube videos API error", {
+      status: videosResponse.status,
+    });
+    throw new AppError("Could not load playlist videos", 502);
+  }
+
+  let videosBody: YouTubeVideoDetailsResponse;
+  try {
+    videosBody =
+      (await videosResponse.json()) as YouTubeVideoDetailsResponse;
+  } catch {
+    throw new AppError(
+      "Could not load playlist videos — invalid response",
+      502,
+    );
+  }
+
+  const detailsMap = new Map<string, YouTubeSearchResult>();
+  for (const item of videosBody.items ?? []) {
+    if (item.status?.embeddable === false) {
+      continue;
+    }
+    const thumb =
+      item.snippet?.thumbnails?.medium?.url ??
+      item.snippet?.thumbnails?.default?.url ??
+      item.snippet?.thumbnails?.high?.url ??
+      "";
+
+    detailsMap.set(item.id, {
+      videoId: item.id,
+      title: item.snippet?.title ?? "",
+      channelTitle: item.snippet?.channelTitle ?? "",
+      thumbnailUrl: thumb,
+      duration: item.contentDetails?.duration ?? "",
+    });
+  }
+
+  const results: YouTubeSearchResult[] = [];
+  for (const id of videoIds) {
+    const detail = detailsMap.get(id);
+    if (detail) {
+      results.push(detail);
+    }
+  }
+
+  if (results.length === 0) {
+    throw new AppError("No playable videos found in this playlist", 404);
+  }
+
+  return results;
+}

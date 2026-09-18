@@ -31,6 +31,15 @@ class QueueStore {
     return [...q];
   }
 
+  /** Prepend an item to the front of the queue. Returns the updated snapshot. */
+  prepend(roomCode: string, item: QueueItem): QueueItem[] {
+    const q = this.getOrCreate(roomCode);
+    if (q.length < MAX_QUEUE_SIZE) {
+      q.unshift(item);
+    }
+    return [...q];
+  }
+
   /**
    * Pop the first item from the queue and return it.
    * Returns `undefined` when the queue is already empty.

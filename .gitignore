@@ -9,5 +9,5 @@ build/
 .env
 .env.*
 !.env.example
-.agent
+.agent/
 sli.md
