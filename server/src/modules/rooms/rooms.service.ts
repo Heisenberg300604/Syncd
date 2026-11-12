@@ -190,6 +190,32 @@ export async function getRoomByCode(roomCode: string): Promise<RoomDTO | null> {
   return room ? toRoomDTO(room) : null;
 }
 
+/**
+ * Returns true if the authenticated Clerk user is currently a member of the
+ * given room. Used by the REST `getRoom` handler to enforce access control
+ * before returning full room details.
+ */
+export async function isMemberOfRoom(
+  clerkUserId: string,
+  roomCode: string,
+): Promise<boolean> {
+  const user = await findUserByClerkId(clerkUserId);
+  if (!user) return false;
+
+  const room = await prisma.room.findUnique({
+    where: { roomCode },
+    select: {
+      members: {
+        where: { userId: user.id },
+        select: { userId: true },
+        take: 1,
+      },
+    },
+  });
+
+  return (room?.members.length ?? 0) > 0;
+}
+
 export async function getRoomHostId(roomCode: string): Promise<string | null> {
   const room = await prisma.room.findUnique({
     where: { roomCode },

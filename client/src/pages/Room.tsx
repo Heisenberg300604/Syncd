@@ -66,6 +66,8 @@ export function Room() {
     chatSending,
     sendChatMessage,
     queue,
+    queueError,
+    clearQueueError,
     addToQueue,
     prependToQueue,
     removeFromQueue,
@@ -435,6 +437,8 @@ export function Room() {
               onReorder={reorderQueue}
               onClear={clearQueue}
               onSkip={advanceQueue}
+              error={queueError}
+              onDismissError={clearQueueError}
             />
           </div>
         </div>

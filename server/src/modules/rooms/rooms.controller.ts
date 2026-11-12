@@ -6,6 +6,7 @@ import { validateRoomCode } from "./rooms.validation.js";
 import {
   createRoomWithHost,
   getRoomByCode,
+  isMemberOfRoom,
   joinRoom,
   leaveRoom,
 } from "./rooms.service.js";
@@ -74,6 +75,11 @@ export const getRoom = asyncHandler(async (req: Request, res: Response) => {
 
   if (!room) {
     throw new AppError("Room not found", 404);
+  }
+
+  const memberCheck = await isMemberOfRoom(userId, validation.value);
+  if (!memberCheck) {
+    throw new AppError("Forbidden", 403);
   }
 
   res.status(200).json({ room } satisfies RoomResponse);

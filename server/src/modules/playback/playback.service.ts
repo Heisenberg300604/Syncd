@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma.js";
 import { AppError } from "../../utils/apiResponse.js";
 import { parseIso8601DurationToSeconds } from "../music/music.validation.js";
+import { validateSeekPosition } from "./playback.validation.js";
 import type {
   PlaybackAction,
   PlaybackSnapshot,
@@ -85,7 +86,7 @@ export async function applyPlaybackControl(
 ): Promise<PlaybackSnapshot> {
   const existing = await prisma.room.findUnique({
     where: { roomCode },
-    select: { currentVideoId: true, isPlaying: true },
+    select: { currentVideoId: true, isPlaying: true, currentDuration: true },
   });
 
   if (!existing) {
@@ -96,8 +97,19 @@ export async function applyPlaybackControl(
     throw new AppError("Nothing is loaded in this room", 409);
   }
 
-  const safePosition =
-    Number.isFinite(position) && position >= 0 ? position : 0;
+  let safePosition: number;
+
+  if (action === "seek") {
+    const seekResult = validateSeekPosition(position, existing.currentDuration);
+    if (!seekResult.ok) {
+      throw new AppError(seekResult.message, 400);
+    }
+    safePosition = seekResult.value;
+  } else {
+    // play / pause: apply the simple existing guard
+    safePosition =
+      Number.isFinite(position) && position >= 0 ? position : 0;
+  }
 
   const room = await prisma.room.update({
     where: { roomCode },

@@ -35,6 +35,14 @@ interface PendingTransfer {
 class HostTransferStore {
   private readonly pending = new Map<string, PendingTransfer>();
 
+  /**
+   * Per-room in-memory guard against concurrent timer callbacks both running
+   * the DB transfer simultaneously. The DB `updateMany` conditional guard is
+   * the authoritative protection; this Set makes the second callback a cheap
+   * no-op before it even touches the database.
+   */
+  private readonly transferInProgress = new Set<string>();
+
   arm(
     roomCode: string,
     hostUserId: string,
@@ -64,6 +72,18 @@ class HostTransferStore {
 
   isPending(roomCode: string): boolean {
     return this.pending.has(roomCode);
+  }
+
+  /** Mark a room as having a transfer in progress. Returns false if already marked. */
+  beginTransfer(roomCode: string): boolean {
+    if (this.transferInProgress.has(roomCode)) return false;
+    this.transferInProgress.add(roomCode);
+    return true;
+  }
+
+  /** Clear the in-progress flag for a room. */
+  endTransfer(roomCode: string): void {
+    this.transferInProgress.delete(roomCode);
   }
 }
 
@@ -123,6 +143,13 @@ function emitPending(
   emitToRoom(roomCode, "host:pending", payload);
 }
 
+// Empty-room policy: if the host disconnects and no other members are online,
+// no timer is armed and the room state is preserved frozen in the database.
+// When any member next connects (or reconnects), reevaluateHostSuccession()
+// re-examines the situation and arms a transfer timer if appropriate.
+// If the room remains empty indefinitely, the frozen state is acceptable for
+// the MVP: the room can still be rejoined and the host role re-assigned.
+
 /**
  * Called when a user's last socket for a room drops. Arms the grace timer only
  * if that user was the host and someone else is online to take over; otherwise
@@ -174,6 +201,16 @@ async function runScheduledTransfer(
   expectedHostUserId: string,
   expectedHostUsername: string,
 ): Promise<void> {
+  // In-memory guard: prevent two concurrent timer callbacks from both running
+  // the DB transfer for the same room. The DB `updateMany` conditional is the
+  // authoritative guard; this is a cheap early exit before any DB round-trip.
+  if (!hostTransferStore.beginTransfer(roomCode)) {
+    logger.info(
+      `Skipping duplicate transfer attempt for ${roomCode} (already in progress)`,
+    );
+    return;
+  }
+
   let transferred = false;
   try {
     const roomData = await getRoomMembersForPresence(roomCode);
@@ -205,6 +242,7 @@ async function runScheduledTransfer(
   } catch (err) {
     logger.error(`Scheduled host transfer failed for ${roomCode}`, err);
   } finally {
+    hostTransferStore.endTransfer(roomCode);
     // Every path that did not transfer (successor went offline, the host
     // changed underneath us, an error) still has to retire the countdown
     // banner; a successful transfer retires it via `host:update`.
@@ -240,6 +278,62 @@ export function cancelPendingTransferOnReturn(
     pending: false,
     hostUserId: userId,
     hostUsername: username,
+  });
+}
+
+/**
+ * Called when a member joins a room that may have an offline host.
+ *
+ * Covers the gap where the host disconnected when no one else was online
+ * (so no timer was armed), but now a member is back. If the host is still
+ * offline and no transfer is already pending, we arm one now.
+ *
+ * Guards:
+ * - Does nothing if a transfer is already pending.
+ * - Does nothing if the host is currently online.
+ * - Only picks successors who are actual room members.
+ * - Only picks successors who are currently online.
+ */
+export async function reevaluateHostSuccession(
+  roomCode: string,
+  roomData: RoomPresenceData,
+): Promise<void> {
+  // A timer is already ticking — nothing to do.
+  if (hostTransferStore.isPending(roomCode)) return;
+
+  // Host is online — no succession needed.
+  if (presenceStore.isOnline(roomCode, roomData.hostUserId)) return;
+
+  // Find the host's username from the members list (may be absent if they
+  // have fully left the room rather than just disconnected).
+  const hostMember = roomData.members.find(
+    (m) => m.userId === roomData.hostUserId,
+  );
+  const hostUsername = hostMember?.username ?? roomData.hostUserId;
+
+  // Pick the best online successor from the current member list.
+  const successor = pickSuccessor(roomCode, roomData, roomData.hostUserId);
+  if (!successor) return;
+
+  const deadline = hostTransferStore.arm(
+    roomCode,
+    roomData.hostUserId,
+    HOST_TRANSFER_GRACE_MS,
+    () => {
+      void runScheduledTransfer(roomCode, roomData.hostUserId, hostUsername);
+    },
+  );
+
+  logger.info(
+    `Reevaluated host succession in ${roomCode}: host ${hostUsername} offline, arming transfer to ${successor.username} in ${HOST_TRANSFER_GRACE_MS / 1000}s`,
+  );
+
+  emitPending(roomCode, {
+    pending: true,
+    hostUserId: roomData.hostUserId,
+    hostUsername,
+    successorUsername: successor.username,
+    deadline: new Date(deadline).toISOString(),
   });
 }
 

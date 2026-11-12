@@ -47,6 +47,7 @@ import {
   announceHostChange,
   cancelPendingTransferOnReturn,
   clearPendingTransfer,
+  reevaluateHostSuccession,
   scheduleHostTransferIfHostLeft,
 } from "./hostTransfer.js";
 import {
@@ -55,8 +56,9 @@ import {
   setRoomBroadcaster,
 } from "./roomBroadcast.js";
 import { reply } from "./ack.js";
-import { queueStore } from "./queueStore.js";
+import { queueStore, roomMutex } from "./queueStore.js";
 import type {
+  EnqueueResult,
   QueueAck,
   QueueAddPayload,
   QueueAdvancePayload,
@@ -184,7 +186,17 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "queue:add",
       (payload: QueueAddPayload, ack?: (res: QueueAck) => void) => {
         handleQueueAdd(io, user, payload, joinedRooms)
-          .then((queue) => reply(ack, { ok: true, queue }))
+          .then((result) => {
+            if (!result.ok) {
+              reply(ack, {
+                ok: false,
+                message: "Queue is full (max 50 tracks)",
+                code: "QUEUE_FULL",
+              });
+            } else {
+              reply(ack, { ok: true, queue: result.queue });
+            }
+          })
           .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
       },
     );
@@ -193,7 +205,17 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
       "queue:prepend",
       (payload: QueueAddPayload, ack?: (res: QueueAck) => void) => {
         handleQueuePrepend(io, user, payload, joinedRooms)
-          .then((queue) => reply(ack, { ok: true, queue }))
+          .then((result) => {
+            if (!result.ok) {
+              reply(ack, {
+                ok: false,
+                message: "Queue is full (max 50 tracks)",
+                code: "QUEUE_FULL",
+              });
+            } else {
+              reply(ack, { ok: true, queue: result.queue });
+            }
+          })
           .catch((err) => reply(ack, { ok: false, message: messageOf(err) }));
       },
     );
@@ -369,6 +391,12 @@ async function handleRoomJoin(
     user.id,
     user.username,
     roomData.hostUserId,
+  );
+
+  // If the host was offline and no timer was running (nobody else was online
+  // when the host disconnected), arm a transfer now that someone has joined.
+  reevaluateHostSuccession(roomCode, roomData).catch((err) =>
+    logger.error(`reevaluateHostSuccession failed for ${roomCode}`, err),
   );
 
   const presence = presenceStore.getSnapshot(
@@ -607,7 +635,7 @@ async function handleQueueAdd(
   user: { id: string; username: string },
   payload: QueueAddPayload,
   joinedRooms: Map<string, string>,
-): Promise<QueueSnapshot> {
+): Promise<EnqueueResult> {
   enforceSocketRateLimit("socket:queue", user.id, SOCKET_RATE_LIMITS.queue);
 
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
@@ -623,10 +651,12 @@ async function handleQueueAdd(
 
   const item: QueueItem = validation.value;
 
-  const queue = queueStore.enqueue(roomCode, item);
-  logger.info(`${user.username} queued ${item.videoId} in ${roomCode}`);
-  broadcastQueue(io, roomCode, queue);
-  return queue;
+  const result = queueStore.enqueue(roomCode, item);
+  if (result.ok) {
+    logger.info(`${user.username} queued ${item.videoId} in ${roomCode}`);
+    broadcastQueue(io, roomCode, result.queue);
+  }
+  return result;
 }
 
 async function handleQueuePrepend(
@@ -634,7 +664,7 @@ async function handleQueuePrepend(
   user: { id: string; username: string },
   payload: QueueAddPayload,
   joinedRooms: Map<string, string>,
-): Promise<QueueSnapshot> {
+): Promise<EnqueueResult> {
   enforceSocketRateLimit("socket:queue", user.id, SOCKET_RATE_LIMITS.queue);
 
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
@@ -647,10 +677,12 @@ async function handleQueuePrepend(
 
   const item: QueueItem = validation.value;
 
-  const queue = queueStore.prepend(roomCode, item);
-  logger.info(`${user.username} prepended ${item.videoId} in ${roomCode}`);
-  broadcastQueue(io, roomCode, queue);
-  return queue;
+  const result = queueStore.prepend(roomCode, item);
+  if (result.ok) {
+    logger.info(`${user.username} prepended ${item.videoId} in ${roomCode}`);
+    broadcastQueue(io, roomCode, result.queue);
+  }
+  return result;
 }
 
 async function handleQueueRemove(
@@ -692,6 +724,16 @@ async function handleQueueReorder(
  * Host client detected that the current track ended (or explicitly skipped).
  * Pop the next item from the queue and set it as the room's current track.
  * If the queue is empty, clear playback.
+ *
+ * The entire operation runs under a per-room mutex so that two simultaneous
+ * advance requests (e.g. from a double-click or a network retry) cannot both
+ * dequeue the same item.  The safe ordering under the lock is:
+ *   1. Peek the front item — do NOT dequeue yet.
+ *   2. Check the optional `expectedFrontVideoId` guard.
+ *   3. Persist to DB (setRoomTrack / clearRoomTrack).
+ *   4. Only after DB succeeds: dequeue from memory.
+ *   5. Broadcast the resulting state.
+ * If the DB write fails, the item stays in the queue (not silently lost).
  */
 async function handleQueueAdvance(
   io: SocketIOServer,
@@ -704,24 +746,46 @@ async function handleQueueAdvance(
   const roomCode = assertJoined(payload?.roomCode, joinedRooms);
   await assertHost(roomCode, user.id);
 
-  const next = queueStore.dequeue(roomCode);
-  const queue = queueStore.getQueue(roomCode);
+  return roomMutex.withLock(roomCode, async () => {
+    // 1. Peek — keep the item in the queue until the DB write succeeds.
+    const front = queueStore.peek(roomCode);
 
-  if (next) {
-    const playback = await setRoomTrack(roomCode, user.id, next);
-    logger.info(
-      `${user.username} advanced queue → ${next.videoId} in ${roomCode}`,
-    );
-    broadcastPlayback(io, roomCode, playback);
-  } else {
-    // Queue exhausted — stop playback.
-    const playback = await clearRoomTrack(roomCode, user.id);
-    logger.info(`${user.username} queue exhausted in ${roomCode}`);
-    broadcastPlayback(io, roomCode, playback);
-  }
+    // 2. Idempotency guard: if the caller told us what it expected at the
+    //    front and that no longer matches, this is a duplicate request.
+    if (
+      payload?.expectedFrontVideoId !== undefined &&
+      front?.videoId !== payload.expectedFrontVideoId
+    ) {
+      // The queue already advanced past this item — return current state.
+      logger.info(
+        `${user.username} duplicate advance ignored in ${roomCode} (expected ${payload.expectedFrontVideoId}, front is ${front?.videoId ?? "empty"})`,
+      );
+      return queueStore.getQueue(roomCode);
+    }
 
-  broadcastQueue(io, roomCode, queue);
-  return queue;
+    if (front) {
+      // 3. Persist first — if this throws the item stays in the queue.
+      const playback = await setRoomTrack(roomCode, user.id, front);
+      // 4. DB succeeded — now dequeue.
+      queueStore.dequeue(roomCode);
+      const queue = queueStore.getQueue(roomCode);
+      logger.info(
+        `${user.username} advanced queue → ${front.videoId} in ${roomCode}`,
+      );
+      // 5. Broadcast.
+      broadcastPlayback(io, roomCode, playback);
+      broadcastQueue(io, roomCode, queue);
+      return queue;
+    } else {
+      // Queue exhausted — stop playback.
+      const playback = await clearRoomTrack(roomCode, user.id);
+      const queue = queueStore.getQueue(roomCode);
+      logger.info(`${user.username} queue exhausted in ${roomCode}`);
+      broadcastPlayback(io, roomCode, playback);
+      broadcastQueue(io, roomCode, queue);
+      return queue;
+    }
+  });
 }
 
 async function handleQueueClear(

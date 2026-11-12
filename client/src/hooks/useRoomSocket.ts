@@ -43,6 +43,13 @@ interface HostTransferAck {
   message?: string;
 }
 
+interface QueueAck {
+  ok: boolean;
+  queue?: QueueSnapshot;
+  message?: string;
+  code?: string;
+}
+
 /**
  * Combines two message lists into one, deduped by id and sorted by server
  * timestamp. ISO 8601 strings sort correctly with a plain string compare, so
@@ -95,6 +102,8 @@ export interface RoomSocket {
   sendChatMessage: (content: string) => void;
   // Queue
   queue: QueueItem[];
+  queueError: string | null;
+  clearQueueError: () => void;
   addToQueue: (track: YouTubeSearchResult) => void;
   prependToQueue: (track: YouTubeSearchResult) => void;
   removeFromQueue: (index: number) => void;
@@ -142,6 +151,8 @@ export function useRoomSocket(
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatSending, setChatSending] = useState(false);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [queueError, setQueueError] = useState<string | null>(null);
+  const clearQueueError = useCallback(() => setQueueError(null), []);
   const [hostUserId, setHostUserId] = useState<string | null>(null);
   const [hostNotice, setHostNotice] = useState<HostUpdatePayload | null>(null);
   const [hostPending, setHostPending] = useState<HostPendingPayload | null>(
@@ -197,8 +208,15 @@ export function useRoomSocket(
       });
       socketRef.current = socket;
 
+      // `connect` fires for both the initial connection and after every
+      // successful reconnect. Using it as the single join trigger avoids the
+      // duplicate `room:join` that would occur if we also emitted inside the
+      // manager-level `reconnect` event.
       socket.on("connect", () => {
         setConnectionStatus("connected");
+        // Clear any stale connection error so the UI doesn't show an old
+        // error message after the socket successfully (re)connects.
+        setPlaybackError(null);
         socket.emit("room:join", { roomCode }, applyJoinAck);
       });
 
@@ -210,13 +228,11 @@ export function useRoomSocket(
         setPlaybackError(err.message);
       });
 
+      // `reconnect_attempt` is a manager-level event that fires while the
+      // socket is trying to reconnect. We use it only to update the UI status;
+      // the actual `room:join` is handled by the `connect` handler above.
       socket.io.on("reconnect_attempt", () => {
         setConnectionStatus("reconnecting");
-      });
-
-      socket.io.on("reconnect", () => {
-        setConnectionStatus("connected");
-        socket.emit("room:join", { roomCode }, applyJoinAck);
       });
 
       socket.on("presence:update", (snapshot: PresenceSnapshot) => {
@@ -347,7 +363,11 @@ export function useRoomSocket(
     (event: string, payload: Record<string, unknown>) => {
       const socket = socketRef.current;
       if (!socket || !socket.connected) return;
-      socket.emit(event, payload);
+      socket.emit(event, payload, (res: QueueAck) => {
+        if (!res?.ok && res?.code === "QUEUE_FULL") {
+          setQueueError(res?.message ?? "Queue is full (max 50 tracks)");
+        }
+      });
     },
     [],
   );
@@ -391,8 +411,12 @@ export function useRoomSocket(
 
   const advanceQueue = useCallback(() => {
     if (!roomCode) return;
-    emitQueue("queue:advance", { roomCode });
-  }, [emitQueue, roomCode]);
+    const expectedFrontVideoId = queue[0]?.videoId;
+    emitQueue("queue:advance", {
+      roomCode,
+      ...(expectedFrontVideoId ? { expectedFrontVideoId } : {}),
+    });
+  }, [emitQueue, roomCode, queue]);
 
   // ---------------------------------------------------------------------------
   // Host transfer — host-only; the server re-checks membership and ownership
@@ -432,6 +456,8 @@ export function useRoomSocket(
     chatSending,
     sendChatMessage,
     queue,
+    queueError,
+    clearQueueError,
     addToQueue,
     prependToQueue,
     removeFromQueue,

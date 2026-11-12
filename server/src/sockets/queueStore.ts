@@ -1,6 +1,69 @@
-import type { QueueItem } from "./queue.types.js";
+import type { EnqueueResult, QueueItem } from "./queue.types.js";
 
 const MAX_QUEUE_SIZE = 50;
+
+// ---------------------------------------------------------------------------
+// RoomMutex — per-room promise queue that serialises async operations.
+//
+// Each room gets its own chain of promises.  Operations for the *same* room
+// are queued behind each other, while operations for *different* rooms run
+// concurrently.  The chain is cleaned up once the last queued operation
+// resolves so we do not hold a stale entry for every room the process has
+// ever seen.
+//
+// Guarantees:
+//   • A throwing `fn` releases the lock (the next operation is not stuck).
+//   • `withLock` returns whatever `fn()` returns (or re-throws its error).
+// ---------------------------------------------------------------------------
+
+export class RoomMutex {
+  /**
+   * Tail of the promise chain for each room. An absent entry means no work is
+   * queued for that room (equivalent to a resolved promise).
+   */
+  private readonly tails = new Map<string, Promise<void>>();
+
+  /**
+   * Run `fn` exclusively for `roomCode`, waiting for any in-flight operation
+   * to finish first. Different rooms run concurrently.
+   */
+  withLock<T>(roomCode: string, fn: () => Promise<T>): Promise<T> {
+    const previous = this.tails.get(roomCode) ?? Promise.resolve();
+
+    let resolveGate!: () => void;
+    const gate = new Promise<void>((res) => {
+      resolveGate = res;
+    });
+
+    const nextTail = previous.then(
+      () => gate,
+      () => gate,
+    );
+    this.tails.set(roomCode, nextTail);
+
+    const result = previous.catch(() => {}).then(() => fn());
+
+    result
+      .finally(() => {
+        resolveGate();
+        if (this.tails.get(roomCode) === nextTail) {
+          this.tails.delete(roomCode);
+        }
+      })
+      .catch(() => {});
+
+    return result;
+  }
+
+  /** True if there is pending work for the given room (useful in tests). */
+  isLocked(roomCode: string): boolean {
+    return this.tails.has(roomCode);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// QueueStore
+// ---------------------------------------------------------------------------
 
 /**
  * Ephemeral per-room queue, keyed by roomCode.
@@ -22,22 +85,44 @@ class QueueStore {
     return q;
   }
 
-  /** Append an item to the back of the queue. Returns the updated snapshot. */
-  enqueue(roomCode: string, item: QueueItem): QueueItem[] {
+  /**
+   * Append an item to the back of the queue.
+   *
+   * Returns `{ ok: true, queue }` on success or `{ ok: false, code: 'QUEUE_FULL', queue }`
+   * when the room has already reached `MAX_QUEUE_SIZE` items.  The queue is
+   * never silently mutated without a signal to the caller.
+   */
+  enqueue(roomCode: string, item: QueueItem): EnqueueResult {
     const q = this.getOrCreate(roomCode);
-    if (q.length < MAX_QUEUE_SIZE) {
-      q.push(item);
+    if (q.length >= MAX_QUEUE_SIZE) {
+      return { ok: false, code: "QUEUE_FULL", queue: [...q] };
     }
-    return [...q];
+    q.push(item);
+    return { ok: true, queue: [...q] };
   }
 
-  /** Prepend an item to the front of the queue. Returns the updated snapshot. */
-  prepend(roomCode: string, item: QueueItem): QueueItem[] {
+  /**
+   * Prepend an item to the front of the queue.
+   *
+   * Returns `{ ok: true, queue }` on success or `{ ok: false, code: 'QUEUE_FULL', queue }`
+   * when the room has already reached `MAX_QUEUE_SIZE` items.
+   */
+  prepend(roomCode: string, item: QueueItem): EnqueueResult {
     const q = this.getOrCreate(roomCode);
-    if (q.length < MAX_QUEUE_SIZE) {
-      q.unshift(item);
+    if (q.length >= MAX_QUEUE_SIZE) {
+      return { ok: false, code: "QUEUE_FULL", queue: [...q] };
     }
-    return [...q];
+    q.unshift(item);
+    return { ok: true, queue: [...q] };
+  }
+
+  /**
+   * Peek at the first item in the queue without removing it.
+   * Returns `undefined` when the queue is empty.
+   */
+  peek(roomCode: string): QueueItem | undefined {
+    const q = this.queues.get(roomCode);
+    return q && q.length > 0 ? q[0] : undefined;
   }
 
   /**
@@ -98,3 +183,4 @@ class QueueStore {
 }
 
 export const queueStore = new QueueStore();
+export const roomMutex = new RoomMutex();

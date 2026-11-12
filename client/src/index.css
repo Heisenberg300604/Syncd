@@ -254,6 +254,81 @@ body {
   opacity: 0.5;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Glass Card                                                                */
+/* -------------------------------------------------------------------------- */
+
+.glass-card {
+  width: 240px;
+  height: 360px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 
+    0 20px 40px -15px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 24px rgba(255, 255, 255, 0.06);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 
+    0 24px 48px -12px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 28px rgba(255, 255, 255, 0.08);
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.7),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.glass-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.6),
+    transparent,
+    rgba(255, 255, 255, 0.15)
+  );
+  pointer-events: none;
+}
+
+.glass-card-banner {
+  width: 100%;
+  max-width: 520px;
+  height: 160px;
+}
+
+@media (max-width: 639px) {
+  .glass-card-banner {
+    width: 240px;
+  }
+}
+
 /* --- Motion --------------------------------------------------------------- */
 
 @keyframes syncd-equalizer {

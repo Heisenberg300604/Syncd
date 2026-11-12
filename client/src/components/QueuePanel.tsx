@@ -11,6 +11,8 @@ interface QueuePanelProps {
   onClear: () => void;
   /** Called when the host explicitly skips to the next item. */
   onSkip: () => void;
+  error?: string | null;
+  onDismissError?: () => void;
 }
 
 export function QueuePanel({
@@ -20,6 +22,8 @@ export function QueuePanel({
   onReorder,
   onClear,
   onSkip,
+  error,
+  onDismissError,
 }: QueuePanelProps) {
   const [dragging, setDragging] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
@@ -120,6 +124,21 @@ export function QueuePanel({
           </div>
         )}
       </div>
+
+      {error && (
+        <div className="mb-2 flex items-center justify-between rounded-lg border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs text-danger">
+          <span>{error}</span>
+          {onDismissError && (
+            <button
+              onClick={onDismissError}
+              className="ml-2 text-ink-muted transition-colors hover:text-ink"
+              aria-label="Dismiss queue error"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
 
       <ul className="max-h-72 space-y-1 overflow-y-auto syncd-scrollbar pr-2">
         {queue.map((item, index) => {
