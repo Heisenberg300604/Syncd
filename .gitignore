@@ -1,13 +1,68 @@
-# Dependencies
-node_modules/
+# Logs & Diagnostics
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Build output
-dist/
-build/
-
-# Environment variables
+# Runtime data & Environment
 .env
 .env.*
 !.env.example
-
 sli.md
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# IDE & Editor Settings
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Node Dependencies & Package Manager Artefacts
+node_modules/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+
+# Frontend Build Outputs
+dist/
+build/
+out/
+.next/
+
+# Rust & Tauri Native Build Artifacts
+target/
+Desktop/src-tauri/target/
+*.pdb
+*.ilk
+
+# Tauri Bundle & Release Outputs
+src-tauri/target/
+Desktop/src-tauri/gen/
+*.msi
+*.exe
+*.app
+*.dmg
+*.deb
+*.rpm
+
+# Local SQLite databases & temp caches
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+Desktop/Data/
+Desktop/Index/
+Desktop/
+.agent/
+

@@ -1,0 +1,88 @@
+name: Desktop CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Desktop/**'
+      - '.github/workflows/desktop-ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Desktop/**'
+      - '.github/workflows/desktop-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Desktop Frontend (Types & Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Desktop
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        if: hashFiles('Desktop/package.json') != ''
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Typecheck
+        if: hashFiles('Desktop/tsconfig.json') != ''
+        run: npx tsc --noEmit
+
+      - name: Build frontend
+        if: hashFiles('Desktop/package.json') != ''
+        run: npm run build --if-present
+
+  rust:
+    name: Desktop Core (Rust Format, Clippy & Tests)
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: Desktop/src-tauri
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        if: hashFiles('Desktop/src-tauri/Cargo.toml') != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust Cache
+        if: hashFiles('Desktop/src-tauri/Cargo.toml') != ''
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Desktop/src-tauri
+
+      - name: Check formatting
+        if: hashFiles('Desktop/src-tauri/Cargo.toml') != ''
+        run: cargo fmt --all --check
+
+      - name: Clippy lints
+        if: hashFiles('Desktop/src-tauri/Cargo.toml') != ''
+        run: cargo clippy -- -D warnings
+
+      - name: Run unit & integration tests
+        if: hashFiles('Desktop/src-tauri/Cargo.toml') != ''
+        run: cargo test
+
