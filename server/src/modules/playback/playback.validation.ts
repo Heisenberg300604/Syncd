@@ -58,3 +58,36 @@ export function isPlaybackAction(raw: unknown): raw is PlaybackAction {
     (PLAYBACK_ACTIONS as string[]).includes(raw)
   );
 }
+
+export type SeekValidation =
+  | { ok: true; value: number }
+  | { ok: false; message: string };
+
+/**
+ * Validates and optionally clamps a seek position.
+ *
+ * - Rejects non-finite values (NaN, Infinity, non-numbers).
+ * - Rejects negative positions.
+ * - Clamps to `durationSeconds` when it is known and > 0 (positions slightly
+ *   over the duration are common near the track end — clamp rather than reject).
+ * - When `durationSeconds` is null (live stream or unknown), any finite
+ *   non-negative value is accepted as-is.
+ */
+export function validateSeekPosition(
+  raw: unknown,
+  durationSeconds: number | null,
+): SeekValidation {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return { ok: false, message: "Invalid seek position" };
+  }
+
+  if (raw < 0) {
+    return { ok: false, message: "Seek position cannot be negative" };
+  }
+
+  if (durationSeconds !== null && durationSeconds > 0) {
+    return { ok: true, value: Math.min(raw, durationSeconds) };
+  }
+
+  return { ok: true, value: raw };
+}

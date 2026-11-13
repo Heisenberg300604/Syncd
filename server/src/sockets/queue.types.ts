@@ -32,6 +32,13 @@ export interface QueueReorderPayload {
 
 export interface QueueAdvancePayload {
   roomCode: string;
+  /**
+   * Optional idempotency guard.  When provided the advance is a no-op if the
+   * current front of the queue does not match, preventing duplicate advances
+   * from double-clicks or concurrent requests.  Clients should always send it;
+   * omitting it preserves backward compatibility with older clients.
+   */
+  expectedFrontVideoId?: string;
 }
 
 export interface QueueClearPayload {
@@ -39,9 +46,18 @@ export interface QueueClearPayload {
 }
 
 // ---------------------------------------------------------------------------
+// Store result types
+// ---------------------------------------------------------------------------
+
+/** Discriminated union returned by enqueue / prepend to surface capacity errors. */
+export type EnqueueResult =
+  | { ok: true; queue: QueueItem[] }
+  | { ok: false; code: "QUEUE_FULL"; queue: QueueItem[] };
+
+// ---------------------------------------------------------------------------
 // Ack shapes
 // ---------------------------------------------------------------------------
 
 export type QueueAck =
   | { ok: true; queue: QueueSnapshot }
-  | { ok: false; message: string };
+  | { ok: false; message: string; code?: "QUEUE_FULL" };
