@@ -165,6 +165,9 @@ private struct NowPlayingCard: View {
     var body: some View {
         if playback.item != nil {
             VStack(spacing: Theme.Spacing.md) {
+                if playback.audioAvailability == .embedded {
+                    YouTubePlayerSurface()
+                }
                 HStack(spacing: Theme.Spacing.md) {
                     ArtworkView(url: playback.item?.artworkURL, size: 76)
                     VStack(alignment: .leading, spacing: 4) {

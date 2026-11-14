@@ -82,6 +82,27 @@ struct PlaybackCoordinatorTests {
         #expect(!coordinator.canTogglePlayback)
     }
 
+    @Test func youTubePlaysThroughEmbeddedPlayerWhenAvailable() async {
+        let embed = MockAudioEngine()
+        embed.supportsRateAdjustment = false
+        let coordinator = PlaybackCoordinator(
+            engine: engine, embedEngine: embed, audioSession: nil, nowPlaying: nil, remoteCommands: nil,
+            clock: clock, resolver: RoomSourceResolver()
+        )
+        coordinator.attachRoom(code: "ABC234", commander: commander)
+        clock.advance(4)
+        await deliver(Fixtures.snapshot(isPlaying: true, position: 10, serverTime: Fixtures.t0.addingTimeInterval(4)), to: coordinator, resync: true)
+
+        #expect(coordinator.audioAvailability == .embedded)
+        #expect(engine.loads.isEmpty)
+        #expect(embed.loads.count == 1)
+        #expect(embed.seeks.last == 14)
+        #expect(embed.state == .playing)
+        #expect(coordinator.status == .playing)
+        // A participant can pause the audio on their own device.
+        #expect(coordinator.canTogglePlayback)
+    }
+
     @Test func largeDriftTriggersAuthoritativeSeek() async {
         let coordinator = makeCoordinator()
         await deliver(Fixtures.snapshot(isPlaying: true, position: 0), to: coordinator)
