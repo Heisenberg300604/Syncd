@@ -31,6 +31,8 @@ final class SocketIORoomClient: RoomRealtimeClient {
     private var isClosed = false
     /// `.error` and `.disconnect` can both fire for one failure; only the first schedules.
     private var reconnectPending = false
+    /// Why the last attempt failed, shown while retrying.
+    private var lastFailureReason: String?
     private let pathMonitor = NWPathMonitor()
 
     static let ackTimeout: Double = 10
@@ -77,7 +79,7 @@ final class SocketIORoomClient: RoomRealtimeClient {
     private func openSocket(after delay: Double) {
         connectTask?.cancel()
         tearDownSocket()
-        connectionState = attempt == 0 ? .connecting : .reconnecting(attempt: attempt)
+        connectionState = attempt == 0 ? .connecting : .reconnecting(attempt: attempt, reason: lastFailureReason)
         let forceRefresh = attempt > 0
 
         connectTask = Task { [weak self, tokenProvider] in
@@ -94,6 +96,7 @@ final class SocketIORoomClient: RoomRealtimeClient {
             guard let self, !Task.isCancelled, !self.isClosed else { return }
             guard let token, !token.isEmpty else {
                 Log.socket.error("No auth token for socket handshake")
+                self.lastFailureReason = "Your session couldn't be refreshed. Check your connection, or sign out and back in."
                 self.scheduleReconnect()
                 return
             }
@@ -171,10 +174,11 @@ final class SocketIORoomClient: RoomRealtimeClient {
         socket.on(clientEvent: .error) { [weak self] data, _ in
             // Handshake rejections arrive here (e.g. "User profile not found",
             // expired token). Never log the payload — it can echo the token.
-            let description = (data.first as? String) ?? "unknown"
+            let description = Self.errorMessage(from: data)
             MainActor.assumeIsolated {
                 guard let self, !self.isClosed, !self.connectionState.isConnected else { return }
                 Log.socket.error("Socket error during connect: \(description, privacy: .private)")
+                self.lastFailureReason = Self.describeConnectError(description)
                 self.scheduleReconnect()
             }
         }
@@ -210,6 +214,39 @@ final class SocketIORoomClient: RoomRealtimeClient {
         }
     }
 
+    /// Socket.IO v4 delivers a handshake rejection (`next(new Error(msg))` on
+    /// the server) as `{ message: msg }`; transport failures arrive as strings
+    /// or errors. Reads every shape so the real reason reaches the UI.
+    nonisolated static func errorMessage(from data: [Any]) -> String {
+        guard let first = data.first else { return "No details from the server" }
+        if let text = first as? String { return text }
+        if let object = first as? [String: Any] {
+            if let message = object["message"] as? String { return message }
+            if let nested = object["data"] as? [String: Any], let message = nested["message"] as? String { return message }
+        }
+        if let error = first as? any Error { return error.localizedDescription }
+        return String(describing: first)
+    }
+
+    /// Turns the server's handshake rejection (see `io.use` in
+    /// server/src/sockets/index.ts) into something a person can act on.
+    nonisolated static func describeConnectError(_ raw: String) -> String {
+        let lower = raw.lowercased()
+        if lower.contains("authorized party") || lower.contains("azp") || lower.contains("unauthorized party") {
+            return "The server rejected this app's sign-in token. Its socket check only accepts tokens from the web app's address, so the server needs to allow native-app tokens."
+        }
+        if lower.contains("profile not found") {
+            return "Your SyncD profile wasn't found on this server. Finish onboarding, then try again."
+        }
+        if lower.contains("expired") || lower.contains("missing auth token") || lower.contains("invalid token") {
+            return "Your session token was rejected. Retrying with a fresh one…"
+        }
+        if lower.contains("timeout") || lower.contains("websocket") || lower.contains("could not connect") || lower.contains("refused") {
+            return "Can't reach the room server. Check that it's running and reachable from this device."
+        }
+        return "The server refused the connection: \(raw)"
+    }
+
     nonisolated private static func decodeFirst<T: Decodable>(_ type: T.Type, from data: [Any], event: String) -> T? {
         guard let first = data.first else { return nil }
         do {
@@ -235,6 +272,7 @@ final class SocketIORoomClient: RoomRealtimeClient {
                     return
                 }
                 self.attempt = 0
+                self.lastFailureReason = nil
                 self.connectionState = .connected
                 self.continuation.yield(.joined(RoomJoinSnapshot(
                     presence: presence,

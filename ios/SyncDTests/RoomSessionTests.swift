@@ -163,8 +163,8 @@ struct RoomSessionTests {
 
     @Test func connectionStateIsMirrored() {
         let (session, _) = makeSession()
-        session.handle(.connection(.reconnecting(attempt: 2)))
-        #expect(session.connection == .reconnecting(attempt: 2))
+        session.handle(.connection(.reconnecting(attempt: 2, reason: nil)))
+        #expect(session.connection == .reconnecting(attempt: 2, reason: nil))
     }
 }
 
