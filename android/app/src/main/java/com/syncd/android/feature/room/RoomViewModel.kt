@@ -10,6 +10,7 @@ import com.syncd.android.data.repository.RoomSessionRepository
 import com.syncd.android.di.AppContainer
 import com.syncd.android.domain.model.RoomState
 import com.syncd.android.playback.coordinator.RoomSyncCoordinator
+import com.syncd.android.playback.coordinator.SyncStatus
 import com.syncd.android.playback.engine.EngineStatus
 import com.syncd.android.playback.engine.YouTubeRoomEngine
 import com.syncd.android.playback.synchronization.PlaybackTimeline
@@ -128,6 +129,12 @@ class RoomViewModel(private val code: String, private val c: AppContainer) : Vie
     fun togglePlay() {
         val p = room.value?.playback ?: return
         if (p.videoId == null) return
+        // The room is playing but this device stopped (interruption, local pause):
+        // rejoin live instead of pausing the room for everyone.
+        if (p.isPlaying && coordinator.status.value == SyncStatus.PausedLocally) {
+            coordinator.resync()
+            return
+        }
         val position = localOrRoomPosition(p)
         viewModelScope.launch { c.rooms.control(if (p.isPlaying) "pause" else "play", position) }
     }

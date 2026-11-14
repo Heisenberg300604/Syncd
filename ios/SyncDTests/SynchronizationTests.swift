@@ -75,7 +75,8 @@ struct DriftPolicyTests {
     }
 
     @Test func seeksWhenRateAdjustmentUnsupported() {
-        #expect(policy.correction(forDrift: 1.0, supportsRateAdjustment: false) == .seek)
+        #expect(policy.correction(forDrift: 1.0, supportsRateAdjustment: false) == .monitor)
+        #expect(policy.correction(forDrift: 2.5, supportsRateAdjustment: false) == .seek)
     }
 
     @Test func nonFiniteDriftSeeks() {
