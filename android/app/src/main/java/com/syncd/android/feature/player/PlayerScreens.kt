@@ -107,7 +107,7 @@ fun MiniPlayer(onOpenPlayer: () -> Unit, onOpenRoom: (String) -> Unit) {
             val r = room!!
             MiniBar(
                 title = r.playback?.title ?: r.restTrackTitle ?: "Nothing playing",
-                subtitle = "Room ${r.roomCode} · open the room to listen",
+                subtitle = if (r.playback?.videoId != null) "Room ${r.roomCode} · playing" else "Room ${r.roomCode}",
                 onClick = { onOpenRoom(r.roomCode) },
                 leading = {
                     Box(

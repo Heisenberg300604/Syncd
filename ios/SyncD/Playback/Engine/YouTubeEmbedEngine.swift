@@ -30,7 +30,8 @@ final class YouTubeEmbedEngine: NSObject, AudioEngine {
     var currentTime: TimeInterval {
         guard state == .playing else { return reportedTime }
         let elapsed = Date().timeIntervalSince(reportedAt)
-        return reportedTime + min(max(0, elapsed), 1)
+        // WebKit may throttle the page's timer; allow a few seconds of gap.
+        return reportedTime + min(max(0, elapsed), 3)
     }
 
     var supportsRateAdjustment: Bool { false }

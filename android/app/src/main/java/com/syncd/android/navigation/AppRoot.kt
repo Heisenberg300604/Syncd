@@ -44,7 +44,10 @@ import com.syncd.android.feature.home.HomeScreen
 import com.syncd.android.feature.player.FullPlayerScreen
 import com.syncd.android.feature.player.MiniPlayer
 import com.syncd.android.feature.profile.ProfileScreen
+import com.syncd.android.feature.room.PersistentRoomPlayer
 import com.syncd.android.feature.room.RoomScreen
+import androidx.compose.ui.platform.LocalContext
+import com.syncd.android.SyncDApplication
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
@@ -172,19 +175,27 @@ private fun MainScaffold(onSignOut: () -> Unit) {
             }
         },
     ) { padding ->
-        NavHost(nav, startDestination = HomeRoute, modifier = Modifier.padding(padding)) {
-            composable<HomeRoute> {
-                HomeScreen(
-                    onOpenRoom = { code -> nav.navigate(RoomRoute(code)) { launchSingleTop = true } },
-                    onOpenPlayer = { nav.navigate(PlayerRoute) },
-                )
+        Box(Modifier.fillMaxSize()) {
+            NavHost(nav, startDestination = HomeRoute, modifier = Modifier.padding(padding)) {
+                composable<HomeRoute> {
+                    HomeScreen(
+                        onOpenRoom = { code -> nav.navigate(RoomRoute(code)) { launchSingleTop = true } },
+                        onOpenPlayer = { nav.navigate(PlayerRoute) },
+                    )
+                }
+                composable<ProfileRoute> { ProfileScreen(onSignOut = onSignOut) }
+                composable<RoomRoute> { backStack ->
+                    val route = backStack.toRoute<RoomRoute>()
+                    RoomScreen(code = route.code, onBack = { nav.popBackStack() })
+                }
+                composable<PlayerRoute> { FullPlayerScreen(onBack = { nav.popBackStack() }) }
             }
-            composable<ProfileRoute> { ProfileScreen(onSignOut = onSignOut) }
-            composable<RoomRoute> { backStack ->
-                val route = backStack.toRoute<RoomRoute>()
-                RoomScreen(code = route.code, onBack = { nav.popBackStack() })
-            }
-            composable<PlayerRoute> { FullPlayerScreen(onBack = { nav.popBackStack() }) }
+            // Above every screen: the room's video, in the room's player box or floating.
+            PersistentRoomPlayer(
+                c = (LocalContext.current.applicationContext as SyncDApplication).container,
+                bottomInset = padding.calculateBottomPadding(),
+                onOpenRoom = { code -> nav.navigate(RoomRoute(code)) { launchSingleTop = true } },
+            )
         }
     }
 }

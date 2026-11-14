@@ -15,6 +15,9 @@ import com.syncd.android.data.local.RecentRoomsStore
 import com.syncd.android.data.repository.MusicRepository
 import com.syncd.android.data.repository.RoomSessionRepository
 import com.syncd.android.data.repository.UserRepository
+import com.syncd.android.feature.room.RoomPlayerSlot
+import com.syncd.android.playback.coordinator.RoomSyncCoordinator
+import com.syncd.android.playback.engine.YouTubeRoomEngine
 import com.syncd.android.playback.session.PlaybackConnection
 import com.syncd.android.playback.synchronization.DriftPolicy
 import com.syncd.android.playback.synchronization.ServerClock
@@ -23,6 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
 /**
@@ -74,6 +78,24 @@ class AppContainer(application: Application) {
     )
 
     val playback = PlaybackConnection(application)
+
+    /**
+     * The active room's YouTube player and its sync, app-scoped so music keeps
+     * playing while the user moves around the app (not only on the room screen).
+     * Rendered by [com.syncd.android.feature.room.PersistentRoomPlayer].
+     */
+    val roomEngine = YouTubeRoomEngine(monotonicNowMs)
+    val roomSync = RoomSyncCoordinator(
+        scope = appScope,
+        clock = serverClock,
+        policy = driftPolicy,
+        monotonicNowMs = monotonicNowMs,
+        onTrackEnded = {
+            // Only the host advances the shared queue (the server enforces this too).
+            if (rooms.state.value?.isHost(users.currentUser?.id) == true) appScope.launch { rooms.queueAdvance() }
+        },
+    )
+    val roomPlayerSlot = RoomPlayerSlot()
 
     /** Clears every piece of signed-in state, then ends the Clerk session. */
     suspend fun signOut(): Result<Unit> {

@@ -60,6 +60,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -364,7 +365,8 @@ private fun PlayerCard(vm: RoomViewModel, room: RoomState, sync: SyncStatus, isH
             Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp))
                 .background(SyncDColors.Surface).border(1.dp, SyncDColors.Line, RoundedCornerShape(18.dp)),
         ) {
-            YouTubeSurface(vm.engine, vm::onPlayerVisible, vm::onPlayerHidden, Modifier.fillMaxSize())
+            // The video itself is drawn here by the app-level PersistentRoomPlayer.
+            RoomPlayerSlotMarker(vm.playerSlot, Modifier.fillMaxSize())
             if (!hasTrack) {
                 Column(
                     Modifier.fillMaxSize().background(SyncDColors.Surface).padding(16.dp),
@@ -405,9 +407,16 @@ private fun PlayerCard(vm: RoomViewModel, room: RoomState, sync: SyncStatus, isH
             var position by remember { mutableDoubleStateOf(vm.roomPositionSec()) }
             var dragging by remember { mutableStateOf(false) }
             var dragValue by remember { mutableFloatStateOf(0f) }
+            // A seek the host just made: shown until the room confirms it (a new
+            // snapshot restarts the effect below) instead of snapping back to the
+            // old position for the network round trip.
+            var pendingSeek by remember { mutableStateOf<Double?>(null) }
+            var pendingSeekAtMs by remember { mutableLongStateOf(0L) }
             LaunchedEffect(playback) {
+                pendingSeek = null
                 while (true) {
-                    if (!dragging) position = vm.roomPositionSec()
+                    if (pendingSeek != null && System.currentTimeMillis() - pendingSeekAtMs > 5_000) pendingSeek = null
+                    if (!dragging) position = pendingSeek ?: vm.roomPositionSec()
                     delay(500)
                 }
             }
@@ -419,6 +428,9 @@ private fun PlayerCard(vm: RoomViewModel, room: RoomState, sync: SyncStatus, isH
                     dragValue = it
                 },
                 onValueChangeFinished = {
+                    pendingSeek = dragValue.toDouble()
+                    pendingSeekAtMs = System.currentTimeMillis()
+                    position = dragValue.toDouble()
                     vm.seekTo(dragValue.toDouble())
                     dragging = false
                 },
