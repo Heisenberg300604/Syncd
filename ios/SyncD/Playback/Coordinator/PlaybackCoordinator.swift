@@ -132,8 +132,13 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
     @ObservationIgnored private var isInterrupted = false
     @ObservationIgnored private var wasPlayingBeforeInterruption = false
     @ObservationIgnored private var userPausedDuringInterruption = false
+    /// A seek the user just made. The UI shows its target until the room
+    /// confirms it and the player has jumped, instead of snapping back to the
+    /// old position for the length of the network round trip.
+    @ObservationIgnored private var pendingSeek: (target: TimeInterval, at: Date)?
 
     static let seekCooldown: TimeInterval = 3
+    static let pendingSeekTimeout: TimeInterval = 5
     static let tickInterval: Duration = .milliseconds(500)
     /// Drift is evaluated every N ticks (2 s), not every UI refresh.
     static let driftCheckEveryTicks = 4
@@ -272,6 +277,7 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
             nowPlayingCenter?.clear()
             audioAvailability = .unavailable(reason: Self.unavailableReason(for: source))
             status = state.isPlaying ? .playing : .paused
+            pendingSeek = nil
             position = state.expectedPosition(atServerTime: serverNow())
             updateRemoteCommandAvailability()
             return
@@ -387,12 +393,18 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
         case .none:
             return
         case .local:
-            Task { await engine.seek(to: clamped); publishNowPlaying() }
+            showPendingSeek(clamped)
+            Task {
+                await engine.seek(to: clamped)
+                pendingSeek = nil
+                publishNowPlaying()
+            }
         case .room:
             guard isHost else {
                 commandError = PresentableError(title: "Host only", message: "Only the host can seek the room.", isRetryable: false)
                 return
             }
+            showPendingSeek(clamped)
             sendControl(.seek, position: clamped)
         }
     }
@@ -443,6 +455,7 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
                 guard generation == reconcileGeneration else { return }
             }
             engine.setRate(1)
+            pendingSeek = nil
             if shouldPlay {
                 activateAudioSessionIfOwned()
                 engine.play()
@@ -488,13 +501,18 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
 
     func tick() {
         tickCount &+= 1
-        if usesEngine {
+        if let pending = pendingSeek, clock.now().timeIntervalSince(pending.at) > Self.pendingSeekTimeout {
+            pendingSeek = nil
+        }
+        if let pending = pendingSeek {
+            position = pending.target
+        } else if usesEngine {
             position = engine.currentTime
         }
         guard case .room = session, let room = roomState, room.hasTrack else { return }
         let serverNow = serverNow()
 
-        if !usesEngine {
+        if !usesEngine, pendingSeek == nil {
             position = room.expectedPosition(atServerTime: serverNow)
         }
 
@@ -555,9 +573,15 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
                 let timed = try await commander.sendPlaybackControl(action, position: target)
                 applyRoomSnapshot(timed, isResync: false)
             } catch {
+                if action == .seek { pendingSeek = nil }
                 commandError = PresentableError(error)
             }
         }
+    }
+
+    private func showPendingSeek(_ target: TimeInterval) {
+        pendingSeek = (target, clock.now())
+        position = target
     }
 
     private func requestAdvance() {
@@ -658,6 +682,7 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
 
     private func resetPlayback() {
         reconcileGeneration += 1
+        pendingSeek = nil
         tickTask?.cancel()
         tickTask = nil
         clearItem()

@@ -9,10 +9,8 @@ import com.syncd.android.core.util.parseInstantMillis
 import com.syncd.android.data.repository.RoomSessionRepository
 import com.syncd.android.di.AppContainer
 import com.syncd.android.domain.model.RoomState
-import com.syncd.android.playback.coordinator.RoomSyncCoordinator
 import com.syncd.android.playback.coordinator.SyncStatus
 import com.syncd.android.playback.engine.EngineStatus
-import com.syncd.android.playback.engine.YouTubeRoomEngine
 import com.syncd.android.playback.synchronization.PlaybackTimeline
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,8 +31,9 @@ sealed interface RoomOpenState {
 
 /**
  * Screen-scoped controller for one room. The room's live state lives in the
- * app-scoped [RoomSessionRepository]; this ViewModel owns only what must die
- * with the screen: the visible YouTube engine and its sync coordinator.
+ * app-scoped [RoomSessionRepository], and the YouTube player and its sync are
+ * app-scoped too ([AppContainer.roomEngine] / [AppContainer.roomSync]) so the
+ * music keeps playing after this screen is closed.
  *
  * Host-only actions are offered to the host in the UI as a convenience; the
  * server rejects them for anyone else and the rejection is surfaced as a notice.
@@ -63,18 +62,10 @@ class RoomViewModel(private val code: String, private val c: AppContainer) : Vie
     private val _leaving = MutableStateFlow(false)
     val leaving = _leaving.asStateFlow()
 
-    val engine = YouTubeRoomEngine(c.monotonicNowMs)
-    private val coordinator = RoomSyncCoordinator(
-        scope = viewModelScope,
-        clock = c.serverClock,
-        policy = c.driftPolicy,
-        monotonicNowMs = c.monotonicNowMs,
-        onTrackEnded = {
-            // Only the host advances the shared queue (the server enforces this too).
-            if (isHost) viewModelScope.launch { c.rooms.queueAdvance() }
-        },
-    )
+    private val engine = c.roomEngine
+    private val coordinator = c.roomSync
     val sync = coordinator.status
+    val playerSlot = c.roomPlayerSlot
 
     val isHost: Boolean get() = room.value?.isHost(selfId) == true
 
@@ -91,17 +82,6 @@ class RoomViewModel(private val code: String, private val c: AppContainer) : Vie
             }
         }
     }
-
-    // ---- Visible player lifecycle ---------------------------------------------------
-
-    /** The YouTube view is on screen and the app is in the foreground. */
-    fun onPlayerVisible() {
-        // One audible source at a time: device playback yields to the room.
-        c.playback.pause()
-        coordinator.attach(engine, room.map { it?.playback }, connection)
-    }
-
-    fun onPlayerHidden() = coordinator.detach()
 
     fun resync() = coordinator.resync()
 
@@ -211,7 +191,4 @@ class RoomViewModel(private val code: String, private val c: AppContainer) : Vie
         }
     }
 
-    override fun onCleared() {
-        coordinator.detach()
-    }
 }

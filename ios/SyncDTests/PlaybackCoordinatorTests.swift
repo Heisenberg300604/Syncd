@@ -145,6 +145,26 @@ struct PlaybackCoordinatorTests {
         #expect(embed.state == .playing)
     }
 
+    /// Regression: releasing the slider snapped the progress back to the old
+    /// position until the server round trip finished.
+    @Test func hostSeekShowsTargetUntilRoomConfirms() async {
+        let embed = MockAudioEngine()
+        let coordinator = makeEmbeddedCoordinator(embed)
+        coordinator.updateRole(isHost: true)
+        await deliver(Fixtures.snapshot(duration: 240, isPlaying: true, position: 65), to: coordinator, resync: true)
+
+        coordinator.seek(to: 120)
+        #expect(coordinator.position == 120)
+        coordinator.tick() // engine is still at 65 until the room confirms
+        #expect(coordinator.position == 120)
+
+        // A failed command falls back to the real position.
+        await drainMainActor()
+        coordinator.tick()
+        #expect(coordinator.commandError != nil)
+        #expect(coordinator.position == 65)
+    }
+
     @Test func embeddedPlayerToleratesSubSeekDrift() async {
         let embed = MockAudioEngine()
         let coordinator = makeEmbeddedCoordinator(embed)
