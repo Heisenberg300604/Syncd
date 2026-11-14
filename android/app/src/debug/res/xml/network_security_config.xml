@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG BUILDS ONLY. Lets the app reach a backend started with `npm run dev`
+  over plain HTTP on the emulator host alias or a LAN address. Release builds
+  use src/main/res/xml/network_security_config.xml (cleartext disabled).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

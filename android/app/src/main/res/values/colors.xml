@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors client/src/index.css @theme tokens. Compose uses core/design/Color.kt. -->
+    <color name="syncd_canvas">#FF0A0908</color>
+    <color name="syncd_accent">#FFF7A23B</color>
+    <color name="syncd_launcher_background">#FF12100E</color>
+</resources>

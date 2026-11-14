@@ -1,0 +1,13 @@
+// Copy to Config/Local.xcconfig (gitignored) and fill in.
+// Never put a Clerk *secret* key (sk_...) here — only the publishable key.
+
+// DEVELOPMENT_TEAM = ABCDE12345
+// SYNCD_BUNDLE_ID = com.yourcompany.syncd
+
+// Same value as client VITE_CLERK_PUBLISHABLE_KEY.
+SYNCD_CLERK_PUBLISHABLE_KEY = pk_test_replace_me
+
+// Simulator talking to a local server:
+// SYNCD_API_BASE_URL = http:/$()/localhost:5000/api
+// Physical device talking to your Mac on the LAN:
+// SYNCD_API_BASE_URL = http:/$()/192.168.1.20:5000/api

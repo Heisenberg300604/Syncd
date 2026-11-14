@@ -1,0 +1,15 @@
+# Gradle / Android Studio
+.gradle/
+build/
+/local.properties
+/syncd.local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+# Signing material must never be committed
+*.jks
+*.keystore
+keystore.properties

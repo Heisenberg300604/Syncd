@@ -1,0 +1,12 @@
+#include "Base.xcconfig"
+
+SYNCD_ENVIRONMENT = production
+// Production URL and publishable key are supplied by Local.xcconfig or CI.
+SYNCD_API_BASE_URL =
+
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+SWIFT_COMPILATION_MODE = wholemodule
+SWIFT_OPTIMIZATION_LEVEL = -O
+VALIDATE_PRODUCT = YES
+
+#include? "Local.xcconfig"

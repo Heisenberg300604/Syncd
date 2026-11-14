@@ -1,0 +1,11 @@
+# Copy to `syncd.local.properties` (git-ignored) and fill in real values.
+# Only PUBLIC client configuration belongs here. Never put the Clerk secret key,
+# the YouTube API key, database URLs or signing keys in the Android app.
+
+# Same value as the web client's VITE_API_BASE_URL — must include the /api suffix.
+# Android emulator -> host machine is 10.0.2.2. A physical device needs your
+# machine's LAN IP (debug builds allow cleartext HTTP; release builds do not).
+syncd.apiBaseUrl=http://10.0.2.2:5000/api
+
+# Same value as VITE_CLERK_PUBLISHABLE_KEY (publishable, safe to ship).
+syncd.clerkPublishableKey=pk_test_replace_me

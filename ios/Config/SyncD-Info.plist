@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>SYNCDEnvironment</key>
+	<string>$(SYNCD_ENVIRONMENT)</string>
+	<key>SYNCDApiBaseURL</key>
+	<string>$(SYNCD_API_BASE_URL)</string>
+	<key>SYNCDClerkPublishableKey</key>
+	<string>$(SYNCD_CLERK_PUBLISHABLE_KEY)</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Allows http:// to localhost / LAN hosts for development only.
+		     Public hosts still require HTTPS. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>SyncD connects to a development server on your local network.</string>
+</dict>
+</plist>
