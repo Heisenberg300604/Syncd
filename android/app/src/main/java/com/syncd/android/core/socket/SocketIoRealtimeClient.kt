@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.KSerializer
@@ -75,7 +74,7 @@ class SocketIoRealtimeClient(
 
     init {
         scope.launch(serial) {
-            networkAvailable.distinctUntilChanged().collect { available ->
+            networkAvailable.collect { available ->
                 online = available
                 if (!desired) return@collect
                 if (available && socket?.connected() != true) {

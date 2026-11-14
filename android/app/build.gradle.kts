@@ -24,7 +24,8 @@ fun String.asBuildConfigString(): String = "\"" + replace("\\", "\\\\").replace(
 
 android {
     namespace = "com.syncd.android"
-    compileSdk = 36
+    // Build-time only (stable AndroidX requires 37). Runtime behaviour follows targetSdk.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.syncd.android"
@@ -127,4 +128,10 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
+}
+
+// The opt-in Socket.IO integration test depends on this variable; declaring it as
+// an input stops Gradle's build cache from replaying a result for a different setup.
+tasks.withType<Test>().configureEach {
+    inputs.property("syncdSioUrl", providers.environmentVariable("SYNCD_SIO_URL").orElse(""))
 }
