@@ -136,6 +136,13 @@ struct AudioAvailabilityNote: View {
             .padding(Theme.Spacing.sm)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.Palette.raised, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        } else if playback.audioAvailability == .embedded, !playback.isLocallyPaused {
+            Label("Playing through YouTube's player. Audio pauses while SyncD is in the background.", systemImage: "play.rectangle")
+                .font(.footnote)
+                .foregroundStyle(Theme.Palette.inkMuted)
+                .padding(Theme.Spacing.sm)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.Palette.raised, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         } else if playback.isLocallyPaused {
             Label("Paused on this iPhone. The room is still playing — press play to rejoin live.", systemImage: "pause.circle")
                 .font(.footnote)
@@ -161,11 +168,15 @@ struct PlaybackStatusLabel: View {
         case .idle: "Idle"
         case .loading: "Loading…"
         case .buffering: "Buffering…"
-        case .playing: playback.audioAvailability == .native ? "Playing" : "Room is playing"
-        case .paused: playback.audioAvailability == .native ? "Paused" : "Room is paused"
+        case .playing: producesAudio ? "Playing" : "Room is playing"
+        case .paused: producesAudio ? "Paused" : "Room is paused"
         case .ended: "Ended"
         case let .failed(error): error.title
         }
+    }
+
+    private var producesAudio: Bool {
+        playback.audioAvailability == .native || playback.audioAvailability == .embedded
     }
 
     private var color: Color {

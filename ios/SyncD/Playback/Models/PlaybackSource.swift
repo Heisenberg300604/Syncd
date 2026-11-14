@@ -14,6 +14,9 @@ enum PlaybackSource: Sendable, Hashable {
     struct Capabilities: Sendable, Equatable {
         /// Can be rendered by `AVPlayerAudioEngine`.
         let nativeEngine: Bool
+        /// Can be rendered by the provider's official embedded player
+        /// (`YouTubeEmbedEngine`). Foreground only.
+        var embeddedPlayer: Bool = false
         /// Keeps playing when the app is backgrounded or the device is locked.
         let backgroundAudio: Bool
         /// Publishes lock-screen / Control Center metadata and controls.
@@ -23,7 +26,7 @@ enum PlaybackSource: Sendable, Hashable {
     var capabilities: Capabilities {
         switch self {
         case .youtube:
-            Capabilities(nativeEngine: false, backgroundAudio: false, systemMediaControls: false)
+            Capabilities(nativeEngine: false, embeddedPlayer: true, backgroundAudio: false, systemMediaControls: false)
         case .remoteStream, .localFile:
             Capabilities(nativeEngine: true, backgroundAudio: true, systemMediaControls: true)
         }

@@ -15,9 +15,16 @@ struct FullPlayerView: View {
             ScrollView {
                 VStack(spacing: Theme.Spacing.lg) {
                     header
-                    ArtworkView(url: playback.item?.artworkURL, size: artworkSize, cornerRadius: Theme.Radius.xl)
-                        .shadow(color: .black.opacity(0.45), radius: 30, y: 16)
-                        .padding(.top, Theme.Spacing.xs)
+                    Group {
+                        if playback.audioAvailability == .embedded {
+                            YouTubePlayerSurface(cornerRadius: Theme.Radius.xl)
+                                .frame(maxWidth: proxy.size.width - Theme.Spacing.lg * 2)
+                        } else {
+                            ArtworkView(url: playback.item?.artworkURL, size: artworkSize, cornerRadius: Theme.Radius.xl)
+                        }
+                    }
+                    .shadow(color: .black.opacity(0.45), radius: 30, y: 16)
+                    .padding(.top, Theme.Spacing.xs)
 
                     VStack(spacing: Theme.Spacing.xxs) {
                         Text(playback.item?.title ?? "Nothing playing")

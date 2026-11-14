@@ -49,6 +49,9 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
         case none
         /// This device is producing audio through AVPlayer.
         case native
+        /// This device is producing audio through the provider's official
+        /// embedded player (YouTube). Foreground only, no lock screen.
+        case embedded
         /// Following the room's timeline without local audio.
         case unavailable(reason: String)
     }
@@ -104,7 +107,8 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
 
     // MARK: Dependencies
 
-    @ObservationIgnored private let engine: any AudioEngine
+    @ObservationIgnored private let nativeEngine: any AudioEngine
+    @ObservationIgnored private let embedEngine: (any AudioEngine)?
     @ObservationIgnored private let audioSession: AudioSessionManager?
     @ObservationIgnored private let nowPlayingCenter: NowPlayingManager?
     @ObservationIgnored private let remoteCommands: RemoteCommandManager?
@@ -136,6 +140,7 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
 
     init(
         engine: any AudioEngine,
+        embedEngine: (any AudioEngine)? = nil,
         audioSession: AudioSessionManager?,
         nowPlaying: NowPlayingManager?,
         remoteCommands: RemoteCommandManager?,
@@ -143,7 +148,8 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
         resolver: any PlaybackSourceResolving = RoomSourceResolver(),
         driftPolicy: DriftPolicy = DriftPolicy()
     ) {
-        self.engine = engine
+        self.nativeEngine = engine
+        self.embedEngine = embedEngine
         self.audioSession = audioSession
         self.nowPlayingCenter = nowPlaying
         self.remoteCommands = remoteCommands
@@ -151,13 +157,32 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
         self.resolver = resolver
         self.driftPolicy = driftPolicy
 
-        engine.onStateChange = { [weak self] state in self?.engineStateChanged(state) }
+        engine.onStateChange = { [weak self] state in
+            guard self?.audioAvailability == .native else { return }
+            self?.engineStateChanged(state)
+        }
+        embedEngine?.onStateChange = { [weak self] state in
+            guard self?.audioAvailability == .embedded else { return }
+            self?.engineStateChanged(state)
+        }
         audioSession?.onEvent = { [weak self] event in self?.handleAudioSessionEvent(event) }
         remoteCommands?.handler = self
         audioSession?.configure()
     }
 
-    private var usesEngine: Bool { audioAvailability == .native }
+    /// True when this device produces audio for the current item.
+    private var usesEngine: Bool { audioAvailability == .native || audioAvailability == .embedded }
+
+    /// The engine rendering the current item.
+    private var engine: any AudioEngine {
+        if audioAvailability == .embedded, let embedEngine { return embedEngine }
+        return nativeEngine
+    }
+
+    private func stopAllEngines() {
+        if nativeEngine.currentItem != nil { nativeEngine.stop() }
+        if let embedEngine, embedEngine.currentItem != nil { embedEngine.stop() }
+    }
 
     // MARK: Room lifecycle
 
@@ -223,8 +248,17 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
             source: source
         )
 
-        guard source.capabilities.nativeEngine else {
-            if engine.currentItem != nil { engine.stop() }
+        let availability: AudioAvailability
+        if source.capabilities.nativeEngine {
+            availability = .native
+        } else if source.capabilities.embeddedPlayer, embedEngine != nil {
+            availability = .embedded
+        } else {
+            availability = .unavailable(reason: Self.unavailableReason(for: source))
+        }
+
+        guard availability != .unavailable(reason: Self.unavailableReason(for: source)) else {
+            stopAllEngines()
             nowPlayingCenter?.clear()
             audioAvailability = .unavailable(reason: Self.unavailableReason(for: source))
             status = state.isPlaying ? .playing : .paused
@@ -233,7 +267,10 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
             return
         }
 
-        audioAvailability = .native
+        if audioAvailability != availability {
+            stopAllEngines()
+            audioAvailability = availability
+        }
         reconcileEngine(forceReload: trackChanged || engine.currentItem?.id != trackId, forceSeek: isResync)
     }
 
@@ -581,7 +618,7 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
     }
 
     private func clearItem() {
-        if engine.currentItem != nil { engine.stop() }
+        stopAllEngines()
         item = nil
         status = .idle
         position = 0
@@ -624,7 +661,7 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
 
     private func updateRemoteCommandAvailability() {
         guard let remoteCommands else { return }
-        guard usesEngine, item != nil else {
+        guard usesEngine, let item, item.source.capabilities.systemMediaControls else {
             remoteCommands.update(.none)
             return
         }

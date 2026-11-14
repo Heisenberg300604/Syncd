@@ -13,6 +13,8 @@ final class AppDependencies {
     let clerk: Clerk
     let session: SessionStore
     let playback: PlaybackCoordinator
+    /// YouTube's official embedded player; rendered by `YouTubePlayerSurface`.
+    let youTubePlayer: YouTubeEmbedEngine
     let rooms: RoomsController
     let recentRooms: RecentRoomsStore
     let api: any SyncDAPIProtocol
@@ -33,8 +35,11 @@ final class AppDependencies {
         recentRooms = RecentRoomsStore(container: modelContainer)
 
         let clock = SystemMonotonicClock()
+        let youTubePlayer = YouTubeEmbedEngine()
+        self.youTubePlayer = youTubePlayer
         playback = PlaybackCoordinator(
             engine: AVPlayerAudioEngine(),
+            embedEngine: youTubePlayer,
             audioSession: AudioSessionManager(),
             nowPlaying: NowPlayingManager(),
             remoteCommands: RemoteCommandManager(),
