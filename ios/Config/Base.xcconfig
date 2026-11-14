@@ -27,7 +27,7 @@ SYNCD_BUNDLE_ID = com.syncd.ios
 PRODUCT_BUNDLE_IDENTIFIER = $(SYNCD_BUNDLE_ID)
 
 INFOPLIST_KEY_CFBundleDisplayName = SyncD
-INFOPLIST_KEY_UILaunchScreen_Generation = YES
+// Launch screen (SyncD mark on the canvas colour) is defined in Config/SyncD-Info.plist.
 INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES
 INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait
 INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.music

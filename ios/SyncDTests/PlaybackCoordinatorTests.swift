@@ -103,6 +103,61 @@ struct PlaybackCoordinatorTests {
         #expect(coordinator.canTogglePlayback)
     }
 
+    private func makeEmbeddedCoordinator(_ embed: MockAudioEngine) -> PlaybackCoordinator {
+        embed.supportsRateAdjustment = false
+        let coordinator = PlaybackCoordinator(
+            engine: engine, embedEngine: embed, audioSession: nil, nowPlaying: nil, remoteCommands: nil,
+            clock: clock, resolver: RoomSourceResolver()
+        )
+        coordinator.attachRoom(code: "ABC234", commander: commander)
+        return coordinator
+    }
+
+    /// Regression: WebKit's media session made iOS report an interruption of
+    /// SyncD's session; the coordinator then refused to play after any pause.
+    @Test func embeddedPlayerResumesAfterPauseDespiteSessionInterruption() async {
+        let embed = MockAudioEngine()
+        let coordinator = makeEmbeddedCoordinator(embed)
+        await deliver(Fixtures.snapshot(isPlaying: true, position: 0), to: coordinator, resync: true)
+        coordinator.handleAudioSessionEvent(.interruptionBegan)
+
+        await deliver(Fixtures.snapshot(isPlaying: false, position: 5, updatedAt: Fixtures.t0.addingTimeInterval(5), serverTime: Fixtures.t0.addingTimeInterval(5)), to: coordinator)
+        #expect(embed.state == .paused)
+
+        await deliver(Fixtures.snapshot(isPlaying: true, position: 5, updatedAt: Fixtures.t0.addingTimeInterval(8), serverTime: Fixtures.t0.addingTimeInterval(8)), to: coordinator)
+        #expect(embed.state == .playing)
+        #expect(coordinator.status == .playing)
+    }
+
+    /// When the player stopped on its own while the room plays, the host's
+    /// play button rejoins live instead of pausing everyone.
+    @Test func hostToggleRejoinsWhenDeviceStoppedButRoomPlays() async {
+        let embed = MockAudioEngine()
+        let coordinator = makeEmbeddedCoordinator(embed)
+        coordinator.updateRole(isHost: true)
+        await deliver(Fixtures.snapshot(isPlaying: true, position: 0), to: coordinator, resync: true)
+        embed.state = .paused // e.g. WebKit paused the video
+
+        coordinator.togglePlayPause()
+        await drainMainActor()
+
+        #expect(commander.controls.isEmpty)
+        #expect(embed.state == .playing)
+    }
+
+    @Test func embeddedPlayerToleratesSubSeekDrift() async {
+        let embed = MockAudioEngine()
+        let coordinator = makeEmbeddedCoordinator(embed)
+        await deliver(Fixtures.snapshot(isPlaying: true, position: 0), to: coordinator, resync: true)
+        let seeksBefore = embed.seeks.count
+
+        clock.advance(10)
+        embed.currentTime = 8.8 // 1.2 s behind: would loop-seek a streamed player
+        for _ in 0..<PlaybackCoordinator.driftCheckEveryTicks { coordinator.tick() }
+        await drainMainActor()
+        #expect(embed.seeks.count == seeksBefore)
+    }
+
     @Test func largeDriftTriggersAuthoritativeSeek() async {
         let coordinator = makeCoordinator()
         await deliver(Fixtures.snapshot(isPlaying: true, position: 0), to: coordinator)

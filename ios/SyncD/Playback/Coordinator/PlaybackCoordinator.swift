@@ -179,6 +179,16 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
         return nativeEngine
     }
 
+    /// Only AVPlayer playback uses SyncD's own audio session. YouTube's
+    /// embedded player runs inside WebKit, which manages its own session;
+    /// activating ours alongside it makes iOS report a spurious interruption
+    /// that would leave the coordinator refusing to play.
+    private var ownsAudioSession: Bool { audioAvailability == .native }
+
+    private func activateAudioSessionIfOwned() {
+        if ownsAudioSession { audioSession?.activate() }
+    }
+
     private func stopAllEngines() {
         if nativeEngine.currentItem != nil { nativeEngine.stop() }
         if let embedEngine, embedEngine.currentItem != nil { embedEngine.stop() }
@@ -270,6 +280,10 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
         if audioAvailability != availability {
             stopAllEngines()
             audioAvailability = availability
+            if !ownsAudioSession {
+                audioSession?.deactivate()
+                isInterrupted = false
+            }
         }
         reconcileEngine(forceReload: trackChanged || engine.currentItem?.id != trackId, forceSeek: isResync)
     }
@@ -347,6 +361,14 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
     }
 
     func togglePlayPause() {
+        // The room is playing but this device isn't (a local pause, or iOS /
+        // WebKit stopped the player): rejoin live instead of pausing the room.
+        if case .room = session, usesEngine, isRoomPlaying, !isPlaying, status != .loading {
+            commandError = nil
+            isLocallyPaused = false
+            reconcileEngine(forceReload: false, forceSeek: true)
+            return
+        }
         if case .room = session, isHost {
             isRoomPlaying ? pause() : play()
             return
@@ -422,7 +444,7 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
             }
             engine.setRate(1)
             if shouldPlay {
-                audioSession?.activate()
+                activateAudioSessionIfOwned()
                 engine.play()
             } else {
                 engine.pause()
@@ -557,6 +579,12 @@ final class PlaybackCoordinator: PlaybackCommandHandling {
     // MARK: Audio session events
 
     func handleAudioSessionEvent(_ event: InterruptionPolicy.Event) {
+        // WebKit's media session reports through our session's notifications;
+        // the embedded player handles its own interruptions and route changes.
+        guard audioAvailability != .embedded else {
+            isInterrupted = false
+            return
+        }
         if event == .interruptionBegan {
             wasPlayingBeforeInterruption = intendsToProduceAudio
             userPausedDuringInterruption = false

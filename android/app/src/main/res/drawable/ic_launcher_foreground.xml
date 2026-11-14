@@ -1,20 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- SyncD mark: two offset sound waves converging (in sync). -->
+<!--
+  SyncD mark: equalizer bars settling into rhythm (same mark as the web favicon
+  and the iOS icon). Sized to the adaptive-icon safe zone (central 66dp).
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFF7A23B"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:pathData="M34,58 Q40,40 46,58 T58,58 T70,58" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFF97316"
-        android:strokeWidth="5"
-        android:strokeLineCap="round"
-        android:pathData="M38,50 Q44,32 50,50 T62,50 T74,50" />
+    <path android:pathData="M32.25,50.25 a3.75,3.75 0 0,1 7.5,0 v7.5 a3.75,3.75 0 0,1 -7.5,0 z M44.25,39.75 a3.75,3.75 0 0,1 7.5,0 v28.5 a3.75,3.75 0 0,1 -7.5,0 z M56.25,53.25 a3.75,3.75 0 0,1 7.5,0 v1.5 a3.75,3.75 0 0,1 -7.5,0 z M68.25,44.25 a3.75,3.75 0 0,1 7.5,0 v19.5 a3.75,3.75 0 0,1 -7.5,0 z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="32.25"
+                android:startY="36"
+                android:endX="75.75"
+                android:endY="72"
+                android:startColor="#FFFCD34D"
+                android:endColor="#FFF97316" />
+        </aapt:attr>
+    </path>
 </vector>
