@@ -3,7 +3,7 @@ package com.syncd.android.core.model
 import kotlinx.serialization.Serializable
 
 /*
- * Socket.IO wire models. Mirrors server/src/sockets/*.types.ts and the playback /
+ * Socket.IO wire models. Mirrors the server/src/sockets type files and the playback /
  * messages type files. Event names live in core/socket/SocketEvents.kt.
  */
 
