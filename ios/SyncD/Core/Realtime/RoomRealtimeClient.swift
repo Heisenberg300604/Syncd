@@ -5,11 +5,20 @@ enum RoomConnectionState: Equatable, Sendable {
     case connecting
     /// Socket connected *and* `room:join` acknowledged.
     case connected
-    case reconnecting(attempt: Int)
+    /// `reason` is the last handshake failure, in user-facing words, when known.
+    case reconnecting(attempt: Int, reason: String?)
     /// Not recoverable by retrying (room deleted, membership revoked).
     case failed(String)
 
     var isConnected: Bool { self == .connected }
+
+    var failureReason: String? {
+        switch self {
+        case let .reconnecting(_, reason): reason
+        case let .failed(message): message
+        default: nil
+        }
+    }
 }
 
 /// A playback snapshot plus the local times bracketing it, for clock estimation.

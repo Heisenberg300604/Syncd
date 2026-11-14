@@ -125,7 +125,7 @@ struct ConnectionStatusPill: View {
         case .idle: "Offline"
         case .connecting: "Connecting"
         case .connected: "Live"
-        case let .reconnecting(attempt): attempt > 1 ? "Reconnecting (\(attempt))" : "Reconnecting"
+        case let .reconnecting(attempt, _): attempt > 1 ? "Reconnecting (\(attempt))" : "Reconnecting"
         case .failed: "Disconnected"
         }
     }

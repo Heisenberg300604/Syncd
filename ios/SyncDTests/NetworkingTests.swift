@@ -200,6 +200,41 @@ final class Counter: @unchecked Sendable {
     @discardableResult func increment() -> Int { lock.withLock { count += 1; return count } }
 }
 
+@Suite("Socket handshake errors")
+struct SocketHandshakeErrorTests {
+    @Test func explainsAuthorizedPartyRejection() {
+        let raw = #"Invalid JWT Authorized party claim (azp) undefined. Expected "http://localhost:5173"."#
+        #expect(SocketIORoomClient.describeConnectError(raw).contains("native-app tokens"))
+    }
+
+    /// The real shape Socket.IO v4 delivers for `next(new Error(msg))`.
+    @Test func readsMessageFromConnectErrorObject() {
+        let payload: [Any] = [["message": #"Invalid JWT Authorized party claim (azp) undefined. Expected "http://localhost:5173"."#]]
+        let message = SocketIORoomClient.errorMessage(from: payload)
+        #expect(message.contains("Authorized party"))
+        #expect(SocketIORoomClient.describeConnectError(message).contains("native-app tokens"))
+    }
+
+    @Test func readsPlainStringAndNestedErrors() {
+        #expect(SocketIORoomClient.errorMessage(from: ["Tried emitting when not connected"]) == "Tried emitting when not connected")
+        #expect(SocketIORoomClient.errorMessage(from: [["data": ["message": "inner"]]]) == "inner")
+        #expect(SocketIORoomClient.errorMessage(from: []) == "No details from the server")
+    }
+
+    @Test func explainsMissingProfile() {
+        #expect(SocketIORoomClient.describeConnectError("User profile not found").contains("onboarding"))
+    }
+
+    @Test func passesThroughUnknownReasons() {
+        #expect(SocketIORoomClient.describeConnectError("Something odd").hasSuffix("Something odd"))
+    }
+
+    @Test func reasonSurfacesWhileReconnecting() {
+        #expect(RoomConnectionState.reconnecting(attempt: 3, reason: "x").failureReason == "x")
+        #expect(RoomConnectionState.connected.failureReason == nil)
+    }
+}
+
 @Suite("Configuration")
 struct ConfigurationTests {
     @Test func derivesSocketURLLikeWeb() throws {

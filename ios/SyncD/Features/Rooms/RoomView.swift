@@ -146,10 +146,11 @@ private struct RoomHeaderView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.Palette.inkMuted)
             }
-            if case let .failed(message) = session.connection {
-                Label(message, systemImage: "exclamationmark.triangle")
+            if let reason = session.connection.failureReason {
+                Label(reason, systemImage: "exclamationmark.triangle")
                     .font(.footnote)
                     .foregroundStyle(Theme.Palette.danger)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.vertical, Theme.Spacing.xs)
@@ -186,6 +187,24 @@ private struct NowPlayingCard: View {
                 }
                 AudioAvailabilityNote()
             }
+            .padding(.vertical, Theme.Spacing.xs)
+        } else if !session.hasJoined, let reason = session.connection.failureReason {
+            // Don't spin forever: say why the room can't be reached yet.
+            VStack(spacing: Theme.Spacing.xs) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.title2)
+                    .foregroundStyle(Theme.Palette.warning)
+                    .accessibilityHidden(true)
+                Text("Can't connect to the room").font(.headline)
+                Text(reason)
+                    .font(.footnote)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(Theme.Palette.inkMuted)
+                if case .reconnecting = session.connection {
+                    Text("Retrying automatically.").font(.caption).foregroundStyle(Theme.Palette.inkFaint)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 80)
             .padding(.vertical, Theme.Spacing.xs)
         } else if !session.hasJoined {
             HStack {
