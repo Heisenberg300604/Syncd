@@ -1,6 +1,0 @@
-Config/Local.xcconfig
-xcuserdata/
-*.xcuserstate
-DerivedData/
-build/
-.swiftpm/
