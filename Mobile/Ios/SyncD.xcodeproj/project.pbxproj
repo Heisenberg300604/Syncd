@@ -1,0 +1,377 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5D0000000000000000000101 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5D0000000000000000000201 /* ClerkKit */; };
+		5D0000000000000000000102 /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 5D0000000000000000000202 /* ClerkKitUI */; };
+		5D0000000000000000000103 /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = 5D0000000000000000000203 /* SocketIO */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5D0000000000000000000301 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5D0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5D0000000000000000000401;
+			remoteInfo = SyncD;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		5D0000000000000000000501 /* SyncD.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SyncD.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5D0000000000000000000502 /* SyncDTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SyncDTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5D0000000000000000000511 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		5D0000000000000000000512 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		5D0000000000000000000513 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		5D0000000000000000000514 /* SyncD-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "SyncD-Info.plist"; sourceTree = "<group>"; };
+		5D0000000000000000000515 /* SyncD.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SyncD.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		5D0000000000000000000601 /* SyncD */ = {isa = PBXFileSystemSynchronizedRootGroup; path = SyncD; sourceTree = "<group>"; };
+		5D0000000000000000000602 /* SyncDTests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = SyncDTests; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5D0000000000000000000701 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5D0000000000000000000101 /* ClerkKit in Frameworks */,
+				5D0000000000000000000102 /* ClerkKitUI in Frameworks */,
+				5D0000000000000000000103 /* SocketIO in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5D0000000000000000000702 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		5D0000000000000000000801 = {
+			isa = PBXGroup;
+			children = (
+				5D0000000000000000000601 /* SyncD */,
+				5D0000000000000000000602 /* SyncDTests */,
+				5D0000000000000000000803 /* Config */,
+				5D0000000000000000000802 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5D0000000000000000000802 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				5D0000000000000000000501 /* SyncD.app */,
+				5D0000000000000000000502 /* SyncDTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		5D0000000000000000000803 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				5D0000000000000000000511 /* Base.xcconfig */,
+				5D0000000000000000000512 /* Debug.xcconfig */,
+				5D0000000000000000000513 /* Release.xcconfig */,
+				5D0000000000000000000514 /* SyncD-Info.plist */,
+				5D0000000000000000000515 /* SyncD.entitlements */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5D0000000000000000000401 /* SyncD */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5D0000000000000000000B02 /* Build configuration list for PBXNativeTarget "SyncD" */;
+			buildPhases = (
+				5D0000000000000000000901 /* Sources */,
+				5D0000000000000000000701 /* Frameworks */,
+				5D0000000000000000000A01 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5D0000000000000000000601 /* SyncD */,
+			);
+			name = SyncD;
+			packageProductDependencies = (
+				5D0000000000000000000201 /* ClerkKit */,
+				5D0000000000000000000202 /* ClerkKitUI */,
+				5D0000000000000000000203 /* SocketIO */,
+			);
+			productName = SyncD;
+			productReference = 5D0000000000000000000501 /* SyncD.app */;
+			productType = "com.apple.product-type.application";
+		};
+		5D0000000000000000000402 /* SyncDTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5D0000000000000000000B03 /* Build configuration list for PBXNativeTarget "SyncDTests" */;
+			buildPhases = (
+				5D0000000000000000000902 /* Sources */,
+				5D0000000000000000000702 /* Frameworks */,
+				5D0000000000000000000A02 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5D0000000000000000000C01 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5D0000000000000000000602 /* SyncDTests */,
+			);
+			name = SyncDTests;
+			productName = SyncDTests;
+			productReference = 5D0000000000000000000502 /* SyncDTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5D0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					5D0000000000000000000401 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					5D0000000000000000000402 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = 5D0000000000000000000401;
+					};
+				};
+			};
+			buildConfigurationList = 5D0000000000000000000B01 /* Build configuration list for PBXProject "SyncD" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 5D0000000000000000000801;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5D0000000000000000000D01 /* XCRemoteSwiftPackageReference "clerk-ios" */,
+				5D0000000000000000000D02 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 5D0000000000000000000802 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5D0000000000000000000401 /* SyncD */,
+				5D0000000000000000000402 /* SyncDTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		5D0000000000000000000A01 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5D0000000000000000000A02 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		5D0000000000000000000901 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5D0000000000000000000902 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5D0000000000000000000C01 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5D0000000000000000000401 /* SyncD */;
+			targetProxy = 5D0000000000000000000301 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		5D0000000000000000000E01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5D0000000000000000000512 /* Debug.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		5D0000000000000000000E02 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5D0000000000000000000513 /* Release.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		5D0000000000000000000E11 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/SyncD.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/SyncD-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		5D0000000000000000000E12 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/SyncD.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Config/SyncD-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		5D0000000000000000000E21 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SYNCD_BUNDLE_ID).tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SyncD.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SyncD";
+			};
+			name = Debug;
+		};
+		5D0000000000000000000E22 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SYNCD_BUNDLE_ID).tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SyncD.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SyncD";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5D0000000000000000000B01 /* Build configuration list for PBXProject "SyncD" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5D0000000000000000000E01 /* Debug */,
+				5D0000000000000000000E02 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5D0000000000000000000B02 /* Build configuration list for PBXNativeTarget "SyncD" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5D0000000000000000000E11 /* Debug */,
+				5D0000000000000000000E12 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5D0000000000000000000B03 /* Build configuration list for PBXNativeTarget "SyncDTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5D0000000000000000000E21 /* Debug */,
+				5D0000000000000000000E22 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5D0000000000000000000D01 /* XCRemoteSwiftPackageReference "clerk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/clerk/clerk-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.7.2;
+			};
+		};
+		5D0000000000000000000D02 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 16.1.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5D0000000000000000000201 /* ClerkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5D0000000000000000000D01 /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = ClerkKit;
+		};
+		5D0000000000000000000202 /* ClerkKitUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5D0000000000000000000D01 /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = ClerkKitUI;
+		};
+		5D0000000000000000000203 /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5D0000000000000000000D02 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			productName = SocketIO;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 5D0000000000000000000001 /* Project object */;
+}
