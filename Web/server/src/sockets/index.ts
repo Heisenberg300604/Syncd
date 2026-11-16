@@ -11,6 +11,7 @@ import {
   transferRoomHost,
 } from "../modules/rooms/rooms.service.js";
 import { presenceStore } from "./presenceStore.js";
+import { isAuthorizedParty } from "./socketAuth.js";
 import {
   applyPlaybackControl,
   clearRoomTrack,
@@ -93,13 +94,18 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
     }
 
     try {
-      // `authorizedParties` pins the token to a frontend this API actually
-      // serves, so a session token minted for a different origin on the same
-      // Clerk instance cannot be replayed here.
+      // Browser tokens carry `azp` (the page origin) and must come from a
+      // frontend this API serves, so a token minted for another origin on the
+      // same Clerk instance can't be replayed here. Native-app tokens
+      // (iOS/Android) carry no `azp`; Clerk's `authorizedParties` option would
+      // reject those too, so the check is applied by `isAuthorizedParty`.
       const payload = await verifyToken(token, {
         secretKey: config.clerkSecretKey,
-        authorizedParties: config.clerkAuthorizedParties,
       });
+      if (!isAuthorizedParty(payload.azp, config.clerkAuthorizedParties)) {
+        next(new Error("Invalid token: unauthorized party"));
+        return;
+      }
       const clerkUserId = payload.sub;
       if (!clerkUserId) {
         next(new Error("Invalid token: missing subject"));

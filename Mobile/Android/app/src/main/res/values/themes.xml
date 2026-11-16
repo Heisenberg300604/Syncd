@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Window-level theme only; all UI is Compose (core/design/Theme.kt). Dark-first. -->
+    <style name="Theme.SyncD" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/syncd_canvas</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

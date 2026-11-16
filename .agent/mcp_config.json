@@ -15,6 +15,12 @@
                 "shadcn@latest",
                 "mcp"
             ]
+        },
+        "21st": {
+            "url": "https://21st.dev/api/mcp",
+            "headers": {
+                "x-api-key": "21st_sk_b408b99716d86a9c6b0d9c52a9f41020a8c2c85fb4cbe9950b23c5cf24cb2af1"
+            }
         }
         //other mcp servers
     }
