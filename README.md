@@ -11,7 +11,6 @@
 [![Android App](https://img.shields.io/badge/Android-Kotlin_%7C_Compose-21262d?style=flat-square&logo=android&logoColor=3DDC84&labelColor=0d1117)](./Mobile/Android)
 [![iOS App](https://img.shields.io/badge/iOS-Swift_%7C_SwiftUI-21262d?style=flat-square&logo=swift&logoColor=F05138&labelColor=0d1117)](./Mobile/Ios)
 [![Server & Protocol](https://img.shields.io/badge/Backend-Express_%7C_Socket.IO-21262d?style=flat-square&logo=socketdotio&logoColor=FFFFFF&labelColor=0d1117)](./Web/server)
-[![License](https://img.shields.io/badge/License-MIT_%2F_ISC-21262d?style=flat-square&logo=opensourceinitiative&logoColor=94A3B8&labelColor=0d1117)](LICENSE)
 
 <br/>
 
@@ -325,14 +324,6 @@ cd Desktop && npm run typecheck && cargo check --manifest-path src-tauri/Cargo.t
 - **Server Authority:** Playhead position, host promotion, and room queue mutations are strictly validated on the backend.
 - **Dedicated Design Tokens:** Desktop and native platforms strictly conform to curated design token palettes without uncurated color drifts.
 - **Zero In-Tree Secrets:** All API keys, database credentials, and Clerk secrets are managed via local `.env` files and environment stores excluded from version control.
-
----
-
-## License & Governance
-
-Individual sub-projects in this repository are licensed as follows:
-- **SyncD Desktop & Mobile:** [MIT License](LICENSE)
-- **SyncD Web Client & Server:** [ISC License](./Web/server/package.json)
 
 ---
 
