@@ -6,20 +6,39 @@
 
 ### *The Real-Time Social Music-Listening Sanctuary & Synchronized Media Lounge*
 
-[![CI: Web](https://img.shields.io/github/actions/workflow/status/syncd/syncd/web-ci.yml?branch=main&label=CI%3A%20Web&style=flat-square&labelColor=0d1117)](.github/workflows/web-ci.yml)
-[![CI: Desktop](https://img.shields.io/github/actions/workflow/status/syncd/syncd/desktop-ci.yml?branch=main&label=CI%3A%20Desktop&style=flat-square&labelColor=0d1117)](.github/workflows/desktop-ci.yml)
-[![Platforms: Web | Desktop | Mobile](https://img.shields.io/badge/Platforms-Web%20%7C%20Desktop%20%7C%20Android%20%7C%20iOS-21262d?style=flat-square&labelColor=0d1117)](/)
-[![License: MIT / ISC](https://img.shields.io/badge/License-MIT%20%2F%20ISC-21262d?style=flat-square&labelColor=0d1117)](LICENSE)
+[![Tauri Desktop](https://img.shields.io/badge/Desktop-Tauri_2_%7C_Rust-21262d?style=flat-square&logo=tauri&logoColor=24C8DB&labelColor=0d1117)](./Desktop)
+[![Web Client](https://img.shields.io/badge/Web-React_19_%7C_Vite-21262d?style=flat-square&logo=react&logoColor=61DAFB&labelColor=0d1117)](./Web/client)
+[![Android App](https://img.shields.io/badge/Android-Kotlin_%7C_Compose-21262d?style=flat-square&logo=android&logoColor=3DDC84&labelColor=0d1117)](./Mobile/Android)
+[![iOS App](https://img.shields.io/badge/iOS-Swift_%7C_SwiftUI-21262d?style=flat-square&logo=swift&logoColor=F05138&labelColor=0d1117)](./Mobile/Ios)
+[![Server & Protocol](https://img.shields.io/badge/Backend-Express_%7C_Socket.IO-21262d?style=flat-square&logo=socketdotio&logoColor=FFFFFF&labelColor=0d1117)](./Web/server)
+[![License](https://img.shields.io/badge/License-MIT_%2F_ISC-21262d?style=flat-square&logo=opensourceinitiative&logoColor=94A3B8&labelColor=0d1117)](LICENSE)
 
 <br/>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Playback-Server--Authoritative-0284c7?style=flat-square" alt="Server-Authoritative" />
-  <img src="https://img.shields.io/badge/Drift%20Correction-%3C%202.0s-059669?style=flat-square" alt="Drift Correction" />
-  <img src="https://img.shields.io/badge/Governance-Host--Guarded-d97706?style=flat-square" alt="Host-Guarded" />
-  <img src="https://img.shields.io/badge/Architecture-Clean%20%2F%20Modular-334155?style=flat-square" alt="Architecture" />
-  <img src="https://img.shields.io/badge/Latency-Sub--30ms%20Native-0d9488?style=flat-square" alt="Sub-30ms Latency" />
-</p>
+<table align="center" width="100%">
+  <tr>
+    <td align="center" width="20%">
+      <b>Authoritative Sync</b><br/>
+      <sub>Dynamic drift recovery &lt; 2.0s</sub>
+    </td>
+    <td align="center" width="20%">
+      <b>Host Governance</b><br/>
+      <sub>Strict role-gated mutations</sub>
+    </td>
+    <td align="center" width="20%">
+      <b>Sub-30ms Audio</b><br/>
+      <sub>Native CPAL WASAPI playback</sub>
+    </td>
+    <td align="center" width="20%">
+      <b>Lossless Linkage</b><br/>
+      <sub>Local track auto-substitution</sub>
+    </td>
+    <td align="center" width="20%">
+      <b>Cross-Platform</b><br/>
+      <sub>Web · Desktop · Android · iOS</sub>
+    </td>
+  </tr>
+</table>
 
 <p align="center">
   <a href="#ecosystem-overview">Overview</a> &nbsp;•&nbsp;
