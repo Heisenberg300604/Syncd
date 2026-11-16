@@ -1,4 +1,4 @@
-# SyncD — Cross-Platform Synchronized Music & Social Listening Ecosystem
+# SyncD - Cross-Platform Synchronized Music & Social Listening Ecosystem
 
 <div align="center">
 
