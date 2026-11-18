@@ -1,6 +1,8 @@
 # Gradle / Android Studio
 .gradle/
+.gradle_user_home/
 build/
+app/build/
 /local.properties
 /syncd.local.properties
 .idea/
@@ -9,6 +11,13 @@ build/
 captures/
 .externalNativeBuild/
 .cxx/
+build.log
+build_utf8.log
+Loger/
+
+# Local SDK and Cache
+android-sdk/
+
 # Signing material must never be committed
 *.jks
 *.keystore

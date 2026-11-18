@@ -11,6 +11,7 @@ import com.syncd.android.di.AppContainer
 import com.syncd.android.domain.model.RoomState
 import com.syncd.android.playback.coordinator.SyncStatus
 import com.syncd.android.playback.engine.EngineStatus
+import com.syncd.android.playback.engine.YouTubeRoomEngine
 import com.syncd.android.playback.synchronization.PlaybackTimeline
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,10 +68,22 @@ class RoomViewModel(private val code: String, private val c: AppContainer) : Vie
     val sync = coordinator.status
     val playerSlot = c.roomPlayerSlot
 
+    val captionsEnabled: StateFlow<Boolean> = (engine as? YouTubeRoomEngine)?.captionsEnabled
+        ?: MutableStateFlow(false).asStateFlow()
+
+    fun toggleCaptions() {
+        (engine as? YouTubeRoomEngine)?.toggleCaptions()
+    }
+
     val isHost: Boolean get() = room.value?.isHost(selfId) == true
 
     init {
         load()
+        viewModelScope.launch {
+            c.userPrefs.captionsByDefault.collect { defaultCaptions ->
+                (engine as? YouTubeRoomEngine)?.setCaptionsEnabled(defaultCaptions)
+            }
+        }
     }
 
     fun load() {
@@ -162,14 +175,10 @@ class RoomViewModel(private val code: String, private val c: AppContainer) : Vie
     fun leave() {
         if (_leaving.value) return
         _leaving.value = true
+        // Instantly notify UI to navigate away without waiting for backend roundtrip
+        _navigateBack.trySend(Unit)
         viewModelScope.launch {
-            when (val r = c.rooms.leave()) {
-                is ApiResult.Success -> {
-                    if (r.value.roomDeleted) localNotices.send("You were the last one here — the room has closed.")
-                    _navigateBack.send(Unit)
-                }
-                is ApiResult.Failure -> localNotices.send("Couldn't leave: ${r.error.message}")
-            }
+            c.rooms.leave()
             _leaving.value = false
         }
     }

@@ -142,20 +142,24 @@ class RoomSessionRepository(
     }
 
     /**
-     * `POST /rooms/:code/leave`. Local state is cleared only after the server
-     * confirms, so a failure never leaves a false "left" state.
+     * Optimistic leave: instantly clears local state, stops audio/socket so the UI
+     * reacts with zero latency, while notifying the server in the background.
      */
     suspend fun leave(): ApiResult<LeaveRoomResponse> {
         val code = _state.value?.roomCode ?: return ApiResult.Success(LeaveRoomResponse(left = true))
-        val result = apiCall { api.leaveRoom(code) }
-        if (result is ApiResult.Success) {
-            withContext(stateDispatcher) {
-                leaveSocketRoom(code)
-                clearLocal()
-            }
-            recents?.remove(code)
+        withContext(stateDispatcher) {
+            leaveSocketRoom(code)
+            clearLocal()
         }
-        return result
+        recents?.remove(code)
+
+        return withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val result = apiCall { api.leaveRoom(code) }
+            if (result is ApiResult.Success && result.value.roomDeleted) {
+                _notices.tryEmit("You were the last one here — the room has closed.")
+            }
+            result
+        }
     }
 
     /** Forget a Removed/Closed room locally (nothing to tell the server). */

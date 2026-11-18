@@ -12,6 +12,7 @@ import com.syncd.android.core.socket.NetworkMonitor
 import com.syncd.android.core.socket.RealtimeClient
 import com.syncd.android.core.socket.SocketIoRealtimeClient
 import com.syncd.android.data.local.RecentRoomsStore
+import com.syncd.android.data.local.UserPreferencesStore
 import com.syncd.android.data.repository.MusicRepository
 import com.syncd.android.data.repository.RoomSessionRepository
 import com.syncd.android.data.repository.UserRepository
@@ -67,6 +68,7 @@ class AppContainer(application: Application) {
     val users = UserRepository(api)
     val music = MusicRepository(api)
     val recentRooms = RecentRoomsStore(application)
+    val userPrefs = UserPreferencesStore(application)
     val rooms = RoomSessionRepository(
         scope = appScope,
         stateDispatcher = Dispatchers.Main.immediate,

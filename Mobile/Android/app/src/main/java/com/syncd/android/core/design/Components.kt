@@ -1,5 +1,6 @@
 package com.syncd.android.core.design
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +31,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -138,24 +146,54 @@ fun StatusPill(text: String, color: Color, modifier: Modifier = Modifier, showDo
 
 /** CSS-only-style initials avatar (matches the web's generated avatars rather than fetching images). */
 @Composable
-fun Avatar(name: String, modifier: Modifier = Modifier, size: Dp = 36.dp, online: Boolean? = null) {
+fun Avatar(
+    name: String,
+    modifier: Modifier = Modifier,
+    size: Dp = 36.dp,
+    online: Boolean? = null,
+    useGradient: Boolean = false,
+) {
     val palette = listOf(
         Color(0xFFF7A23B), Color(0xFFF97316), Color(0xFF7DD3FC), Color(0xFF34D399),
         Color(0xFFFBBF24), Color(0xFFF472B6), Color(0xFFA78BFA),
     )
+    val gradients = listOf(
+        listOf(Color(0xFFFB7185), Color(0xFFBE185D)), // Rose/Pink (matches Heisenberg avatar in iOS)
+        listOf(Color(0xFFFB923C), Color(0xFFEA580C)), // Orange
+        listOf(Color(0xFFFBBF24), Color(0xFFD97706)), // Amber
+        listOf(Color(0xFF38BDF8), Color(0xFF0284C7)), // Sky
+        listOf(Color(0xFF34D399), Color(0xFF059669)), // Emerald
+        listOf(Color(0xFFA78BFA), Color(0xFF7C3AED)), // Purple
+    )
     val tint = palette[name.hashCode().absoluteValue % palette.size]
+    val grad = gradients[name.hashCode().absoluteValue % gradients.size]
+
     Box(modifier.size(size).clearAndSetSemantics { }) {
-        Box(
-            Modifier.fillMaxSize().clip(CircleShape).background(tint.copy(alpha = 0.18f))
-                .border(1.dp, tint.copy(alpha = 0.45f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                name.take(1).uppercase(),
-                color = tint,
-                fontWeight = FontWeight.Bold,
-                fontSize = (size.value * 0.42f).sp,
-            )
+        if (useGradient) {
+            Box(
+                Modifier.fillMaxSize().clip(CircleShape).background(Brush.linearGradient(grad)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    name.take(1).uppercase(),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (size.value * 0.42f).sp,
+                )
+            }
+        } else {
+            Box(
+                Modifier.fillMaxSize().clip(CircleShape).background(tint.copy(alpha = 0.18f))
+                    .border(1.dp, tint.copy(alpha = 0.45f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    name.take(1).uppercase(),
+                    color = tint,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = (size.value * 0.42f).sp,
+                )
+            }
         }
         if (online != null) {
             Box(
@@ -164,6 +202,63 @@ fun Avatar(name: String, modifier: Modifier = Modifier, size: Dp = 36.dp, online
                     .background(if (online) SyncDColors.Online else SyncDColors.InkFaint),
             )
         }
+    }
+}
+
+/** Outline music note house icon matching iOS `music.note.house`. */
+@Composable
+fun MusicNoteHouseIcon(modifier: Modifier = Modifier, tint: Color = SyncDColors.Accent) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = 2.4.dp.toPx()
+
+        // Roof path
+        val roof = Path().apply {
+            moveTo(w * 0.10f, h * 0.42f)
+            lineTo(w * 0.50f, h * 0.10f)
+            lineTo(w * 0.90f, h * 0.42f)
+        }
+        drawPath(roof, color = tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Body path
+        val body = Path().apply {
+            moveTo(w * 0.22f, h * 0.38f)
+            lineTo(w * 0.22f, h * 0.88f)
+            lineTo(w * 0.78f, h * 0.88f)
+            lineTo(w * 0.78f, h * 0.38f)
+        }
+        drawPath(body, color = tint, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Music note stem inside
+        val stemX = w * 0.58f
+        val noteTop = h * 0.44f
+        val noteBottom = h * 0.70f
+        drawLine(
+            color = tint,
+            start = Offset(stemX, noteTop),
+            end = Offset(stemX, noteBottom),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
+
+        // Note flag
+        val flag = Path().apply {
+            moveTo(stemX, noteTop)
+            cubicTo(
+                stemX + w * 0.14f, noteTop + h * 0.04f,
+                stemX + w * 0.14f, noteTop + h * 0.12f,
+                stemX, noteTop + h * 0.16f,
+            )
+        }
+        drawPath(flag, color = tint, style = Stroke(width = stroke, cap = StrokeCap.Round))
+
+        // Note head (filled oval)
+        drawOval(
+            color = tint,
+            topLeft = Offset(stemX - w * 0.16f, noteBottom - h * 0.08f),
+            size = Size(w * 0.18f, h * 0.12f),
+        )
     }
 }
 

@@ -25,18 +25,73 @@ class YouTubeRoomEngine(private val monotonicNowMs: () -> Long) : RoomPlaybackEn
     override val supportsRateCorrection: Boolean = false
 
     private var player: YouTubePlayer? = null
+    private var webView: android.webkit.WebView? = null
+    private val _captionsEnabled = MutableStateFlow(false)
+    val captionsEnabled: StateFlow<Boolean> = _captionsEnabled.asStateFlow()
+
     private var pending: (YouTubePlayer.() -> Unit)? = null
     private var reportedSec = 0.0
     private var reportedAtMs = 0L
+
+    fun setWebView(wv: android.webkit.WebView?) {
+        webView = wv
+        applyCaptionsState()
+    }
+
+    fun toggleCaptions() {
+        _captionsEnabled.value = !_captionsEnabled.value
+        applyCaptionsState()
+    }
+
+    fun setCaptionsEnabled(enabled: Boolean) {
+        _captionsEnabled.value = enabled
+        applyCaptionsState()
+    }
+
+    private fun applyCaptionsState() {
+        val wv = webView ?: return
+        val enabled = _captionsEnabled.value
+        val js = if (enabled) {
+            """
+            try {
+                if (window.player) {
+                    player.loadModule("captions");
+                    player.setOption("captions", "track", {"languageCode": "en"});
+                    player.setOption("captions", "reload", true);
+                }
+            } catch(e) {}
+            """.trimIndent()
+        } else {
+            """
+            try {
+                if (window.player) {
+                    player.unloadModule("captions");
+                    player.setOption("captions", "track", {});
+                }
+            } catch(e) {}
+            """.trimIndent()
+        }
+        wv.post {
+            wv.evaluateJavascript(js, null)
+        }
+    }
 
     val listener = object : AbstractYouTubePlayerListener() {
         override fun onReady(youTubePlayer: YouTubePlayer) {
             player = youTubePlayer
             pending?.invoke(youTubePlayer)
             pending = null
+            applyCaptionsState()
         }
 
         override fun onStateChange(youTubePlayer: YouTubePlayer, state: PlayerConstants.PlayerState) {
+            if (state == PlayerConstants.PlayerState.PLAYING) {
+                // Ensure captions are kept off by default unless explicitly toggled on
+                applyCaptionsState()
+            } else if (state == PlayerConstants.PlayerState.ENDED) {
+                // Immediately pause on finish to avoid YouTube rendering its recommended videos overlay
+                runCatching { youTubePlayer.pause() }
+            }
             val status = when (state) {
                 PlayerConstants.PlayerState.PLAYING -> EngineStatus.Playing
                 PlayerConstants.PlayerState.PAUSED -> EngineStatus.Paused
@@ -99,6 +154,7 @@ class YouTubeRoomEngine(private val monotonicNowMs: () -> Long) : RoomPlaybackEn
     /** Called when the hosting view is released; the next view gets a fresh player. */
     fun detachPlayer() {
         player = null
+        webView = null
         pending = null
         _state.value = EngineState()
     }

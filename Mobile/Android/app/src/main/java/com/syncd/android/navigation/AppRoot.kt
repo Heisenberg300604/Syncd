@@ -1,35 +1,31 @@
 package com.syncd.android.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.CloudOff
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.NavDestination.Companion.hasRoute
-import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
+import com.syncd.android.SyncDApplication
 import com.syncd.android.core.auth.AuthState
 import com.syncd.android.core.design.LoadingState
 import com.syncd.android.core.design.MessageState
@@ -38,28 +34,31 @@ import com.syncd.android.core.network.ApiError
 import com.syncd.android.data.repository.ProfileState
 import com.syncd.android.di.AppContainer
 import com.syncd.android.di.appViewModel
+import com.syncd.android.domain.model.RoomPhase
 import com.syncd.android.feature.auth.OnboardingScreen
 import com.syncd.android.feature.auth.SignInScreen
 import com.syncd.android.feature.home.HomeScreen
+import com.syncd.android.feature.permission.PermissionScreen
 import com.syncd.android.feature.player.FullPlayerScreen
 import com.syncd.android.feature.player.MiniPlayer
 import com.syncd.android.feature.profile.ProfileScreen
+import com.syncd.android.feature.room.ActiveRoomTabScreen
 import com.syncd.android.feature.room.PersistentRoomPlayer
-import com.syncd.android.feature.room.RoomScreen
-import androidx.compose.ui.platform.LocalContext
-import com.syncd.android.SyncDApplication
+import com.syncd.android.feature.search.SearchSheet
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 @Serializable data object HomeRoute
+@Serializable data object RoomTabRoute
+@Serializable data object PlayerRoute
 @Serializable data object ProfileRoute
 @Serializable data class RoomRoute(val code: String)
-@Serializable data object PlayerRoute
 
 /** Session gate: auth → `/me` → onboarding → app. Mirrors the web route guards. */
 class AppRootViewModel(private val c: AppContainer) : ViewModel() {
     val auth = c.auth.state
     val profile = c.users.state
+    val hasSeenPermissions = c.userPrefs.hasSeenPermissionScreen
     private var lastSessionId: String? = null
 
     init {
@@ -90,6 +89,10 @@ class AppRootViewModel(private val c: AppContainer) : ViewModel() {
         viewModelScope.launch { c.users.refresh() }
     }
 
+    fun markPermissionOnboarded() {
+        viewModelScope.launch { c.userPrefs.setPermissionOnboarded(true) }
+    }
+
     fun signOut() {
         viewModelScope.launch { c.signOut() }
     }
@@ -100,6 +103,7 @@ fun AppRoot() {
     val vm = appViewModel { AppRootViewModel(it) }
     val auth by vm.auth.collectAsState()
     val profile by vm.profile.collectAsState()
+    val hasSeenPermissions by vm.hasSeenPermissions.collectAsState(initial = true)
 
     Box(Modifier.fillMaxSize().background(SyncDColors.Canvas)) {
         when (val a = auth) {
@@ -120,7 +124,13 @@ fun AppRoot() {
                     primaryAction = if (p.error is ApiError.Unauthorized) "Sign in again" to vm::signOut else "Try again" to vm::retryProfile,
                     secondaryAction = if (p.error is ApiError.Unauthorized) null else "Sign out" to vm::signOut,
                 )
-                is ProfileState.Ready -> MainScaffold(onSignOut = vm::signOut)
+                is ProfileState.Ready -> {
+                    if (!hasSeenPermissions) {
+                        PermissionScreen(onContinue = vm::markPermissionOnboarded)
+                    } else {
+                        MainScaffold(onSignOut = vm::signOut)
+                    }
+                }
             }
         }
     }
@@ -128,74 +138,83 @@ fun AppRoot() {
 
 @Composable
 private fun MainScaffold(onSignOut: () -> Unit) {
-    val nav = rememberNavController()
-    val entry by nav.currentBackStackEntryAsState()
-    val destination = entry?.destination
-    val topLevel = destination?.hasRoute<HomeRoute>() == true || destination?.hasRoute<ProfileRoute>() == true
+    val context = LocalContext.current
+    val app = context.applicationContext as SyncDApplication
+    val activeRoom by app.container.rooms.state.collectAsState()
+    val inRoom = activeRoom?.takeIf { it.phase !is RoomPhase.Closed && it.phase !is RoomPhase.Removed } != null
+    var searchSheetOpen by remember { mutableStateOf(false) }
 
-    fun goTopLevel(route: Any) = nav.navigate(route) {
-        popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { AppTab.entries.size })
+    val coroutineScope = rememberCoroutineScope()
+    val currentTab = AppTab.entries[pagerState.currentPage]
+
+    BackHandler(enabled = pagerState.currentPage != 0) {
+        coroutineScope.launch { pagerState.animateScrollToPage(0) }
     }
 
     Scaffold(
         containerColor = SyncDColors.Canvas,
         bottomBar = {
-            if (topLevel) {
-                Column {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // MiniPlayer: show when local device media is playing
+                if (currentTab != AppTab.PLAYER) {
                     MiniPlayer(
-                        onOpenPlayer = { nav.navigate(PlayerRoute) },
-                        onOpenRoom = { code -> nav.navigate(RoomRoute(code)) },
+                        onOpenPlayer = { coroutineScope.launch { pagerState.animateScrollToPage(AppTab.PLAYER.ordinal) } },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
-                    NavigationBar(containerColor = SyncDColors.Surface) {
-                        val colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = SyncDColors.AccentInk,
-                            indicatorColor = SyncDColors.Accent,
-                            selectedTextColor = SyncDColors.Ink,
-                            unselectedIconColor = SyncDColors.InkMuted,
-                            unselectedTextColor = SyncDColors.InkMuted,
-                        )
-                        NavigationBarItem(
-                            selected = destination.hasRoute<HomeRoute>(),
-                            onClick = { goTopLevel(HomeRoute) },
-                            icon = { Icon(Icons.Filled.Home, contentDescription = null) },
-                            label = { Text("Home") },
-                            colors = colors,
-                        )
-                        NavigationBarItem(
-                            selected = destination.hasRoute<ProfileRoute>(),
-                            onClick = { goTopLevel(ProfileRoute) },
-                            icon = { Icon(Icons.Filled.Person, contentDescription = null) },
-                            label = { Text("Profile") },
-                            colors = colors,
-                        )
-                    }
                 }
+                // FloatingNavBar is kept active across ALL screens, including Player!
+                FloatingNavBar(
+                    currentTab = currentTab,
+                    onTabSelected = { tab ->
+                        coroutineScope.launch { pagerState.animateScrollToPage(tab.ordinal) }
+                    },
+                    inRoom = inRoom,
+                    onAddMusic = { searchSheetOpen = true },
+                )
             }
         },
     ) { padding ->
         Box(Modifier.fillMaxSize()) {
-            NavHost(nav, startDestination = HomeRoute, modifier = Modifier.padding(padding)) {
-                composable<HomeRoute> {
-                    HomeScreen(
-                        onOpenRoom = { code -> nav.navigate(RoomRoute(code)) { launchSingleTop = true } },
-                        onOpenPlayer = { nav.navigate(PlayerRoute) },
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+            ) { page ->
+                when (AppTab.entries[page]) {
+                    AppTab.HOME -> HomeScreen(
+                        onOpenRoom = { _ -> coroutineScope.launch { pagerState.animateScrollToPage(AppTab.ROOM.ordinal) } },
+                    )
+                    AppTab.ROOM -> ActiveRoomTabScreen(
+                        onGoHome = { coroutineScope.launch { pagerState.animateScrollToPage(AppTab.HOME.ordinal) } },
+                    )
+                    AppTab.PLAYER -> FullPlayerScreen(
+                        onBack = null,
+                    )
+                    AppTab.PROFILE -> ProfileScreen(
+                        onSignOut = onSignOut,
                     )
                 }
-                composable<ProfileRoute> { ProfileScreen(onSignOut = onSignOut) }
-                composable<RoomRoute> { backStack ->
-                    val route = backStack.toRoute<RoomRoute>()
-                    RoomScreen(code = route.code, onBack = { nav.popBackStack() })
-                }
-                composable<PlayerRoute> { FullPlayerScreen(onBack = { nav.popBackStack() }) }
             }
-            // Above every screen: the room's video, in the room's player box or floating.
+
+            // Above every screen: the room's video (in slot on room screen, or draggable floating mini player)
             PersistentRoomPlayer(
-                c = (LocalContext.current.applicationContext as SyncDApplication).container,
+                c = app.container,
                 bottomInset = padding.calculateBottomPadding(),
-                onOpenRoom = { code -> nav.navigate(RoomRoute(code)) { launchSingleTop = true } },
+                onOpenRoom = { _ -> coroutineScope.launch { pagerState.animateScrollToPage(AppTab.ROOM.ordinal) } },
             )
+
+            // Room search sheet opened from the floating navbar
+            if (searchSheetOpen && inRoom) {
+                SearchSheet(
+                    somethingPlaying = activeRoom?.playback?.videoId != null,
+                    onDismiss = { searchSheetOpen = false },
+                )
+            }
         }
     }
 }

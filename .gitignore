@@ -67,3 +67,13 @@ Desktop/
 .agent/
 
 Audio/
+
+# Mobile Android Local Artifacts
+Mobile/Android/android-sdk/
+Mobile/Android/.gradle/
+Mobile/Android/.gradle_user_home/
+Mobile/Android/build/
+Mobile/Android/app/build/
+Mobile/Android/local.properties
+Mobile/Android/syncd.local.properties
+Mobile/Android/*.log

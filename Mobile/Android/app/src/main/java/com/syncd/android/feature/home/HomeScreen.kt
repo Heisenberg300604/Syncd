@@ -1,13 +1,9 @@
 package com.syncd.android.feature.home
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.provider.OpenableColumns
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,14 +17,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.AudioFile
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -43,17 +41,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.syncd.android.core.design.Avatar
 import com.syncd.android.core.design.PrimaryButton
 import com.syncd.android.core.design.SecondaryButton
 import com.syncd.android.core.design.SectionHeader
@@ -68,7 +68,6 @@ import com.syncd.android.data.repository.RoomSessionRepository
 import com.syncd.android.di.AppContainer
 import com.syncd.android.di.appViewModel
 import com.syncd.android.domain.model.RoomState
-import com.syncd.android.playback.source.SourceResolver
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -159,176 +158,255 @@ class HomeViewModel(private val c: AppContainer) : ViewModel() {
             _state.update { it.copy(openingCode = null) }
         }
     }
-
-    /** Local, device-only playback through the Media3 service. Never shared with a room. */
-    fun playLocalFile(context: Context, uri: Uri): Boolean {
-        runCatching {
-            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-            ?.use { if (it.moveToFirst()) it.getString(0) else null }
-            ?.substringBeforeLast('.')
-            .orEmpty()
-        val source = SourceResolver.forLocalUri(uri.toString(), name)
-        if (source == null) {
-            _messages.trySend("That file can't be played.")
-            return false
-        }
-        val result = c.playback.play(source)
-        result.exceptionOrNull()?.let { _messages.trySend(it.message ?: "Couldn't start playback.") }
-        return result.isSuccess
-    }
 }
 
 @Composable
-fun HomeScreen(onOpenRoom: (String) -> Unit, onOpenPlayer: () -> Unit) {
+fun HomeScreen(
+    onOpenRoom: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val vm = appViewModel { HomeViewModel(it) }
     val state by vm.state.collectAsState()
     val recent by vm.recent.collectAsState()
     val active by vm.activeRoom.collectAsState()
     val snackbar = remember { SnackbarHostState() }
-    val context = LocalContext.current
 
     LaunchedEffect(vm) { vm.navigate.collect(onOpenRoom) }
     LaunchedEffect(vm) { vm.messages.collect { snackbar.showSnackbar(it) } }
 
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null && vm.playLocalFile(context, uri)) onOpenPlayer()
-    }
-
-    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.fillMaxSize().statusBarsPadding(),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // iOS-matching greeting header
             item {
-                Column {
-                    Text(
-                        "Hey${vm.username?.let { ", $it" } ?: ""}",
-                        style = MaterialTheme.typography.headlineMedium,
-                        modifier = Modifier.semantics { heading() },
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                ) {
+                    Avatar(
+                        name = vm.username ?: "?",
+                        size = 46.dp,
+                        useGradient = true,
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text("Listen together, in sync.", style = MaterialTheme.typography.bodyMedium, color = SyncDColors.InkMuted)
+                    Spacer(Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = "Welcome back",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SyncDColors.InkMuted,
+                        )
+                        Text(
+                            text = vm.username ?: "User",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = SyncDColors.Ink,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                    }
                 }
             }
 
+            // Active Room card
             active?.let { room ->
                 item {
-                    SyncDCard(Modifier.fillMaxWidth().clickable(role = Role.Button) { onOpenRoom(room.roomCode) }) {
+                    SyncDCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(role = Role.Button) { onOpenRoom(room.roomCode) },
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(SyncDColors.AccentLo),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Outlined.GraphicEq, contentDescription = null, tint = SyncDColors.Accent)
+                            }
+                            Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f)) {
-                                StatusPill("In a room", SyncDColors.Online)
-                                Spacer(Modifier.height(8.dp))
-                                Text("Room ${room.roomCode}", style = MaterialTheme.typography.titleMedium)
-                                val title = room.playback?.title ?: room.restTrackTitle
                                 Text(
-                                    title ?: "Nothing playing",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    "Listening in ${room.roomCode}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                    color = SyncDColors.Accent,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                val title = room.playback?.title ?: room.restTrackTitle ?: "Room active"
+                                Text(
+                                    title,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                                     maxLines = 1,
+                                    color = SyncDColors.Ink,
                                 )
                             }
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Return to room ${room.roomCode}")
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Return to room ${room.roomCode}",
+                                tint = SyncDColors.InkFaint,
+                            )
                         }
                     }
                 }
             }
 
+            // Start Listening section
             item {
-                SyncDCard(Modifier.fillMaxWidth()) {
-                    Text("Start a room", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "You'll be the host and get a code to share.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    Spacer(Modifier.height(14.dp))
-                    PrimaryButton("Create room", vm::create, Modifier.fillMaxWidth(), loading = state.creating, icon = Icons.Outlined.Add)
-                }
-            }
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SectionHeader("Start listening")
 
-            item {
-                SyncDCard(Modifier.fillMaxWidth()) {
-                    Text("Join with a code", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = state.joinCode,
-                        onValueChange = vm::onCodeChange,
-                        placeholder = { Text("ABC234") },
-                        isError = state.joinError != null,
-                        supportingText = state.joinError?.let { { Text(it) } },
-                        singleLine = true,
-                        textStyle = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Monospace, letterSpacing = 4.sp),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, imeAction = ImeAction.Go),
-                        keyboardActions = KeyboardActions(onGo = { vm.join() }),
+                    PrimaryButton(
+                        text = "Create a room",
+                        onClick = vm::create,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SyncDColors.Accent),
+                        loading = state.creating,
+                        icon = Icons.Outlined.Add,
                     )
-                    Spacer(Modifier.height(8.dp))
-                    SecondaryButton(
-                        if (state.joining) "Joining…" else "Join room",
-                        vm::join,
-                        Modifier.fillMaxWidth(),
-                        enabled = !state.joining && state.joinCode.length == RoomCodes.LENGTH,
-                    )
-                }
-            }
 
-            item { SectionHeader("Recent rooms") }
-            if (recent.isEmpty()) {
-                item {
-                    Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.History, null, tint = SyncDColors.InkFaint)
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            "Rooms you open on this device show up here. SyncD doesn't list public rooms yet — ask a friend for a code.",
-                            style = MaterialTheme.typography.bodySmall,
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = state.joinCode,
+                            onValueChange = vm::onCodeChange,
+                            placeholder = { Text("Room code", color = SyncDColors.InkFaint) },
+                            singleLine = true,
+                            isError = state.joinError != null,
+                            supportingText = state.joinError?.let { { Text(it) } },
+                            textStyle = MaterialTheme.typography.titleMedium.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 2.sp,
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Characters,
+                                imeAction = ImeAction.Go,
+                            ),
+                            keyboardActions = KeyboardActions(onGo = { vm.join() }),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = SyncDColors.Raised,
+                                unfocusedContainerColor = SyncDColors.Raised,
+                                focusedBorderColor = SyncDColors.Accent,
+                                unfocusedBorderColor = SyncDColors.LineStrong,
+                                focusedTextColor = SyncDColors.Ink,
+                                unfocusedTextColor = SyncDColors.Ink,
+                            ),
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 52.dp),
+                        )
+
+                        SecondaryButton(
+                            text = if (state.joining) "Joining…" else "Join",
+                            onClick = vm::join,
+                            enabled = !state.joining && state.joinCode.length == RoomCodes.LENGTH,
+                            modifier = Modifier.height(52.dp),
                         )
                     }
                 }
-            } else {
-                items(recent, key = { it.roomCode }) { room ->
-                    RecentRoomRow(room, opening = state.openingCode == room.roomCode) { vm.open(room.roomCode) }
-                }
             }
 
-            item { SectionHeader("On this device") }
+            // Recent rooms section
             item {
-                SyncDCard(Modifier.fillMaxWidth()) {
-                    Text("Play an audio file", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Plays a file from your phone with background playback, lock-screen and Bluetooth controls. " +
-                            "It's private to this device and isn't shared with any room.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    SecondaryButton("Choose audio file", { picker.launch(arrayOf("audio/*")) }, Modifier.fillMaxWidth(), icon = Icons.Outlined.AudioFile)
+                SectionHeader("Recent rooms")
+            }
+
+            if (recent.isEmpty()) {
+                item {
+                    SyncDCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        padding = PaddingValues(16.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Outlined.History, null, tint = SyncDColors.Accent.copy(alpha = 0.8f))
+                            Spacer(Modifier.width(14.dp))
+                            Column {
+                                Text(
+                                    "No recent rooms",
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                    color = SyncDColors.Ink,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "Rooms you join on this device will show up here. Share a 6-character code with friends to listen together.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = SyncDColors.InkMuted,
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                item {
+                    SyncDCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        padding = PaddingValues(0.dp),
+                    ) {
+                        recent.forEachIndexed { index, room ->
+                            RecentRoomRow(
+                                room = room,
+                                opening = state.openingCode == room.roomCode,
+                                onOpen = { vm.open(room.roomCode) },
+                            )
+                            if (index < recent.lastIndex) {
+                                HorizontalDivider(
+                                    color = SyncDColors.Line,
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
+
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
     }
 }
 
 @Composable
-private fun RecentRoomRow(room: RecentRoom, opening: Boolean, onOpen: () -> Unit) {
-    SyncDCard(
-        Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = !opening, role = Role.Button, onClick = onOpen),
-        padding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+private fun RecentRoomRow(
+    room: RecentRoom,
+    opening: Boolean,
+    onOpen: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clickable(enabled = !opening, role = Role.Button, onClick = onOpen)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(room.roomCode, style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace, letterSpacing = 2.sp))
-                Text(
-                    "Host ${room.hostUsername} · opened ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(room.lastOpenedAtMs))}",
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                )
-            }
-            Text(if (opening) "Opening…" else "Open", color = SyncDColors.Accent, style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.size(4.dp))
+        Avatar(name = room.hostUsername, size = 38.dp, useGradient = true)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                room.roomCode,
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.5.sp,
+                ),
+                color = SyncDColors.Ink,
+            )
+            Text(
+                "Hosted by ${room.hostUsername} · ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(room.lastOpenedAtMs))}",
+                style = MaterialTheme.typography.bodySmall,
+                color = SyncDColors.InkMuted,
+                maxLines = 1,
+            )
         }
+        Text(
+            if (opening) "Opening…" else "Open",
+            color = SyncDColors.Accent,
+            style = MaterialTheme.typography.labelLarge,
+        )
     }
 }

@@ -4,12 +4,16 @@ import android.content.ClipData
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,31 +22,40 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ExitToApp
+import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.outlined.Chat
+import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DoNotDisturbOn
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.PersonOff
+import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -54,6 +67,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -69,13 +83,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,6 +103,7 @@ import com.syncd.android.core.design.ConnectionPill
 import com.syncd.android.core.design.LoadingState
 import com.syncd.android.core.design.MessageState
 import com.syncd.android.core.design.StatusPill
+import com.syncd.android.core.design.SyncDCard
 import com.syncd.android.core.design.SyncDColors
 import com.syncd.android.core.socket.ConnectionState
 import com.syncd.android.core.util.formatClock
@@ -145,7 +166,8 @@ private fun RoomContent(vm: RoomViewModel, room: RoomState, onBack: () -> Unit) 
     val scope = rememberCoroutineScope()
     val isHost = room.isHost(vm.selfId)
 
-    var tab by rememberSaveable { mutableStateOf(RoomTab.Queue) }
+    var drawerOpen by rememberSaveable { mutableStateOf(false) }
+    var drawerTab by rememberSaveable { mutableStateOf(RoomTab.Queue) }
     var menuOpen by remember { mutableStateOf(false) }
     var confirmLeave by remember { mutableStateOf(false) }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
@@ -207,59 +229,155 @@ private fun RoomContent(vm: RoomViewModel, room: RoomState, onBack: () -> Unit) 
                 },
             )
         },
-        floatingActionButton = {
-            if (isHost && tab != RoomTab.Chat) {
-                ExtendedFloatingActionButton(
-                    onClick = { searchOpen = true },
-                    icon = { Icon(Icons.Outlined.Search, null) },
-                    text = { Text("Add music") },
-                    containerColor = SyncDColors.Accent,
-                    contentColor = SyncDColors.AccentInk,
-                )
-            }
-        },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding()
+                .pointerInput(Unit) {
+                    detectVerticalDragGestures { change, dragAmount ->
+                        // Swipe UP has negative dragAmount
+                        if (dragAmount < -20f) {
+                            change.consume()
+                            drawerOpen = true
+                        }
+                    }
+                },
+        ) {
             ConnectionBanner(connection, room)
             HostBanners(vm, room, dismissedNotice)
 
             PlayerCard(vm, room, sync, isHost)
 
-            PrimaryTabRow(selectedTabIndex = tab.ordinal, containerColor = SyncDColors.Canvas, contentColor = SyncDColors.Ink) {
-                RoomTab.entries.forEach { t ->
-                    val label = when (t) {
-                        RoomTab.Queue -> "Queue · ${room.queue.size}"
-                        RoomTab.People -> "People · ${room.members.count { it.online == true }}/${room.members.size}"
-                        RoomTab.Chat -> "Chat"
-                    }
-                    Tab(selected = tab == t, onClick = { tab = t }, text = { Text(label, maxLines = 1) })
+            // Push the controls into the bottom thumb zone
+            Spacer(Modifier.weight(1f))
+
+            // Bottom Control Zone: 2x2 Playback Grid (Left/Centre) + Vertical Drawer Pills (Right)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                // Playback Controls in 2x2 Grid
+                PlaybackControlsGrid(
+                    vm = vm,
+                    room = room,
+                    isHost = isHost,
+                    onOpenSearch = { searchOpen = true },
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                )
+
+                // Vertical Drawer Pills (Queue, Chat, People) on the right
+                Column(
+                    modifier = Modifier.width(132.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    RoomDrawerPill(
+                        icon = Icons.Outlined.QueueMusic,
+                        label = "Queue",
+                        count = room.queue.size,
+                        onClick = {
+                            drawerTab = RoomTab.Queue
+                            drawerOpen = true
+                        },
+                    )
+                    RoomDrawerPill(
+                        icon = Icons.Outlined.Chat,
+                        label = "Chat",
+                        count = room.messages.size,
+                        onClick = {
+                            drawerTab = RoomTab.Chat
+                            drawerOpen = true
+                        },
+                    )
+                    RoomDrawerPill(
+                        icon = Icons.Outlined.People,
+                        label = "People",
+                        count = room.members.count { it.online == true },
+                        onClick = {
+                            drawerTab = RoomTab.People
+                            drawerOpen = true
+                        },
+                    )
                 }
             }
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                when (tab) {
-                    RoomTab.Queue -> QueuePanel(
-                        queue = room.queue,
-                        isHost = isHost,
-                        onRemove = vm::removeFromQueue,
-                        onMove = vm::moveInQueue,
-                        onClear = vm::clearQueue,
-                        onAdd = { searchOpen = true },
-                    )
-                    RoomTab.People -> ParticipantsPanel(
-                        members = room.members,
-                        selfId = vm.selfId,
-                        isHost = isHost,
-                        onMakeHost = vm::transferHost,
-                    )
-                    RoomTab.Chat -> ChatPanel(
-                        messages = room.messages,
-                        selfId = vm.selfId,
-                        connected = connection is ConnectionState.Connected && room.phase is RoomPhase.Live,
-                        onSend = vm::sendChat,
-                        onRetry = vm::retryChat,
-                        onDiscard = vm::discardChat,
-                        modifier = Modifier.navigationBarsPadding(),
-                    )
+        }
+    }
+
+    // Half Drawer (ModalBottomSheet taking ~55% of the screen)
+    if (drawerOpen) {
+        ModalBottomSheet(
+            onDismissRequest = { drawerOpen = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+            containerColor = SyncDColors.Raised,
+            dragHandle = {
+                Box(
+                    Modifier
+                        .padding(vertical = 10.dp)
+                        .size(width = 38.dp, height = 4.dp)
+                        .clip(CircleShape)
+                        .background(SyncDColors.LineStrong),
+                )
+            },
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.55f)
+                    .navigationBarsPadding(),
+            ) {
+                PrimaryTabRow(
+                    selectedTabIndex = drawerTab.ordinal,
+                    containerColor = SyncDColors.Raised,
+                    contentColor = SyncDColors.Ink,
+                ) {
+                    RoomTab.entries.forEach { t ->
+                        val label = when (t) {
+                            RoomTab.Queue -> "Queue · ${room.queue.size}"
+                            RoomTab.People -> "People · ${room.members.count { it.online == true }}/${room.members.size}"
+                            RoomTab.Chat -> "Chat (${room.messages.size})"
+                        }
+                        Tab(
+                            selected = drawerTab == t,
+                            onClick = { drawerTab = t },
+                            text = {
+                                Text(
+                                    label,
+                                    maxLines = 1,
+                                    fontWeight = if (drawerTab == t) FontWeight.Bold else FontWeight.Medium,
+                                )
+                            },
+                        )
+                    }
+                }
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    when (drawerTab) {
+                        RoomTab.Queue -> QueuePanel(
+                            queue = room.queue,
+                            isHost = isHost,
+                            onRemove = vm::removeFromQueue,
+                            onMove = vm::moveInQueue,
+                            onClear = vm::clearQueue,
+                            onAdd = { searchOpen = true },
+                        )
+                        RoomTab.People -> ParticipantsPanel(
+                            members = room.members,
+                            selfId = vm.selfId,
+                            isHost = isHost,
+                            onMakeHost = vm::transferHost,
+                        )
+                        RoomTab.Chat -> ChatPanel(
+                            messages = room.messages,
+                            selfId = vm.selfId,
+                            connected = connection is ConnectionState.Connected && room.phase is RoomPhase.Live,
+                            onSend = vm::sendChat,
+                            onRetry = vm::retryChat,
+                            onDiscard = vm::discardChat,
+                        )
+                    }
                 }
             }
         }
@@ -283,9 +401,10 @@ private fun RoomContent(vm: RoomViewModel, room: RoomState, onBack: () -> Unit) 
                 )
             },
             confirmButton = {
-                TextButton(enabled = !leaving, onClick = {
+                TextButton(onClick = {
                     confirmLeave = false
                     vm.leave()
+                    onBack()
                 }) { Text("Leave", color = SyncDColors.Danger) }
             },
             dismissButton = { TextButton(onClick = { confirmLeave = false }) { Text("Cancel") } },
@@ -450,34 +569,273 @@ private fun PlayerCard(vm: RoomViewModel, room: RoomState, sync: SyncStatus, isH
                 Text(formatClock(duration), style = MaterialTheme.typography.bodySmall)
             }
         }
+    }
+}
 
+@Composable
+private fun PlaybackControlsGrid(
+    vm: RoomViewModel,
+    room: RoomState,
+    isHost: Boolean,
+    onOpenSearch: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val playback = room.playback
+    val hasTrack = playback?.videoId != null
+    val captionsEnabled by vm.captionsEnabled.collectAsState()
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
         if (isHost && hasTrack) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = vm::stopPlayback, modifier = Modifier.size(52.dp)) {
-                    Icon(Icons.Outlined.Stop, contentDescription = "Stop playback and clear the queue")
-                }
-                Spacer(Modifier.width(16.dp))
-                FilledIconButton(
-                    onClick = vm::togglePlay,
-                    modifier = Modifier.size(60.dp).semantics { stateDescription = if (playback.isPlaying) "Playing" else "Paused" },
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = SyncDColors.Accent, contentColor = SyncDColors.AccentInk),
+            // Row 1: Rewind 10s (Left) & Forward 10s (Right, above Pause)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PlayControlTile(
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        val pos = vm.roomPositionSec()
+                        vm.seekTo((pos - 10.0).coerceAtLeast(0.0))
+                    },
+                    icon = Icons.Filled.Replay10,
+                    contentDescription = "Rewind 10 seconds",
+                    label = "-10s",
+                )
+                PlayControlTile(
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        val pos = vm.roomPositionSec()
+                        val duration = playback.duration ?: Double.MAX_VALUE
+                        vm.seekTo((pos + 10.0).coerceAtMost(duration))
+                    },
+                    icon = Icons.Filled.Forward10,
+                    contentDescription = "Forward 10 seconds",
+                    label = "+10s",
+                )
+            }
+            // Row 2: Stop (Left) & Play/Pause (Right)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PlayControlTile(
+                    modifier = Modifier.weight(1f),
+                    onClick = vm::stopPlayback,
+                    icon = Icons.Outlined.Stop,
+                    contentDescription = "Stop playback",
+                    label = "Stop",
+                    tint = SyncDColors.Danger,
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(SyncDColors.Accent)
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = if (playback.isPlaying) "Pause" else "Play",
+                            onClick = vm::togglePlay,
+                        ),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        if (playback.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (playback.isPlaying) "Pause for everyone" else "Play for everyone",
-                        modifier = Modifier.size(32.dp),
-                    )
-                }
-                Spacer(Modifier.width(16.dp))
-                IconButton(onClick = vm::skip, modifier = Modifier.size(52.dp)) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "Skip to next in queue")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Icon(
+                            imageVector = if (playback.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (playback.isPlaying) "Pause" else "Play",
+                            tint = SyncDColors.AccentInk,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = if (playback.isPlaying) "Pause" else "Play",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = SyncDColors.AccentInk,
+                        )
+                    }
                 }
             }
+            // Row 3: CC (Left, under Stop) & Skip (Right, under Pause)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PlayControlTile(
+                    modifier = Modifier.weight(1f),
+                    onClick = vm::toggleCaptions,
+                    icon = if (captionsEnabled) Icons.Filled.ClosedCaption else Icons.Outlined.ClosedCaption,
+                    contentDescription = if (captionsEnabled) "Captions on" else "Captions off",
+                    label = "CC",
+                    tint = if (captionsEnabled) SyncDColors.Accent else SyncDColors.InkMuted,
+                    bg = if (captionsEnabled) SyncDColors.AccentLo else SyncDColors.Raised,
+                    border = if (captionsEnabled) SyncDColors.Accent.copy(alpha = 0.5f) else SyncDColors.LineStrong,
+                )
+                PlayControlTile(
+                    modifier = Modifier.weight(1f),
+                    onClick = vm::skip,
+                    icon = Icons.Filled.SkipNext,
+                    contentDescription = "Skip to next in queue",
+                    label = "Skip",
+                )
+            }
         } else if (hasTrack) {
+            // Listener controls: Resync, Request, and CC toggle
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PlayControlTile(
+                    modifier = Modifier.weight(1f),
+                    onClick = vm::resync,
+                    icon = Icons.Outlined.Sync,
+                    contentDescription = "Resync audio",
+                    label = "Resync",
+                )
+                PlayControlTile(
+                    modifier = Modifier.weight(1f),
+                    onClick = onOpenSearch,
+                    icon = Icons.Outlined.Search,
+                    contentDescription = "Request music",
+                    label = "Request",
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PlayControlTile(
+                    modifier = Modifier.weight(1f),
+                    onClick = vm::toggleCaptions,
+                    icon = if (captionsEnabled) Icons.Filled.ClosedCaption else Icons.Outlined.ClosedCaption,
+                    contentDescription = if (captionsEnabled) "Captions on" else "Captions off",
+                    label = "CC",
+                    tint = if (captionsEnabled) SyncDColors.Accent else SyncDColors.InkMuted,
+                    bg = if (captionsEnabled) SyncDColors.AccentLo else SyncDColors.Raised,
+                    border = if (captionsEnabled) SyncDColors.Accent.copy(alpha = 0.5f) else SyncDColors.LineStrong,
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    Text(
+                        "Host controls playback",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SyncDColors.InkMuted,
+                    )
+                }
+            }
+        } else {
+            // No track playing
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(138.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(SyncDColors.Raised)
+                    .border(1.dp, SyncDColors.LineStrong, RoundedCornerShape(14.dp))
+                    .clickable(enabled = isHost, role = Role.Button, onClick = onOpenSearch),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Outlined.Search, null, tint = SyncDColors.Accent, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (isHost) "Add music" else "Waiting for music…",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = SyncDColors.Ink,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayControlTile(
+    onClick: () -> Unit,
+    icon: ImageVector,
+    contentDescription: String,
+    label: String,
+    modifier: Modifier = Modifier,
+    tint: Color = SyncDColors.Ink,
+    bg: Color = SyncDColors.Raised,
+    border: Color = SyncDColors.LineStrong,
+) {
+    Box(
+        modifier = modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClickLabel = contentDescription, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(horizontal = 6.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(5.dp))
             Text(
-                "Only the host controls playback.",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 2.dp),
+                text = label,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = tint,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun RoomDrawerPill(
+    icon: ImageVector,
+    label: String,
+    count: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(42.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(SyncDColors.Raised)
+            .border(1.dp, SyncDColors.LineStrong, RoundedCornerShape(14.dp))
+            .clickable(role = Role.Button, onClickLabel = "Open $label", onClick = onClick)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(icon, null, tint = SyncDColors.Accent, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = SyncDColors.Ink,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+            )
+            Text(
+                text = "($count)",
+                style = MaterialTheme.typography.labelSmall,
+                color = SyncDColors.InkMuted,
             )
         }
     }
