@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { soundService } from '../services/soundService';
 import type { IndexedFolder, TrackRow, ScanProgress, ScanCompleteEvent, LibraryStats } from '../types/library';
 
 const getInitialViewMode = (): 'list' | 'grid' => {
@@ -85,6 +86,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   },
 
   removeFolder: async (id: string) => {
+    soundService.play('action:delete');
     const prevFolders = get().folders;
     const remainingFolders = prevFolders.filter((f) => f.id !== id);
 
@@ -297,15 +299,22 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       set({ scanProgress: event.payload, isScanning: true });
     });
 
-    const unlistenComplete = await listen<ScanCompleteEvent>('library:scan-complete', async () => {
+    const unlistenComplete = await listen<ScanCompleteEvent>('library:scan-complete', async (event) => {
       set({ isScanning: false, scanProgress: null, hasUnscannedAudio: false });
       await get().loadTracks();
       await get().loadFolders();
       await get().loadStats();
+
+      if (event.payload && event.payload.inserted > 0) {
+        soundService.play('scan:success');
+      } else {
+        soundService.play('scan:nothing_new');
+      }
     });
 
     const unlistenError = await listen<string>('library:scan-error', () => {
       set({ isScanning: false, scanProgress: null });
+      soundService.play('scan:fail');
     });
 
     return () => {

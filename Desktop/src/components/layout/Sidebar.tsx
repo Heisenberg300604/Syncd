@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Keyboard } from 'lucide-react';
 import { useAppStore, type NavigationDestination } from '../../stores/useAppStore';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { useLibraryStore } from '../../stores/useLibraryStore';
@@ -20,7 +21,11 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'settings', label: 'Settings', iconName: 'settings' },
 ];
 
-export function Sidebar() {
+export interface SidebarProps {
+  onOpenShortcuts?: () => void;
+}
+
+export function Sidebar({ onOpenShortcuts }: SidebarProps = {}) {
   const { currentView, setCurrentView } = useAppStore();
   const { user, isAuthenticated } = useAuthStore();
   const { stats, tracks, hasUnscannedAudio, isScanning } = useLibraryStore();
@@ -137,6 +142,26 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Keyboard Shortcuts Trigger */}
+      {onOpenShortcuts && (
+        <div className="px-2 pt-2 border-t border-zinc-850/60">
+          <button
+            type="button"
+            onClick={onOpenShortcuts}
+            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900/60 transition-colors text-[11px] font-medium cursor-pointer group"
+            title="Keyboard Shortcuts (?)"
+          >
+            <span className="flex items-center gap-2">
+              <Keyboard className="w-3.5 h-3.5 text-zinc-500 group-hover:text-amber-400 transition-colors" />
+              <span>Shortcuts</span>
+            </span>
+            <kbd className="px-1.5 py-0.5 rounded bg-zinc-850 text-zinc-400 font-mono text-[9px] border border-zinc-750 group-hover:text-amber-400 group-hover:border-amber-500/40 transition-colors">
+              ?
+            </kbd>
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
+import { soundService } from '../services/soundService';
 
 interface SettingsState {
   isLoaded: boolean;
@@ -8,6 +9,8 @@ interface SettingsState {
   gaplessPlayback: boolean;
   trackNotifications: boolean;
   autoQueue: boolean;
+  sfxEnabled: boolean;
+  sfxVolume: number;
   selectedAccent: 'amber' | 'gold' | 'emerald' | 'cyan';
   apiUrl: string;
   socketUrl: string;
@@ -20,6 +23,8 @@ interface SettingsState {
   setGaplessPlayback: (enabled: boolean) => Promise<void>;
   setTrackNotifications: (enabled: boolean) => Promise<void>;
   setAutoQueue: (enabled: boolean) => Promise<void>;
+  setSfxEnabled: (enabled: boolean) => Promise<void>;
+  setSfxVolume: (volume: number) => Promise<void>;
   setSelectedAccent: (accent: 'amber' | 'gold' | 'emerald' | 'cyan') => Promise<void>;
   setEndpoints: (apiUrl: string, socketUrl: string) => Promise<void>;
 }
@@ -31,6 +36,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   gaplessPlayback: true,
   trackNotifications: true,
   autoQueue: false,
+  sfxEnabled: true,
+  sfxVolume: 0.7,
   selectedAccent: 'amber',
   apiUrl: 'http://localhost:5000/api',
   socketUrl: 'http://localhost:5000',
@@ -39,6 +46,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     try {
       const all = await invoke<Record<string, string>>('get_all_settings');
       if (all) {
+        const sfxEnabled = all['audio.sfxEnabled'] !== 'false';
+        const parsedVol = parseFloat(all['audio.sfxVolume'] || '0.7');
+        const sfxVolume = isNaN(parsedVol) ? 0.7 : Math.max(0, Math.min(1, parsedVol));
+
         set({
           isLoaded: true,
           selectedDevice: all['audio.device'] || 'default',
@@ -46,10 +57,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           gaplessPlayback: all['audio.gapless'] !== 'false',
           trackNotifications: all['ui.notifications'] !== 'false',
           autoQueue: all['playback.autoQueue'] === 'true',
+          sfxEnabled,
+          sfxVolume,
           selectedAccent: ((all['ui.accent'] as 'amber' | 'gold' | 'emerald' | 'cyan') || 'amber'),
           apiUrl: all['network.apiUrl'] || 'http://localhost:5000/api',
           socketUrl: all['network.socketUrl'] || 'http://localhost:5000',
         });
+
+        soundService.setEnabled(sfxEnabled);
+        soundService.setVolume(sfxVolume);
+        soundService.preloadAll().catch(() => {});
+
         if (typeof document !== 'undefined') {
           document.documentElement.setAttribute('data-accent', all['ui.accent'] || 'amber');
         }
@@ -75,26 +93,47 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   setVolumeNormalization: async (enabled: boolean) => {
     set({ volumeNormalization: enabled });
+    soundService.play(enabled ? 'toggle:on' : 'toggle:off');
     await get().setSettingValue('audio.normalization', String(enabled));
   },
 
   setGaplessPlayback: async (enabled: boolean) => {
     set({ gaplessPlayback: enabled });
+    soundService.play(enabled ? 'toggle:on' : 'toggle:off');
     await get().setSettingValue('audio.gapless', String(enabled));
   },
 
   setTrackNotifications: async (enabled: boolean) => {
     set({ trackNotifications: enabled });
+    soundService.play(enabled ? 'toggle:on' : 'toggle:off');
     await get().setSettingValue('ui.notifications', String(enabled));
   },
 
   setAutoQueue: async (enabled: boolean) => {
     set({ autoQueue: enabled });
+    soundService.play(enabled ? 'toggle:on' : 'toggle:off');
     await get().setSettingValue('playback.autoQueue', String(enabled));
+  },
+
+  setSfxEnabled: async (enabled: boolean) => {
+    set({ sfxEnabled: enabled });
+    soundService.setEnabled(enabled);
+    if (enabled) {
+      soundService.play('toggle:on');
+    }
+    await get().setSettingValue('audio.sfxEnabled', String(enabled));
+  },
+
+  setSfxVolume: async (volume: number) => {
+    const clamped = Math.max(0, Math.min(1, volume));
+    set({ sfxVolume: clamped });
+    soundService.setVolume(clamped);
+    await get().setSettingValue('audio.sfxVolume', String(clamped));
   },
 
   setSelectedAccent: async (accent) => {
     set({ selectedAccent: accent });
+    soundService.play('toggle:on');
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-accent', accent);
     }
@@ -107,4 +146,3 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     await get().setSettingValue('network.socketUrl', socketUrl);
   },
 }));
-

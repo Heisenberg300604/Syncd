@@ -119,64 +119,64 @@ export const RightDrawer: React.FC<RightDrawerProps> = ({
       style={{ width: `${width}px` }}
       className="bg-zinc-950/85 backdrop-blur-2xl flex flex-col shrink-0 select-none overflow-hidden h-full w-full"
     >
-      {/* Drawer Header & Tab Selector */}
-      <div className="h-12 border-b border-zinc-800/80 px-3 flex items-center justify-between shrink-0 bg-zinc-950/50 backdrop-blur-md">
-        <div className="flex items-center gap-1 bg-zinc-900/60 p-0.5 rounded-lg border border-zinc-800/80">
+      {/* Drawer Header & Tab Selector (Compact height with single-line tabs) */}
+      <div className="h-10 border-b border-zinc-800/80 px-2.5 flex items-center justify-between shrink-0 bg-zinc-950/50 backdrop-blur-md">
+        <div className="flex items-center gap-0.5 bg-zinc-900/70 p-0.5 rounded-lg border border-zinc-800/70">
           {activeRoom && (
             <button
               type="button"
               onClick={() => setActiveTab('listeners')}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
                 activeTab === 'listeners'
                   ? 'bg-zinc-800 text-amber-400 font-semibold shadow-xs'
-                  : 'text-zinc-400 hover:text-zinc-200'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850/40'
               }`}
             >
-              <Users className="w-3.5 h-3.5" />
-              <span>Listeners ({members.length})</span>
+              <Users className="w-3.5 h-3.5 shrink-0" />
+              <span>Listeners</span>
+              <span className="text-[10px] font-mono text-zinc-500 font-bold">({members.length})</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={() => setActiveTab('chat')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'chat'
                 ? 'bg-zinc-800 text-amber-400 font-semibold shadow-xs'
-                : 'text-zinc-400 hover:text-zinc-200'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850/40'
             }`}
           >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Chat {activeRoom ? `(${chatMessages.length})` : ''}</span>
+            <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+            <span>Chat</span>
+            {activeRoom && (
+              <span className="text-[10px] font-mono text-zinc-500 font-bold">({chatMessages.length})</span>
+            )}
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('queue')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+            className={`h-7 px-2 rounded-md text-[11px] font-medium flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'queue'
                 ? 'bg-zinc-800 text-amber-400 font-semibold shadow-xs'
-                : 'text-zinc-400 hover:text-zinc-200'
+                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-850/40'
             }`}
           >
-            <ListMusic className="w-3.5 h-3.5" />
-            <span>
-              Queue{' '}
-              {activeRoom
-                ? roomQueue.length > 0
-                  ? `(${roomQueue.length})`
-                  : ''
-                : localQueue.length > 0
-                ? `(${localQueue.length})`
-                : ''}
-            </span>
+            <ListMusic className="w-3.5 h-3.5 shrink-0" />
+            <span>Queue</span>
+            {(activeRoom ? roomQueue.length : localQueue.length) > 0 && (
+              <span className="text-[10px] font-mono text-zinc-500 font-bold">
+                ({activeRoom ? roomQueue.length : localQueue.length})
+              </span>
+            )}
           </button>
         </div>
 
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-850 transition-colors cursor-pointer"
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-850/60 transition-colors cursor-pointer shrink-0"
           title="Close drawer (Esc or Ctrl+Q)"
           aria-label="Close drawer"
         >

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { soundService } from "../services/soundService";
 
 export interface Toast {
   id: string;
@@ -18,6 +19,12 @@ export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
 
   addToast: (toast) => {
+    if (toast.type === "delete") {
+      soundService.play("action:delete");
+    } else {
+      soundService.play("notification:ping");
+    }
+
     const id = Math.random().toString(36).substring(2, 9);
     const newToast: Toast = { ...toast, id };
     const duration = toast.duration ?? 4000;

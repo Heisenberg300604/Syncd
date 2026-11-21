@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { type AppInfo, type SystemHealth, invokeCommand } from "../services/tauriBridge";
+import { soundService } from "../services/soundService";
 
 export type NavigationDestination = "home" | "library" | "playlists" | "rooms" | "settings";
 export type DrawerTab = "queue" | "chat" | "listeners";
@@ -31,16 +32,24 @@ export const useAppStore = create<AppState>((set) => ({
   drawerTab: "queue",
 
   setCurrentView: (view) => set({ currentView: view }),
-  openDrawer: (tab) => set((s) => ({ isDrawerOpen: true, drawerTab: tab || s.drawerTab })),
-  closeDrawer: () => set({ isDrawerOpen: false }),
+  openDrawer: (tab) => {
+    soundService.play('drawer:open');
+    set((s) => ({ isDrawerOpen: true, drawerTab: tab || s.drawerTab }));
+  },
+  closeDrawer: () => {
+    soundService.play('drawer:close');
+    set({ isDrawerOpen: false });
+  },
   toggleDrawer: (tab) =>
     set((s) => {
       if (!s.isDrawerOpen) {
+        soundService.play('drawer:open');
         return { isDrawerOpen: true, drawerTab: tab || s.drawerTab };
       }
       if (tab && tab !== s.drawerTab) {
         return { isDrawerOpen: true, drawerTab: tab };
       }
+      soundService.play('drawer:close');
       return { isDrawerOpen: false };
     }),
   setDrawerTab: (tab) => set({ drawerTab: tab }),

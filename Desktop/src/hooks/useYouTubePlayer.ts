@@ -228,6 +228,7 @@ export function useYouTubePlayer(
               modestbranding: 1,
               rel: 0,
               playsinline: 1,
+              wmode: 'opaque',
             },
             events: {
               onReady: () => {

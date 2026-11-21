@@ -97,8 +97,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_process::init())
-        // Bypassed for local dev mode (enable when release pubkey is configured)
-        // .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let scope = app.asset_protocol_scope();
             let _ = scope.allow_directory(&artwork_dir, true);

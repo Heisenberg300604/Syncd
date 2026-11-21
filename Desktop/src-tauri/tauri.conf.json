@@ -43,8 +43,20 @@
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installerHooks": "./nsis/hooks.nsh"
+      }
+    }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRGMDRCRjczNjMxMEE3OTgKUldTWXB4QmpjNzhFVDI2d0hnRnBTSmZWMzVYdVFuQlF6RFlQZTdkMm5aYWpnTWZISUx2SkxIQ1YK",
+      "endpoints": [
+        "https://github.com/Heisenberg300604/Syncd/releases/latest/download/latest.json"
+      ]
+    }
+  }
 }
 

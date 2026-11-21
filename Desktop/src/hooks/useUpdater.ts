@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from '../services/tauriBridge';
+import { soundService } from '../services/soundService';
 
 export type UpdateStatus =
   | 'idle'
@@ -92,6 +93,7 @@ export function useUpdater(): UpdaterState {
         setReleaseDate(update.date ?? null);
         setReleaseNotes(update.body ?? null);
         setStatus('available');
+        soundService.play('update:available');
         return true;
       } else {
         pendingUpdateRef.current = null;

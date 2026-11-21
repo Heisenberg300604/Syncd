@@ -7,8 +7,12 @@ import {
   ListMusic,
   Music,
   X,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 import { usePlayerStore } from '../../stores/usePlayerStore';
+import { useSettingsStore } from '../../stores/useSettingsStore';
+import { useToastStore } from '../../stores/useToastStore';
 import { CodecBadge } from '../ui/CodecBadge';
 import CometDial from '../ui/CometDial';
 import {
@@ -51,11 +55,18 @@ export function BottomPlayer({ isDrawerOpen = false, onToggleDrawer }: BottomPla
     toggleMute,
     toggleShuffle,
     toggleRepeat,
+    devices,
+    loadDevices,
   } = usePlayerStore();
+
+  const { selectedDevice, setSelectedDevice } = useSettingsStore();
+  const { addToast } = useToastStore();
 
   const scrubberRef = useRef<HTMLDivElement>(null);
   const [showVolumeDial, setShowVolumeDial] = useState(false);
+  const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState(false);
   const dialRef = useRef<HTMLDivElement>(null);
+  const deviceDropdownRef = useRef<HTMLDivElement>(null);
 
   const [isHoveredScrubber, setIsHoveredScrubber] = useState(false);
   const [isDraggingSeek, setIsDraggingSeek] = useState(false);
@@ -126,17 +137,77 @@ export function BottomPlayer({ isDrawerOpen = false, onToggleDrawer }: BottomPla
   const effectivePercent = isDraggingSeek && dragSeekPercent !== null ? dragSeekPercent : progressPercent;
   const effectiveTime = isDraggingSeek && dragSeekPercent !== null ? (dragSeekPercent / 100) * duration : positionSeconds;
 
-  // Close dial on outside click
+  // Close dial and device dropdown on outside click
   useEffect(() => {
     if (!showVolumeDial) return;
     const handler = (e: MouseEvent) => {
       if (dialRef.current && !dialRef.current.contains(e.target as Node)) {
         setShowVolumeDial(false);
+        setIsDeviceMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showVolumeDial]);
+
+  // Close device dropdown on click outside of device dropdown
+  useEffect(() => {
+    if (!isDeviceMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (deviceDropdownRef.current && !deviceDropdownRef.current.contains(e.target as Node)) {
+        setIsDeviceMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isDeviceMenuOpen]);
+
+  // Refresh audio devices list whenever volume menu opens
+  useEffect(() => {
+    if (showVolumeDial) {
+      loadDevices();
+    } else {
+      setIsDeviceMenuOpen(false);
+    }
+  }, [showVolumeDial, loadDevices]);
+
+  // Keyboard accessibility: Escape key closes menus
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isDeviceMenuOpen) {
+          setIsDeviceMenuOpen(false);
+        } else if (showVolumeDial) {
+          setShowVolumeDial(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDeviceMenuOpen, showVolumeDial]);
+
+  // Resolved device list & currently active device
+  const availableDevices =
+    devices && devices.length > 0
+      ? devices
+      : [{ id: 'default', name: 'Default Windows Audio Device', isDefault: true }];
+
+  const currentDevice =
+    availableDevices.find((d) => d.id === selectedDevice) ||
+    availableDevices.find((d) => d.isDefault) ||
+    availableDevices[0];
+
+  const currentDeviceName = currentDevice?.name || 'Default Audio Device';
+
+  const handleSelectDevice = async (deviceId: string, deviceName: string) => {
+    await setSelectedDevice(deviceId);
+    setIsDeviceMenuOpen(false);
+    addToast({
+      type: 'success',
+      title: 'Audio Device Configured',
+      message: `Output routed to ${deviceName}.`,
+    });
+  };
 
   const handleDialChange = useCallback((v: number) => {
     setVolume(v);
@@ -367,33 +438,140 @@ export function BottomPlayer({ isDrawerOpen = false, onToggleDrawer }: BottomPla
             )}
           </button>
 
-          {showVolumeDial && (
-            <div
-              className="absolute bottom-[68px] right-0 z-50 flex flex-col items-center gap-2.5 p-3.5 bg-zinc-950/90 backdrop-blur-2xl border border-zinc-700/50 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] select-none"
-              style={{ width: 160 }}
-            >
-              <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-medium">Volume</p>
-              <CometDial
-                value={isMuted ? 0 : volume}
-                min={0}
-                max={100}
-                step={1}
-                unit="%"
-                label="Volume"
-                accent="#f59e0b"
-                ink="#f4f4f5"
-                size={130}
-                sweep={270}
-                thickness={5}
-                onChange={handleDialChange}
-              />
-              <AnimatedVolumeMute
-                isMuted={isMuted}
-                onToggle={toggleMute}
-                className="mt-1"
-              />
-            </div>
-          )}
+          <AnimatePresence>
+            {showVolumeDial && (
+              <motion.div
+                initial={{ opacity: 0, y: 12, scale: 0.94 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 12, scale: 0.94 }}
+                transition={{ type: 'spring', stiffness: 450, damping: 28 }}
+                className="absolute bottom-[68px] right-0 z-50 flex flex-col items-center gap-2 p-3 bg-zinc-950/95 backdrop-blur-2xl border border-zinc-750/70 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] select-none w-52"
+              >
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-medium">Volume</p>
+                <CometDial
+                  value={isMuted ? 0 : volume}
+                  min={0}
+                  max={100}
+                  step={1}
+                  unit="%"
+                  label="Volume"
+                  accent="#f59e0b"
+                  ink="#f4f4f5"
+                  size={130}
+                  sweep={270}
+                  thickness={5}
+                  onChange={handleDialChange}
+                />
+                <AnimatedVolumeMute
+                  isMuted={isMuted}
+                  onToggle={toggleMute}
+                  className="mt-0.5"
+                />
+
+                {/* Subtle divider */}
+                <div className="w-full h-px bg-zinc-800/80 my-0.5" />
+
+                {/* Audio Device Pill Dropdown */}
+                <div className="relative w-full" ref={deviceDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsDeviceMenuOpen((v) => !v)}
+                    className={`w-full h-8 px-2.5 rounded-full bg-zinc-900/90 hover:bg-zinc-850 border transition-all cursor-pointer group flex items-center justify-between gap-1.5 active:scale-[0.98] ${
+                      isDeviceMenuOpen
+                        ? 'border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
+                        : 'border-zinc-750/80 hover:border-zinc-600'
+                    }`}
+                    title={`Audio Output: ${currentDeviceName}`}
+                    aria-label="Select Audio Output Device"
+                    aria-expanded={isDeviceMenuOpen}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Volume2 className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover:scale-105 transition-transform" />
+                      <span className="text-[11px] font-medium text-zinc-300 group-hover:text-zinc-100 truncate text-left">
+                        {currentDeviceName}
+                      </span>
+                    </div>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200 transition-transform duration-200 shrink-0 ${
+                        isDeviceMenuOpen ? 'rotate-180 text-amber-400' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {/* Floating Device Dropdown Menu */}
+                  <AnimatePresence>
+                    {isDeviceMenuOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 28 }}
+                        className="absolute bottom-full mb-2 right-0 w-60 z-50 bg-zinc-950/95 backdrop-blur-2xl border border-zinc-700/80 rounded-2xl p-2 shadow-[0_20px_45px_rgba(0,0,0,0.9)] flex flex-col gap-1 select-none"
+                      >
+                        <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-zinc-800/80 text-[10px] font-semibold tracking-wider text-zinc-400 uppercase">
+                          <span className="flex items-center gap-1.5">
+                            <Volume2 className="w-3 h-3 text-amber-400" />
+                            Audio Output
+                          </span>
+                          <span className="text-[9px] font-mono text-zinc-500">
+                            {availableDevices.length} {availableDevices.length === 1 ? 'device' : 'devices'}
+                          </span>
+                        </div>
+
+                        <div className="max-h-48 overflow-y-auto py-1 flex flex-col gap-0.5 custom-scrollbar">
+                          {availableDevices.map((device) => {
+                            const isCurrent =
+                              selectedDevice === device.id ||
+                              (selectedDevice === 'default' && device.isDefault) ||
+                              (availableDevices.length === 1 && device.id === 'default');
+
+                            return (
+                              <button
+                                key={device.id}
+                                type="button"
+                                onClick={() => handleSelectDevice(device.id, device.name)}
+                                className={`w-full px-2.5 py-1.5 rounded-xl text-left flex items-center justify-between gap-2 transition-all cursor-pointer ${
+                                  isCurrent
+                                    ? 'bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium shadow-xs'
+                                    : 'text-zinc-300 hover:bg-zinc-850 hover:text-zinc-100 border border-transparent'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div
+                                    className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                                      isCurrent
+                                        ? 'bg-amber-500/20 text-amber-400'
+                                        : 'bg-zinc-900 text-zinc-400'
+                                    }`}
+                                  >
+                                    <Volume2 className="w-3.5 h-3.5" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-[11.5px] truncate leading-tight font-medium">
+                                      {device.name}
+                                    </p>
+                                    {device.isDefault && (
+                                      <span className="text-[9px] text-zinc-500 leading-tight block">
+                                        System Default
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {isCurrent && (
+                                  <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Dismiss/Minimize Player */}

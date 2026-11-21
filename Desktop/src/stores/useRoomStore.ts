@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { apiClient } from '../services/apiClient';
 import { socketService } from '../services/socketService';
 import { useAuthStore } from './useAuthStore';
+import { useAppStore } from './useAppStore';
+import { soundService } from '../services/soundService';
 import type {
   ChatMessage,
   PlaybackSnapshot,
@@ -27,7 +29,7 @@ interface RoomState {
   error: string | null;
 
   createAndJoinRoom: () => Promise<string>;
-  joinRoom: (roomCode: string) => Promise<boolean>;
+  joinRoom: (roomCode: string, isFromCreate?: boolean) => Promise<boolean>;
   leaveRoom: () => Promise<void>;
   sendChat: (content: string) => Promise<boolean>;
   setTrack: (track: { videoId: string; title: string; thumbnailUrl: string; duration: string }) => Promise<void>;
@@ -57,7 +59,8 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     try {
       const room = await apiClient.createRoom();
       set({ activeRoom: room });
-      await get().joinRoom(room.roomCode);
+      soundService.play('room:create');
+      await get().joinRoom(room.roomCode, true);
       return room.roomCode;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -66,7 +69,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
   },
 
-  joinRoom: async (roomCode: string) => {
+  joinRoom: async (roomCode: string, isFromCreate?: boolean) => {
     const cleanCode = roomCode.trim().toUpperCase();
     set({ isLoading: true, error: null });
 
@@ -93,6 +96,9 @@ export const useRoomStore = create<RoomState>((set, get) => ({
           chatMessages: ack.messages || [],
           queue: ack.queue || [],
         });
+        if (!isFromCreate) {
+          soundService.play('room:join');
+        }
         return true;
       } else {
         set({ error: ack.message || 'Failed to join real-time room session', isLoading: false });
@@ -109,6 +115,8 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     const { activeRoom } = get();
     if (!activeRoom) return;
     const roomCode = activeRoom.roomCode;
+
+    soundService.play('room:leave');
 
     // 1. Optimistic UI reset: clear room state immediately in memory so UI reacts instantly
     set({
@@ -176,6 +184,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
 
     const res = await socketService.removeFromQueue(activeRoom.roomCode, index);
     if (res.ok && res.queue) {
+      soundService.play('action:delete');
       set({ queue: res.queue });
     }
   },
@@ -227,6 +236,16 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       set((state) => ({
         chatMessages: [...state.chatMessages, message],
       }));
+
+      // Edge case 1:A - Incoming messages only + mute if chat drawer is actively open
+      const currentUser = useAuthStore.getState().user;
+      const isFromOtherUser = currentUser ? message.userId !== currentUser.id : true;
+      const { isDrawerOpen, drawerTab } = useAppStore.getState();
+      const isChatActive = isDrawerOpen && drawerTab === 'chat';
+
+      if (isFromOtherUser && !isChatActive) {
+        soundService.play('notification:chat');
+      }
     };
 
     const onHostPending = (payload: HostPendingPayload) => {

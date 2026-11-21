@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from '../services/tauriBridge';
+import { soundService } from '../services/soundService';
 
 export interface Playlist {
   id: string;
@@ -135,6 +136,7 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
   },
 
   deletePlaylist: async (id: string) => {
+    soundService.play('action:delete');
     if (isTauri()) {
       try {
         await invoke('delete_playlist', { id });
@@ -193,6 +195,7 @@ export const usePlaylistStore = create<PlaylistState>((set, get) => ({
   },
 
   removeTrackFromPlaylist: async (playlistId: string, trackId: string) => {
+    soundService.play('action:delete');
     if (isTauri()) {
       try {
         await invoke('remove_track_from_playlist', { playlistId, trackId });

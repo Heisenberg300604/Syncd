@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { AudioPlaybackStatus, PlaybackState, AudioDeviceDescriptor } from '../types/audio';
 import { useSettingsStore } from './useSettingsStore';
 import { showTrackNotification } from '../services/notificationService';
+import { soundService } from '../services/soundService';
 
 export interface CurrentTrack {
   id: string;
@@ -87,6 +88,7 @@ interface PlayerState {
 
   // Actions
   dismissPlayer: () => void;
+  restorePlayer: () => void;
   playTrack: (track: CurrentTrack, queue?: CurrentTrack[]) => Promise<void>;
   play: () => Promise<void>;
   pause: () => Promise<void>;
@@ -176,6 +178,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   hasPlaybackStarted: false,
 
   dismissPlayer: () => set({ hasPlaybackStarted: false }),
+  restorePlayer: () => {
+    const { currentTrack, queue } = get();
+    if (currentTrack) {
+      set({ hasPlaybackStarted: true });
+    } else if (queue.length > 0) {
+      set({
+        currentTrack: queue[0],
+        hasPlaybackStarted: true,
+        durationSeconds: queue[0].durationSeconds,
+      });
+    }
+  },
 
   playTrack: async (track, newQueue) => {
     const queue = newQueue !== undefined ? newQueue : get().queue;
@@ -526,6 +540,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   removeFromQueue: async (idOrIndex) => {
+    soundService.play('action:delete');
     const queue = [...get().queue];
     let targetId: string | undefined;
     let targetIndex = -1;
@@ -566,6 +581,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   clearQueue: async () => {
+    soundService.play('action:delete');
     set({ queue: [], queueIndex: -1, currentTrack: null, status: 'stopped', hasPlaybackStarted: false });
     try {
       await invoke('queue_clear');

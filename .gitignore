@@ -77,3 +77,11 @@ Mobile/Android/app/build/
 Mobile/Android/local.properties
 Mobile/Android/syncd.local.properties
 Mobile/Android/*.log
+
+# Tauri Signing Keys
+*.key
+*.key.pub
+syncd.key
+syncd.key.pub
+
+

@@ -191,7 +191,7 @@ export const RoomsView: React.FC = () => {
     return (
       <div className="flex-1 overflow-y-auto p-8 pb-28 flex flex-col gap-6 select-none w-full max-w-6xl">
         {/* Active Room Top Bar */}
-        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 p-3.5 bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 rounded-2xl relative shadow-md">
+        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 p-3.5 bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 rounded-2xl relative z-40 shadow-md">
           <div className="flex items-center gap-3 shrink-0">
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
               <Users className="w-4 h-4" />
@@ -221,7 +221,7 @@ export const RoomsView: React.FC = () => {
 
           {/* YouTube Track Finder Search Pill (Embedded in Listening Room Panel) */}
           {isHost ? (
-            <div className="relative flex-1 min-w-[200px] max-w-md mx-2 order-3 lg:order-2 w-full lg:w-auto" ref={searchDropdownRef}>
+            <div className="relative z-50 flex-1 min-w-[200px] max-w-md mx-2 order-3 lg:order-2 w-full lg:w-auto" ref={searchDropdownRef}>
               <form onSubmit={handleYouTubeSearch} className="flex items-center">
                 <div className="w-full flex items-center gap-2 bg-zinc-950/90 border border-zinc-800 hover:border-zinc-700 focus-within:border-amber-500/80 focus-within:ring-2 focus-within:ring-amber-500/20 rounded-full pl-3.5 pr-1.5 py-1 transition-all shadow-inner">
                   <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
@@ -255,10 +255,10 @@ export const RoomsView: React.FC = () => {
                 </div>
               </form>
 
-              {/* Floating Results Popover Dropdown */}
+              {/* Floating Results Popover Dropdown (Clean, borderless glass design) */}
               {searchResults.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 p-2 bg-zinc-950/95 border border-zinc-800/90 rounded-2xl shadow-2xl backdrop-blur-2xl z-50 flex flex-col gap-1.5 max-h-72 overflow-y-auto ring-1 ring-white/[0.06]">
-                  <div className="flex items-center justify-between px-2 py-1 text-[10px] uppercase font-bold tracking-wider text-zinc-400 border-b border-zinc-850">
+                <div className="absolute top-full left-0 right-0 mt-2 p-1.5 bg-zinc-950/95 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.9)] backdrop-blur-2xl z-50 flex flex-col gap-1 max-h-80 overflow-y-auto">
+                  <div className="flex items-center justify-between px-2.5 py-1.5 text-[10px] uppercase font-bold tracking-wider text-zinc-500">
                     <span>Search Results ({searchResults.length})</span>
                     <button
                       type="button"
@@ -271,7 +271,7 @@ export const RoomsView: React.FC = () => {
                   {searchResults.map((res) => (
                     <div
                       key={res.videoId}
-                      className="p-2 rounded-xl bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-850/80 flex items-center justify-between gap-3 group transition-colors"
+                      className="p-2 rounded-xl bg-zinc-900/40 hover:bg-zinc-900 flex items-center justify-between gap-3 group transition-colors"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <img
@@ -280,7 +280,7 @@ export const RoomsView: React.FC = () => {
                           className="w-12 h-8 rounded-lg object-cover shrink-0"
                         />
                         <div className="min-w-0">
-                          <p className="text-xs text-zinc-200 font-medium truncate">{res.title}</p>
+                          <p className="text-xs text-zinc-200 font-medium truncate group-hover:text-amber-300 transition-colors">{res.title}</p>
                           <p className="text-[10px] text-zinc-500 font-mono mt-0.5">{res.duration}</p>
                         </div>
                       </div>
@@ -292,7 +292,7 @@ export const RoomsView: React.FC = () => {
                             handlePlayNow(res);
                             setSearchResults([]);
                           }}
-                          className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-zinc-950 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500 text-amber-400 hover:text-zinc-950 transition-colors cursor-pointer"
                           title="Play Now in Room"
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
@@ -300,7 +300,7 @@ export const RoomsView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleAddQueue(res)}
-                          className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 hover:text-zinc-100 transition-colors cursor-pointer"
                           title="Add to Queue"
                         >
                           <PlusCircle className="w-3.5 h-3.5" />
@@ -390,7 +390,7 @@ export const RoomsView: React.FC = () => {
         )}
 
         {/* Main Room Experience: Theater Player */}
-        <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto">
+        <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto relative z-10">
           <YouTubeRoomPlayer onFocusSearch={() => searchInputRef.current?.focus()} />
         </div>
 

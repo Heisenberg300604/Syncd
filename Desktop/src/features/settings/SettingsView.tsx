@@ -8,8 +8,6 @@ import {
   RefreshCw,
   LogOut,
   LogIn,
-  ChevronDown,
-  Server,
   ExternalLink,
   Clipboard,
   Download,
@@ -32,7 +30,10 @@ import CodeSlots, { type CodeSlotsStatus } from '../../components/ui/CodeSlots';
 import { AnimatedCheckmark } from '../../components/ui/AnimatedCheckmark';
 import { FolderManagerModal } from '../library/components/FolderManagerModal';
 import GlideSelect from '../../components/ui/GlideSelect';
+import { Checkbox } from '../../components/ui/Checkbox';
+import { ElasticSlider } from '../../components/ui/ElasticSlider';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { soundService } from '../../services/soundService';
 import { requestNotificationPermission, showTrackNotification } from '../../services/notificationService';
 
 export function SettingsView() {
@@ -43,12 +44,9 @@ export function SettingsView() {
     isAuthenticated,
     isAuthenticating,
     authError,
-    apiUrl,
-    socketUrl,
     openBrowserLinkingPage,
     exchangeLinkingCode,
     setToken,
-    setEndpoints,
     fetchCurrentUser,
     logout,
   } = useAuthStore();
@@ -63,12 +61,16 @@ export function SettingsView() {
     gaplessPlayback,
     trackNotifications,
     autoQueue,
+    sfxEnabled,
+    sfxVolume,
     selectedAccent,
     setSelectedDevice,
     setVolumeNormalization,
     setGaplessPlayback,
     setTrackNotifications,
     setAutoQueue,
+    setSfxEnabled,
+    setSfxVolume,
     setSelectedAccent,
   } = useSettingsStore();
   const [socialPresence, setSocialPresence] = useState(true);
@@ -82,9 +84,6 @@ export function SettingsView() {
   const [enteredCode, setEnteredCode] = useState('');
   const [showManualToken, setShowManualToken] = useState(false);
   const [authInputToken, setAuthInputToken] = useState('');
-  const [inputApiUrl, setInputApiUrl] = useState(apiUrl);
-  const [inputSocketUrl, setInputSocketUrl] = useState(socketUrl);
-  const [isTestingBackend, setIsTestingBackend] = useState(false);
 
   const activeAccentHex =
     selectedAccent === 'gold'
@@ -194,43 +193,6 @@ export function SettingsView() {
     });
   };
 
-  const handleSaveEndpoints = () => {
-    setEndpoints(inputApiUrl.trim(), inputSocketUrl.trim());
-    addToast({
-      type: 'success',
-      title: 'Endpoints Saved',
-      message: 'Network configuration updated.',
-    });
-  };
-
-  const handleTestBackend = async () => {
-    setIsTestingBackend(true);
-    try {
-      const res = await fetch(`${inputApiUrl.trim()}/health`);
-      if (res.ok) {
-        addToast({
-          type: 'success',
-          title: 'Connected',
-          message: 'SyncD backend server is online and operational.',
-        });
-      } else {
-        addToast({
-          type: 'error',
-          title: 'Server Error',
-          message: `Backend responded with HTTP ${res.status}.`,
-        });
-      }
-    } catch {
-      addToast({
-        type: 'error',
-        title: 'Connection Refused',
-        message: 'Could not reach backend server at specified URL.',
-      });
-    } finally {
-      setIsTestingBackend(false);
-    }
-  };
-
   return (
     <div className="flex-1 overflow-y-auto p-8 pb-28 flex flex-col gap-8 w-full max-w-5xl select-none">
       {/* Top Header */}
@@ -310,11 +272,10 @@ export function SettingsView() {
                 Broadcast online status and listening activity to members inside listening rooms
               </span>
             </div>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={socialPresence}
-              onChange={(e) => setSocialPresence(e.target.checked)}
-              className="accent-amber-500 w-4 h-4 cursor-pointer"
+              onChange={setSocialPresence}
+              ariaLabel="Social Room Presence"
             />
           </div>
         </section>
@@ -369,11 +330,10 @@ export function SettingsView() {
                 Eliminate silence between album tracks for seamless transitions
               </span>
             </div>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={gaplessPlayback}
-              onChange={(e) => setGaplessPlayback(e.target.checked)}
-              className="accent-amber-500 w-4 h-4 cursor-pointer"
+              onChange={setGaplessPlayback}
+              ariaLabel="Gapless Playback"
             />
           </div>
 
@@ -384,11 +344,10 @@ export function SettingsView() {
                 Automatically queue upcoming tracks into Up Next when playing from library or search
               </span>
             </div>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={autoQueue}
-              onChange={(e) => setAutoQueue(e.target.checked)}
-              className="accent-amber-500 w-4 h-4 cursor-pointer"
+              onChange={setAutoQueue}
+              ariaLabel="Auto-Queue Library Tracks"
             />
           </div>
 
@@ -399,13 +358,64 @@ export function SettingsView() {
                 Adjust loudness automatically across different music formats and albums
               </span>
             </div>
-            <input
-              type="checkbox"
+            <Checkbox
               checked={volumeNormalization}
-              onChange={(e) => setVolumeNormalization(e.target.checked)}
-              className="accent-amber-500 w-4 h-4 cursor-pointer"
+              onChange={setVolumeNormalization}
+              ariaLabel="Volume Normalization"
             />
           </div>
+
+          {/* Sound Effects (SFX) Master Toggle */}
+          <div className="flex items-center justify-between text-xs pt-2 border-t border-zinc-850">
+            <div>
+              <span className="font-medium text-zinc-200 block">Desktop Sound Effects (SFX)</span>
+              <span className="text-[11px] text-zinc-400">
+                Auditory feedback for room events, drawer transitions, scans, updates, and interactions
+              </span>
+            </div>
+            <Checkbox
+              checked={sfxEnabled}
+              onChange={setSfxEnabled}
+              ariaLabel="Desktop Sound Effects"
+            />
+          </div>
+
+          {/* Sound Effects Volume Slider & Preview */}
+          {sfxEnabled && (
+            <div className="flex flex-col gap-2 pt-2 border-t border-zinc-850 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-medium text-zinc-200 block">SFX Feedback Volume</span>
+                  <span className="text-[11px] text-zinc-400">
+                    Adjust loudness of interface sound effects independently of music playback
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] font-mono text-zinc-400 bg-zinc-800/60 px-2 py-0.5 rounded">
+                    {Math.round(sfxVolume * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => soundService.play('notification:ping')}
+                    className="text-[11px] text-amber-400 hover:text-amber-300 transition-colors font-medium cursor-pointer"
+                  >
+                    Test SFX
+                  </button>
+                </div>
+              </div>
+              <div className="pt-1.5 pb-0.5">
+                <ElasticSlider
+                  value={sfxVolume}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={setSfxVolume}
+                  formatTooltip={(v) => `${Math.round(v * 100)}%`}
+                  ariaLabel="SFX Feedback Volume"
+                />
+              </div>
+            </div>
+          )}
         </section>
 
         {/* 3. Music Library & Cache Management */}
@@ -555,11 +565,9 @@ export function SettingsView() {
                   Test Notification
                 </button>
               )}
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={trackNotifications}
-                onChange={async (e) => {
-                  const enabled = e.target.checked;
+                onChange={async (enabled) => {
                   await setTrackNotifications(enabled);
                   if (enabled) {
                     const granted = await requestNotificationPermission();
@@ -584,72 +592,13 @@ export function SettingsView() {
                     });
                   }
                 }}
-                className="accent-amber-500 w-4 h-4 cursor-pointer"
+                ariaLabel="Desktop Track Notifications"
               />
             </div>
           </div>
         </section>
 
-        {/* 5. Advanced / Developer Accordion (Collapsed by Default) */}
-        <details className="group rounded-2xl bg-zinc-900/20 border border-zinc-850/80 p-4 transition-colors">
-          <summary className="flex items-center justify-between cursor-pointer list-none text-xs font-medium text-zinc-400 hover:text-zinc-200">
-            <span className="flex items-center gap-2">
-              <Server className="w-3.5 h-3.5 text-zinc-400" />
-              Advanced Developer Options (Network & Server Endpoints)
-            </span>
-            <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />
-          </summary>
-
-          <div className="pt-4 mt-3 border-t border-zinc-850 flex flex-col gap-4 text-xs">
-            <p className="text-[11px] text-zinc-400">
-              Configure backend network endpoints for local testing or custom deployment origins.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-zinc-400 font-mono text-[11px] block mb-1">REST API URL</label>
-                <input
-                  type="text"
-                  value={inputApiUrl}
-                  onChange={(e) => setInputApiUrl(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 font-mono focus:outline-hidden focus:border-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-zinc-400 font-mono text-[11px] block mb-1">Socket.IO URL</label>
-                <input
-                  type="text"
-                  value={inputSocketUrl}
-                  onChange={(e) => setInputSocketUrl(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 font-mono focus:outline-hidden focus:border-amber-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleTestBackend}
-                isLoading={isTestingBackend}
-                className="text-xs"
-              >
-                Test Connectivity
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleSaveEndpoints}
-                className="text-xs"
-              >
-                Apply Overrides
-              </Button>
-            </div>
-          </div>
-        </details>
-
-        {/* 6. Application & System Updates */}
+        {/* 5. Application & System Updates */}
         <section className="p-5 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 flex flex-col gap-4">
           <div className="flex items-center justify-between pb-2 border-b border-zinc-800/60">
             <div className="flex items-center gap-2 text-zinc-200">

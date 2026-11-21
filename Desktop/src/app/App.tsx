@@ -22,6 +22,7 @@ import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isTauri } from "../services/tauriBridge";
 import { AppLoadingScreen } from "../components/feedback/AppLoadingScreen";
+import { ShortcutsModal } from "../components/feedback/ShortcutsModal";
 
 // Code-split heavy secondary views to achieve ultra-fast cold start (<300ms JS evaluation)
 const LibraryView = lazy(() =>
@@ -55,6 +56,7 @@ export function App() {
   const [drawerWidth, setDrawerWidth] = useState(340);
   const [isDrawerResizing, setIsDrawerResizing] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [isWindowFocused, setIsWindowFocused] = useState(true);
   const [isAppReady, setIsAppReady] = useState(false);
@@ -88,6 +90,7 @@ export function App() {
     useLibraryStore.getState().loadStats();
     usePlaylistStore.getState().loadPlaylists();
     usePlayerStore.getState().loadPersistedQueue();
+    usePlayerStore.getState().loadDevices();
     useAuthStore.getState().initializeAuth();
 
     // Show window only when initial DOM is rendered and styled, completely eliminating the black box!
@@ -131,8 +134,10 @@ export function App() {
     onToggleDrawer: () => useAppStore.getState().toggleDrawer(),
     onCloseModals: () => {
       if (isSearchOpen) setIsSearchOpen(false);
+      else if (isShortcutsOpen) setIsShortcutsOpen(false);
       else if (isDrawerOpen) closeDrawer();
     },
+    onToggleShortcuts: () => setIsShortcutsOpen((prev) => !prev),
   });
 
   return (
@@ -192,7 +197,7 @@ export function App() {
       <div className="flex-1 flex overflow-hidden z-10 relative">
         {/* Left Sidebar */}
         <div style={{ width: `${sidebarWidth}px` }} className="shrink-0 flex">
-          <Sidebar />
+          <Sidebar onOpenShortcuts={() => setIsShortcutsOpen(true)} />
         </div>
 
         {/* Left Resize Handle */}
@@ -269,6 +274,9 @@ export function App() {
 
       {/* Global Search Dialog Modal (Ctrl+K) */}
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
+      {/* Global Keyboard Shortcuts Cheatsheet Dialog (?) */}
+      <ShortcutsModal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
 
       {/* Toast Feedback System */}
       <ToastContainer />
