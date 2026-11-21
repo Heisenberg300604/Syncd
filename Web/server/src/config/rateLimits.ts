@@ -23,6 +23,10 @@ export const REST_RATE_LIMITS = {
   musicVideo: { limit: 60, windowMs: 60_000 },
   /** Resolving a playlist costs 2 units and fetches up to 50 videos. */
   musicPlaylist: { limit: 15, windowMs: 60_000 },
+  /** Desktop auth temporary linking code generation (10 requests / min per auth user). */
+  desktopAuthGenerate: { limit: 10, windowMs: 60_000 },
+  /** Desktop auth code exchange brute-force protection (5 attempts / min per IP). */
+  desktopAuthExchange: { limit: 5, windowMs: 60_000 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export const SOCKET_RATE_LIMITS = {

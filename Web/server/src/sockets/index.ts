@@ -12,6 +12,7 @@ import {
 } from "../modules/rooms/rooms.service.js";
 import { presenceStore } from "./presenceStore.js";
 import { isAuthorizedParty } from "./socketAuth.js";
+import { verifyDesktopToken } from "../modules/auth/desktopToken.js";
 import {
   applyPlaybackControl,
   clearRoomTrack,
@@ -94,6 +95,19 @@ export function createSocketServer(httpServer: HttpServer): SocketIOServer {
     }
 
     try {
+      // 1. First check if token is a long-lived SyncD Desktop session token
+      const desktopPayload = verifyDesktopToken(token);
+      if (desktopPayload) {
+        const user = await findUserByClerkId(desktopPayload.sub);
+        if (!user) {
+          next(new Error("User profile not found"));
+          return;
+        }
+        socket.data.user = user;
+        return next();
+      }
+
+      // 2. Otherwise verify standard browser Clerk session token
       // Browser tokens carry `azp` (the page origin) and must come from a
       // frontend this API serves, so a token minted for another origin on the
       // same Clerk instance can't be replayed here. Native-app tokens

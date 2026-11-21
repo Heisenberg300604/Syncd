@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SyncD Desktop",
+  "version": "1.0.0",
+  "identifier": "com.syncd.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "SyncD Desktop",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 680,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "visible": true,
+        "backgroundColor": "#09090b"
+      }
+    ],
+    "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": []
+        }
+      },
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://*.ytimg.com https://*.ggpht.com data: blob:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost http://localhost:5000 ws://localhost:5000 https://api.syncd.com wss://api.syncd.com; media-src 'self' asset: http://asset.localhost; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none';",
+      "devCsp": null,
+      "capabilities": ["default"]
+    }
+  },
+  "plugins": {}
+}
+

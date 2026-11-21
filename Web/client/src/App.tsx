@@ -6,6 +6,7 @@ import { RootGuard } from "./pages/RootGuard";
 import { Onboarding } from "./pages/Onboarding";
 import { Home } from "./pages/Home";
 import { Room } from "./pages/Room";
+import { DesktopAuth } from "./pages/DesktopAuth";
 import { ProtectedRoute, RequireAuth } from "./components/ProtectedRoute";
 import { CurrentUserProvider } from "./providers/CurrentUserProvider";
 import { AuthShell } from "./components/ui/AuthShell";
@@ -90,6 +91,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/desktop-auth" element={<DesktopAuth />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </CurrentUserProvider>

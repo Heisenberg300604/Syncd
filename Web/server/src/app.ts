@@ -9,10 +9,39 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 
 const app = express();
 
+// Disable ETags for JSON API to avoid 304 empty-body issues on authenticated fetch requests
+app.set("etag", false);
+
+const allowedOrigins = new Set([
+  ...config.corsOrigins,
+  "http://localhost:1420",
+  "http://127.0.0.1:1420",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://tauri.localhost",
+  "https://tauri.localhost",
+  "tauri://localhost",
+]);
+
 app.use(
   cors({
-    origin: config.corsOrigins,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile native apps, curl, electron/tauri plugins)
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.has(origin) ||
+        origin.startsWith("http://localhost:") ||
+        origin.startsWith("http://127.0.0.1:") ||
+        origin.startsWith("tauri://") ||
+        origin.endsWith(".localhost")
+      ) {
+        return callback(null, true);
+      }
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cache-Control", "Pragma", "X-Requested-With"],
   }),
 );
 

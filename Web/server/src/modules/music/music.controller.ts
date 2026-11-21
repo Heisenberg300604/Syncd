@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { getAuth } from "@clerk/express";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
+import { getEffectiveUserId } from "../../middleware/getEffectiveUserId.js";
 import { AppError } from "../../utils/apiResponse.js";
 import {
   parseYouTubePlaylistId,
@@ -20,7 +20,7 @@ import type {
 
 export const searchMusic = asyncHandler(
   async (req: Request, res: Response) => {
-    const { userId } = getAuth(req);
+    const userId = getEffectiveUserId(req);
 
     if (!userId) {
       res.status(401).json({ authenticated: false, message: "Unauthorized" });
@@ -40,7 +40,7 @@ export const searchMusic = asyncHandler(
 );
 export const resolveVideo = asyncHandler(
   async (req: Request, res: Response) => {
-    const { userId } = getAuth(req);
+    const userId = getEffectiveUserId(req);
 
     if (!userId) {
       res.status(401).json({ authenticated: false, message: "Unauthorized" });
@@ -60,7 +60,7 @@ export const resolveVideo = asyncHandler(
 
 export const resolvePlaylist = asyncHandler(
   async (req: Request, res: Response) => {
-    const { userId } = getAuth(req);
+    const userId = getEffectiveUserId(req);
 
     if (!userId) {
       res.status(401).json({ authenticated: false, message: "Unauthorized" });

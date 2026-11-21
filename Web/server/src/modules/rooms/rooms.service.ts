@@ -350,14 +350,21 @@ export async function leaveRoom(
   const isHost = room.hostUserId === user.id;
 
   if (!isHost) {
-    await prisma.roomMember.delete({
-      where: {
-        roomId_userId: {
-          roomId: room.id,
-          userId: user.id,
+    try {
+      await prisma.roomMember.delete({
+        where: {
+          roomId_userId: {
+            roomId: room.id,
+            userId: user.id,
+          },
         },
-      },
-    });
+      });
+    } catch (err: unknown) {
+      if ((err as { code?: string })?.code === "P2025") {
+        return { roomDeleted: false, leftUserId: user.id };
+      }
+      throw err;
+    }
     return { roomDeleted: false, leftUserId: user.id };
   }
 
@@ -373,26 +380,40 @@ export async function leaveRoom(
 
   if (!successor) {
     // Deleting the room cascades to all room_members and messages
-    await prisma.room.delete({ where: { id: room.id } });
+    try {
+      await prisma.room.delete({ where: { id: room.id } });
+    } catch (err: unknown) {
+      if ((err as { code?: string })?.code === "P2025") {
+        return { roomDeleted: true, leftUserId: user.id };
+      }
+      throw err;
+    }
     return { roomDeleted: true, leftUserId: user.id };
   }
 
   // Promote before removing the membership so the room is never, even
   // momentarily, hosted by someone who is no longer a member.
-  await prisma.$transaction([
-    prisma.room.update({
-      where: { id: room.id },
-      data: { hostUserId: successor.userId },
-    }),
-    prisma.roomMember.delete({
-      where: {
-        roomId_userId: {
-          roomId: room.id,
-          userId: user.id,
+  try {
+    await prisma.$transaction([
+      prisma.room.update({
+        where: { id: room.id },
+        data: { hostUserId: successor.userId },
+      }),
+      prisma.roomMember.delete({
+        where: {
+          roomId_userId: {
+            roomId: room.id,
+            userId: user.id,
+          },
         },
-      },
-    }),
-  ]);
+      }),
+    ]);
+  } catch (err: unknown) {
+    if ((err as { code?: string })?.code === "P2025") {
+      return { roomDeleted: false, leftUserId: user.id };
+    }
+    throw err;
+  }
 
   return {
     roomDeleted: false,

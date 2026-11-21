@@ -1,0 +1,253 @@
+@import "tailwindcss" source(none);
+@source "../../index.html";
+@source "../../src";
+
+@layer base {
+  :root {
+    --syncd-bg-canvas: #09090b;
+    --syncd-bg-surface: #121214;
+    --syncd-bg-elevated: #1a1a1e;
+    --syncd-bg-sunken: #050507;
+
+    --syncd-border-subtle: #202024;
+    --syncd-border-focus: #f59e0b;
+    --syncd-border-muted: #2e2e34;
+
+    --syncd-text-primary: #f4f4f5;
+    --syncd-text-secondary: #a1a1aa;
+    --syncd-text-muted: #71717a;
+    --syncd-text-disabled: #52525b;
+
+    --syncd-accent-primary: #f59e0b;
+    --syncd-accent-hover: #d97706;
+    --syncd-accent-muted: rgba(245, 158, 11, 0.12);
+
+    --syncd-status-success: #10b981;
+    --syncd-status-warning: #f59e0b;
+    --syncd-status-error: #ef4444;
+    --syncd-status-offline: #6b7280;
+  }
+
+  body {
+    background-color: var(--syncd-bg-canvas);
+    color: var(--syncd-text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    width: 100vw;
+  }
+}
+
+/* Ultra-Sleek Modern Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 158, 11, 0.5);
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: rgba(245, 158, 11, 0.85);
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Firefox scrollbar support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) rgba(0, 0, 0, 0.2);
+}
+
+/* Glass Card Effect for Track Cards without artwork */
+.glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 16px 32px -12px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 20px rgba(255, 255, 255, 0.04);
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 
+    0 20px 40px -10px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 24px rgba(245, 158, 11, 0.08);
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.5),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.glass-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.35),
+    transparent,
+    rgba(255, 255, 255, 0.1)
+  );
+  pointer-events: none;
+}
+
+/* Floating Glass Dock Player */
+.glass-player {
+  position: fixed !important;
+  bottom: 1rem !important;
+  left: 0 !important;
+  right: 0 !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: calc(100% - 2.5rem) !important;
+  max-width: 64rem !important;
+  height: 72px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border-radius: 9999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 
+    0 20px 50px -10px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 24px rgba(255, 255, 255, 0.06) !important;
+  overflow: visible;
+  transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  z-index: 50 !important;
+}
+
+/* Dynamic bottom spacing when player is auto-hidden vs active */
+[data-player-active="false"] .pb-28 {
+  padding-bottom: 2rem !important;
+  transition: padding-bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-player-active="true"] .pb-28 {
+  padding-bottom: 7rem;
+  transition: padding-bottom 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-player::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.6) 30%,
+    rgba(245, 158, 11, 0.45) 50%,
+    rgba(255, 255, 255, 0.6) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* Glass Button Effect for Hero Action Buttons */
+.glass-btn {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 22px 11px rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.8),
+    transparent
+  );
+  pointer-events: none;
+}
+
+.glass-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.8),
+    transparent,
+    rgba(255, 255, 255, 0.3)
+  );
+  pointer-events: none;
+}
+
+.glass-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 
+    0 12px 36px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 0 22px 11px rgba(255, 255, 255, 0.14);
+}
+

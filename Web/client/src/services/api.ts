@@ -141,3 +141,45 @@ export function resolveYouTubePlaylist(
     { method: "GET" },
   );
 }
+
+export interface DesktopAuthCodeResponse {
+  ok: boolean;
+  code: string;
+  expiresInSeconds: number;
+  attemptsRemaining?: number;
+  generationCount?: number;
+}
+
+export function getDesktopAuthCode(
+  getToken: GetToken,
+  username?: string,
+): Promise<DesktopAuthCodeResponse> {
+  return request<DesktopAuthCodeResponse>(
+    "/auth/desktop-code",
+    getToken,
+    {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    },
+  );
+}
+
+export async function checkDesktopCodeStatus(
+  code: string,
+): Promise<"pending" | "claimed" | "expired" | "invalid"> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/desktop-code/status?code=${encodeURIComponent(code)}`, {
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+    });
+    if (!res.ok) return "invalid";
+    const data = await res.json();
+    return data.status || "invalid";
+  } catch {
+    return "invalid";
+  }
+}

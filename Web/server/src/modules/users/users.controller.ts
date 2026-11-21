@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
-import { getAuth } from "@clerk/express";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
 import { AppError } from "../../utils/apiResponse.js";
+import { getEffectiveUserId } from "../../middleware/getEffectiveUserId.js";
 import {
   createUser,
   findUserByClerkId,
@@ -15,7 +15,10 @@ import type {
 } from "./users.types.js";
 
 export const getMe = asyncHandler(async (_req: Request, res: Response) => {
-  const { userId } = getAuth(_req);
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  res.setHeader("Pragma", "no-cache");
+
+  const userId = getEffectiveUserId(_req);
 
   if (!userId) {
     res.status(401).json({ authenticated: false, message: "Unauthorized" });
@@ -35,7 +38,7 @@ export const getMe = asyncHandler(async (_req: Request, res: Response) => {
 
 export const createProfile = asyncHandler(
   async (req: Request, res: Response) => {
-    const { userId } = getAuth(req);
+    const userId = getEffectiveUserId(req);
 
     if (!userId) {
       res.status(401).json({ authenticated: false, message: "Unauthorized" });

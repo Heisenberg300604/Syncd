@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
-import { getAuth } from "@clerk/express";
 import { asyncHandler } from "../../middleware/asyncHandler.js";
+import { getEffectiveUserId } from "../../middleware/getEffectiveUserId.js";
 import { AppError } from "../../utils/apiResponse.js";
 import { validateRoomCode } from "./rooms.validation.js";
 import {
@@ -24,7 +24,7 @@ import type {
 } from "./rooms.types.js";
 
 export const createRoom = asyncHandler(async (_req: Request, res: Response) => {
-  const { userId } = getAuth(_req);
+  const userId = getEffectiveUserId(_req);
 
   if (!userId) {
     res.status(401).json({ authenticated: false, message: "Unauthorized" });
@@ -38,7 +38,7 @@ export const createRoom = asyncHandler(async (_req: Request, res: Response) => {
 
 export const joinRoomHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    const { userId } = getAuth(req);
+    const userId = getEffectiveUserId(req);
 
     if (!userId) {
       res.status(401).json({ authenticated: false, message: "Unauthorized" });
@@ -87,7 +87,7 @@ export const getRoom = asyncHandler(async (req: Request, res: Response) => {
 
 export const leaveRoomHandler = asyncHandler(
   async (req: Request, res: Response) => {
-    const { userId } = getAuth(req);
+    const userId = getEffectiveUserId(req);
 
     if (!userId) {
       res.status(401).json({ authenticated: false, message: "Unauthorized" });

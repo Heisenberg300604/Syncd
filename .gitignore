@@ -63,7 +63,7 @@ Desktop/src-tauri/gen/
 *.db-wal
 Desktop/Data/
 Desktop/Index/
-Desktop/
+
 .agent/
 
 Audio/
@@ -76,4 +76,4 @@ Mobile/Android/build/
 Mobile/Android/app/build/
 Mobile/Android/local.properties
 Mobile/Android/syncd.local.properties
-Mobile/Android/*.log
+Mobile/Android/*.log
