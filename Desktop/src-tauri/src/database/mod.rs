@@ -126,7 +126,7 @@ impl Database {
     pub fn add_indexed_folder(&mut self, path: &str) -> Result<IndexedFolder> {
         let id = format!(
             "folder_{}",
-            &sha2::Sha256::digest(path.as_bytes())[..8]
+            sha2::Sha256::digest(path.as_bytes())[..8]
                 .iter()
                 .map(|b| format!("{:02x}", b))
                 .collect::<String>()
@@ -330,7 +330,7 @@ impl Database {
                 let path_str = scanned.path.to_string_lossy().to_string();
                 let track_id = format!(
                     "trk_{}",
-                    &sha2::Sha256::digest(path_str.as_bytes())[..8]
+                    sha2::Sha256::digest(path_str.as_bytes())[..8]
                         .iter()
                         .map(|b| format!("{:02x}", b))
                         .collect::<String>()

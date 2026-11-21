@@ -87,7 +87,7 @@ impl PlaylistDatabase {
     pub fn create_playlist(&self, name: &str, description: Option<&str>) -> Result<PlaylistRow> {
         let id = format!(
             "pl_{}",
-            &sha2::Sha256::digest(
+            sha2::Sha256::digest(
                 format!(
                     "{}{}",
                     name,
