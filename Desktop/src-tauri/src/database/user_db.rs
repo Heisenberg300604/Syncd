@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use rusqlite::{Connection, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -102,7 +102,7 @@ impl UserDatabase {
                  created_at TEXT NOT NULL DEFAULT (datetime('now'))
              );
 
-             CREATE INDEX IF NOT EXISTS idx_playback_queue_order ON playback_queue(queue_order);"
+             CREATE INDEX IF NOT EXISTS idx_playback_queue_order ON playback_queue(queue_order);",
         )?;
 
         Ok(Self {
@@ -113,7 +113,9 @@ impl UserDatabase {
 
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
         self.conn
-            .query_row("SELECT value FROM settings WHERE key = ?1;", [key], |r| r.get(0))
+            .query_row("SELECT value FROM settings WHERE key = ?1;", [key], |r| {
+                r.get(0)
+            })
             .map(Some)
             .or_else(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => Ok(None),
@@ -200,7 +202,7 @@ impl UserDatabase {
                     artwork_url, source, path, format, bitrate_kbps, 
                     queue_order, is_current, created_at 
              FROM playback_queue 
-             ORDER BY queue_order ASC, created_at ASC;"
+             ORDER BY queue_order ASC, created_at ASC;",
         )?;
 
         let rows = stmt.query_map([], |r| {
@@ -229,16 +231,22 @@ impl UserDatabase {
         Ok(result)
     }
 
-    pub fn add_to_playback_queue(&mut self, tracks: &[QueuedTrackInput]) -> Result<Vec<QueuedTrackRow>> {
+    pub fn add_to_playback_queue(
+        &mut self,
+        tracks: &[QueuedTrackInput],
+    ) -> Result<Vec<QueuedTrackRow>> {
         let tx = self.conn.transaction()?;
 
         let max_order: i64 = tx
-            .query_row("SELECT COALESCE(MAX(queue_order), -1) FROM playback_queue;", [], |r| r.get(0))
+            .query_row(
+                "SELECT COALESCE(MAX(queue_order), -1) FROM playback_queue;",
+                [],
+                |r| r.get(0),
+            )
             .unwrap_or(-1);
 
-        let mut current_order = max_order + 1;
-
         for (idx, t) in tracks.iter().enumerate() {
+            let current_order = max_order + 1 + idx as i64;
             let entry_id = t.id.clone().unwrap_or_else(|| {
                 let now_ms = chrono::Utc::now().timestamp_millis();
                 format!("q_{}_{}_{}", t.track_id, now_ms, idx)
@@ -266,8 +274,6 @@ impl UserDatabase {
                     current_order,
                 ],
             )?;
-
-            current_order += 1;
         }
 
         tx.commit()?;
@@ -275,7 +281,8 @@ impl UserDatabase {
     }
 
     pub fn set_current_track_in_queue(&self, track_id_or_entry_id: &str) -> Result<()> {
-        self.conn.execute("UPDATE playback_queue SET is_current = 0;", [])?;
+        self.conn
+            .execute("UPDATE playback_queue SET is_current = 0;", [])?;
         self.conn.execute(
             "UPDATE playback_queue SET is_current = 1 WHERE id = ?1 OR track_id = ?1;",
             [track_id_or_entry_id],
@@ -311,7 +318,11 @@ impl UserDatabase {
             });
             let src = t.source.as_deref().unwrap_or("local");
             let is_curr = current_track_id.map_or(0, |cid| {
-                if cid == t.track_id || cid == entry_id { 1 } else { 0 }
+                if cid == t.track_id || cid == entry_id {
+                    1
+                } else {
+                    0
+                }
             });
 
             tx.execute(

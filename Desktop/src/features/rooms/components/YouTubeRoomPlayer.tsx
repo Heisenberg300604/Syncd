@@ -201,7 +201,7 @@ export const YouTubeRoomPlayer: React.FC<YouTubeRoomPlayerProps> = ({ onFocusSea
     if (!isHost || !playback?.videoId) return;
     lastUserActionTimestampRef.current = Date.now();
     const cur = player.getCurrentTime();
-    const dur = player.duration || (playback.duration ? parseFloat(playback.duration) : 0) || Infinity;
+    const dur = player.duration || (playback.duration ? (typeof playback.duration === 'number' ? playback.duration : parseFloat(playback.duration)) : 0) || Infinity;
     const target = Math.max(0, Math.min(dur, cur + deltaSeconds));
     player.seekTo(target);
     await controlPlayback('seek', target);
@@ -263,7 +263,7 @@ export const YouTubeRoomPlayer: React.FC<YouTubeRoomPlayerProps> = ({ onFocusSea
 
   // Timeline values
   const displayTime = isDraggingSeek ? dragSeekTime : player.currentTime;
-  const totalDuration = player.duration || (playback?.duration ? parseFloat(playback.duration) : 0) || 0;
+  const totalDuration = player.duration || (playback?.duration ? (typeof playback.duration === 'number' ? playback.duration : parseFloat(playback.duration)) : 0) || 0;
   const progressPercent = totalDuration > 0 ? Math.min(100, Math.max(0, (displayTime / totalDuration) * 100)) : 0;
 
   return (
@@ -356,7 +356,7 @@ export const YouTubeRoomPlayer: React.FC<YouTubeRoomPlayerProps> = ({ onFocusSea
             {/* Header: Track Title & Broadcast State */}
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <h3 className="text-sm font-bold text-zinc-100 truncate" title={playback.title}>
+                <h3 className="text-sm font-bold text-zinc-100 truncate" title={playback.title || undefined}>
                   {playback.title}
                 </h3>
                 <div className="flex items-center gap-2 text-[11px] text-zinc-400 mt-0.5">

@@ -1,7 +1,7 @@
-use std::path::{Path, PathBuf};
 use rusqlite::{Connection, Result};
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -128,8 +128,10 @@ impl PlaylistDatabase {
     }
 
     pub fn delete_playlist(&self, id: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM playlist_tracks WHERE playlist_id = ?1;", [id])?;
-        self.conn.execute("DELETE FROM playlists WHERE id = ?1;", [id])?;
+        self.conn
+            .execute("DELETE FROM playlist_tracks WHERE playlist_id = ?1;", [id])?;
+        self.conn
+            .execute("DELETE FROM playlists WHERE id = ?1;", [id])?;
         Ok(())
     }
 
@@ -142,11 +144,14 @@ impl PlaylistDatabase {
     }
 
     pub fn add_track_to_playlist(&self, playlist_id: &str, track_id: &str) -> Result<bool> {
-        let max_pos: i64 = self.conn.query_row(
-            "SELECT COALESCE(MAX(position), 0) FROM playlist_tracks WHERE playlist_id = ?1;",
-            [playlist_id],
-            |r| r.get(0),
-        ).unwrap_or(0);
+        let max_pos: i64 = self
+            .conn
+            .query_row(
+                "SELECT COALESCE(MAX(position), 0) FROM playlist_tracks WHERE playlist_id = ?1;",
+                [playlist_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
 
         let rows_affected = self.conn.execute(
             "INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position, added_at)
@@ -179,7 +184,7 @@ impl PlaylistDatabase {
 
     pub fn get_playlist_tracks(&self, playlist_id: &str) -> Result<Vec<String>> {
         let mut stmt = self.conn.prepare(
-            "SELECT track_id FROM playlist_tracks WHERE playlist_id = ?1 ORDER BY position ASC;"
+            "SELECT track_id FROM playlist_tracks WHERE playlist_id = ?1 ORDER BY position ASC;",
         )?;
         let rows = stmt.query_map([playlist_id], |r| r.get::<_, String>(0))?;
         let mut tracks = Vec::new();

@@ -5,7 +5,6 @@ import {
   VolumeX,
   Disc,
   ListMusic,
-  Loader2,
   Music,
   X,
 } from 'lucide-react';
@@ -58,19 +57,74 @@ export function BottomPlayer({ isDrawerOpen = false, onToggleDrawer }: BottomPla
   const [showVolumeDial, setShowVolumeDial] = useState(false);
   const dialRef = useRef<HTMLDivElement>(null);
 
+  const [isHoveredScrubber, setIsHoveredScrubber] = useState(false);
+  const [isDraggingSeek, setIsDraggingSeek] = useState(false);
+  const [dragSeekPercent, setDragSeekPercent] = useState<number | null>(null);
+  const [hoverPercent, setHoverPercent] = useState<number | null>(null);
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
+
   const isVisible = Boolean(currentTrack && hasPlaybackStarted);
 
   const isPlaying = status === 'playing';
-  const isLoading = status === 'loading';
   const duration = durationSeconds > 0 ? durationSeconds : currentTrack?.durationSeconds || 0;
   const progressPercent = duration > 0 ? Math.min(100, (positionSeconds / duration) * 100) : 0;
 
-  const handleScrubberClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!scrubberRef.current || duration <= 0) return;
+  const calculateRatio = useCallback((clientX: number) => {
+    if (!scrubberRef.current || duration <= 0) return 0;
     const rect = scrubberRef.current.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    seek(ratio * duration);
+    const rawRatio = (clientX - rect.left) / rect.width;
+    if (rawRatio < 0) return rawRatio * 0.25;
+    if (rawRatio > 1) return 1 + (rawRatio - 1) * 0.25;
+    return rawRatio;
+  }, [duration]);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (duration <= 0) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // quiet fallback
+    }
+    setIsDraggingSeek(true);
+    const ratio = calculateRatio(e.clientX);
+    const clamped = Math.max(0, Math.min(1, ratio));
+    setDragSeekPercent(clamped * 100);
   };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (duration <= 0) return;
+    const ratio = calculateRatio(e.clientX);
+    if (isDraggingSeek) {
+      const clamped = Math.max(0, Math.min(1, ratio));
+      setDragSeekPercent(clamped * 100);
+    } else {
+      const clamped = Math.max(0, Math.min(1, ratio));
+      setHoverPercent(clamped * 100);
+      setHoverTime(clamped * duration);
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingSeek || duration <= 0) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // quiet fallback
+    }
+    const ratio = calculateRatio(e.clientX);
+    const clamped = Math.max(0, Math.min(1, ratio));
+    seek(clamped * duration);
+    setIsDraggingSeek(false);
+    setDragSeekPercent(null);
+  };
+
+  const handlePointerCancel = () => {
+    setIsDraggingSeek(false);
+    setDragSeekPercent(null);
+  };
+
+  const effectivePercent = isDraggingSeek && dragSeekPercent !== null ? dragSeekPercent : progressPercent;
+  const effectiveTime = isDraggingSeek && dragSeekPercent !== null ? (dragSeekPercent / 100) * duration : positionSeconds;
 
   // Close dial on outside click
   useEffect(() => {
@@ -135,7 +189,7 @@ export function BottomPlayer({ isDrawerOpen = false, onToggleDrawer }: BottomPla
       </div>
 
       {/* Playback Controls + Scrubber (Center) */}
-      <div className="flex-1 max-w-xl flex flex-col items-center gap-1 px-4 min-w-0">
+      <div className="flex-1 max-w-xl flex flex-col items-center justify-center gap-0.5 px-4 min-w-0 pt-2 pb-0.5">
         <div className="flex items-center gap-3">
           {/* Shuffle Toggle */}
           <button
@@ -165,14 +219,10 @@ export function BottomPlayer({ isDrawerOpen = false, onToggleDrawer }: BottomPla
             type="button"
             onClick={togglePlay}
             disabled={!currentTrack}
-            className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-400 text-zinc-950 flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-400 text-zinc-950 flex items-center justify-center transition-transform active:scale-90 shadow-lg shadow-amber-500/25 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed select-none"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
-            {isLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin text-zinc-950" />
-            ) : (
-              <AnimatedPlayPause isPlaying={isPlaying} className="w-4 h-4" />
-            )}
+            <AnimatedPlayPause isPlaying={isPlaying} className="w-4 h-4" />
           </button>
 
           {/* Next Track */}
@@ -199,24 +249,82 @@ export function BottomPlayer({ isDrawerOpen = false, onToggleDrawer }: BottomPla
           </button>
         </div>
 
-        {/* Scrubber */}
-        <div className="w-full flex items-center gap-2">
-          <span className="text-[10px] font-mono text-zinc-500 tabular-nums w-10 text-right">
-            {formatTime(positionSeconds)}
+        {/* Elastic Scrubber */}
+        <div className="w-full flex items-center gap-2.5">
+          <span className="text-[10px] font-mono text-zinc-400 tabular-nums w-10 text-right select-none font-medium">
+            {formatTime(effectiveTime)}
           </span>
+
           <div
             ref={scrubberRef}
-            onClick={handleScrubberClick}
-            className="flex-1 h-3 flex items-center group cursor-pointer"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onMouseEnter={() => setIsHoveredScrubber(true)}
+            onMouseLeave={() => {
+              setIsHoveredScrubber(false);
+              setHoverPercent(null);
+              setHoverTime(null);
+            }}
+            className="flex-1 h-4 flex items-center cursor-pointer relative touch-none select-none"
+            role="slider"
+            aria-valuemin={0}
+            aria-valuemax={duration}
+            aria-valuenow={effectiveTime}
+            aria-label="Track Progress"
           >
-            <div className="w-full h-1 bg-zinc-800/80 rounded-full overflow-hidden relative group-hover:h-1.5 transition-all">
-              <div
-                className="h-full bg-amber-500 group-hover:bg-amber-400 rounded-full transition-all duration-75"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+            {/* Tooltip on hover/drag */}
+            <AnimatePresence>
+              {(isDraggingSeek || (isHoveredScrubber && hoverPercent !== null)) && duration > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.85 }}
+                  animate={{ opacity: 1, y: -20, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.85 }}
+                  transition={{ type: 'spring', stiffness: 600, damping: 28 }}
+                  className="absolute pointer-events-none px-2 py-0.5 rounded-md bg-zinc-900/95 border border-zinc-700/80 text-[10px] font-mono text-zinc-100 shadow-xl -translate-x-1/2 z-50 backdrop-blur-md"
+                  style={{ left: `${isDraggingSeek && dragSeekPercent !== null ? dragSeekPercent : (hoverPercent ?? 0)}%` }}
+                >
+                  {formatTime(isDraggingSeek && dragSeekPercent !== null ? (dragSeekPercent / 100) * duration : (hoverTime ?? 0))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Elastic Track Groove */}
+            <motion.div
+              animate={{
+                height: isDraggingSeek ? 9 : isHoveredScrubber ? 8 : 6,
+                scaleY: isDraggingSeek ? 1.08 : 1,
+              }}
+              transition={{ type: 'spring', stiffness: 500, damping: 24 }}
+              className="w-full bg-zinc-800/90 rounded-full relative overflow-visible border border-white/[0.06] shadow-inner"
+            >
+              {/* Elastic Progress Fill Bar */}
+              <motion.div
+                className="h-full bg-amber-500 rounded-full relative"
+                animate={{
+                  width: `${effectivePercent}%`,
+                  boxShadow: isHoveredScrubber || isDraggingSeek
+                    ? '0 0 14px var(--syncd-accent-primary)'
+                    : '0 0 6px var(--syncd-accent-muted)',
+                }}
+                transition={isDraggingSeek ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 28 }}
+              >
+                {/* Refined Theme-Colored Elastic Scrub Knob */}
+                <motion.div
+                  animate={{
+                    scale: isDraggingSeek ? 1.2 : isHoveredScrubber ? 1 : 0,
+                    scaleX: isDraggingSeek ? 1.25 : 1,
+                    opacity: isHoveredScrubber || isDraggingSeek ? 1 : 0,
+                  }}
+                  transition={{ type: 'spring', stiffness: 650, damping: 26 }}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 rounded-full bg-amber-400 border-2 border-zinc-950 shadow-[0_0_8px_var(--syncd-accent-primary),0_2px_4px_rgba(0,0,0,0.6)] pointer-events-none z-10"
+                />
+              </motion.div>
+            </motion.div>
           </div>
-          <span className="text-[10px] font-mono text-zinc-500 tabular-nums w-10">
+
+          <span className="text-[10px] font-mono text-zinc-500 tabular-nums w-10 select-none">
             {formatTime(duration)}
           </span>
         </div>

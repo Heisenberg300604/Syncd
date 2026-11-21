@@ -25,6 +25,7 @@ export interface ShapeGridProps {
   twinkle?: number;
   fade?: number;
   clickCascade?: boolean;
+  interactive?: boolean;
   intro?: boolean;
   opacity?: number;
   backgroundColor?: string;
@@ -74,6 +75,7 @@ interface Settings {
   glow: number;
   twinkle: number;
   clickCascade: boolean;
+  interactive: boolean;
   intro: boolean;
   paused: boolean;
   dpr?: number;
@@ -187,7 +189,7 @@ const flatView = (width: number, height: number): View => ({
   reach: Math.hypot(width, height) / 2
 });
 
-const viewFor = (tiltX: number, tiltY: number, width: number, height: number, cellSize: number, horizonY?: number): View => {
+const viewFor = (tiltX: number, tiltY: number, width: number, height: number, _cellSize: number, horizonY?: number): View => {
   if (!tiltX && !tiltY) return flatView(width, height);
   const ax = (tiltX * Math.PI) / 180;
   const ay = (tiltY * Math.PI) / 180;
@@ -207,7 +209,6 @@ const viewFor = (tiltX: number, tiltY: number, width: number, height: number, ce
   ];
   const forward = multiply(multiply([1, 0, cx, 0, 1, cy, 0, 0, 1], tilt), [1, 0, -cx, 0, 1, -cy, 0, 0, 1]);
   const inverse = invert(forward);
-  const facing = Math.cos(ax) * Math.cos(ay);
   const far = FAR;
   const near = 0.2;
   const nearness = (x: number, y: number) => inverse[6] * x + inverse[7] * y + inverse[8] - 1 / far;
@@ -371,6 +372,7 @@ export default function ShapeGrid({
   twinkle = 0,
   fade = 0,
   clickCascade = true,
+  interactive = true,
   intro = true,
   opacity = 1,
   backgroundColor = 'transparent',
@@ -405,6 +407,7 @@ export default function ShapeGrid({
     glow: clamp(glow, 0, 1),
     twinkle: clamp(twinkle, 0, 1),
     clickCascade,
+    interactive,
     intro,
     paused,
     dpr
@@ -517,7 +520,7 @@ export default function ShapeGrid({
           state.hues.delete(key);
         } else state.lit.set(key, next);
       }
-      if (state.spotPower < 0.01) return;
+      if (!s.interactive || state.spotPower < 0.01) return;
       const wx = state.spotX + state.offsetX;
       const wy = state.spotY + state.offsetY;
       const reach = Math.max(s.radius, 0.5) * s.cellSize;
@@ -763,6 +766,7 @@ export default function ShapeGrid({
     };
 
     const onMove = (event: PointerEvent) => {
+      if (!settingsRef.current.interactive) return;
       const point = pointFrom(event);
       if (point && !state.inside && state.spotPower < 0.02) {
         state.spotX = point[0];
@@ -784,7 +788,7 @@ export default function ShapeGrid({
 
     const onDown = (event: PointerEvent) => {
       const s = settingsRef.current;
-      if (!s.clickCascade) return;
+      if (!s.interactive || !s.clickCascade) return;
       const point = pointFrom(event);
       if (!point) return;
       state.cascades.push({
@@ -812,10 +816,12 @@ export default function ShapeGrid({
     });
     visibility.observe(container);
 
-    window.addEventListener('pointermove', onMove, { passive: true });
-    window.addEventListener('pointerdown', onDown, { passive: true });
-    document.documentElement.addEventListener('pointerleave', onLeave);
-    window.addEventListener('blur', onLeave);
+    if (settingsRef.current.interactive) {
+      window.addEventListener('pointermove', onMove, { passive: true });
+      window.addEventListener('pointerdown', onDown, { passive: true });
+      document.documentElement.addEventListener('pointerleave', onLeave);
+      window.addEventListener('blur', onLeave);
+    }
 
     engineRef.current = {
       redraw: () => {

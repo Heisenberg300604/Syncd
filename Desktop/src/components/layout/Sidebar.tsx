@@ -92,7 +92,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 flex flex-col gap-0.5 px-2 pt-3 overflow-y-auto">
+      <nav className="flex-1 flex flex-col gap-1 px-2 pt-3 overflow-y-auto">
         {NAV_ITEMS.map((item) => {
           const isActive = currentView === item.id;
           return (
@@ -103,8 +103,8 @@ export function Sidebar() {
               className={[
                 'group flex items-center justify-between px-3 py-2 rounded-lg text-[12px] font-medium transition-all duration-150 cursor-pointer text-left w-full',
                 isActive
-                  ? 'bg-zinc-800/80 text-amber-400 font-semibold'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60',
+                  ? 'bg-amber-500/10 text-amber-400 font-semibold border border-amber-500/20 shadow-xs'
+                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60 border border-transparent',
               ].join(' ')}
             >
               <div className="flex items-center gap-2.5 min-w-0">
@@ -112,7 +112,7 @@ export function Sidebar() {
                   name={item.iconName}
                   isActive={isActive}
                   className={`w-4 h-4 shrink-0 transition-colors ${
-                    isActive ? 'text-amber-400' : 'text-zinc-500 group-hover:text-zinc-200'
+                    isActive ? 'text-amber-400' : 'text-zinc-500 group-hover:text-amber-400'
                   }`}
                 />
                 <span className="truncate">{item.label}</span>
@@ -127,7 +127,7 @@ export function Sidebar() {
                   className={`px-1.5 py-0.5 text-[10px] font-mono font-medium rounded-full shrink-0 transition-colors ${
                     isActive
                       ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                      : 'bg-zinc-900 text-zinc-500 border border-zinc-800/80 group-hover:text-zinc-300 group-hover:border-zinc-700'
+                      : 'bg-zinc-900 text-zinc-500 border border-zinc-800/80 group-hover:text-amber-400 group-hover:border-amber-500/30'
                   }`}
                 >
                   <CountUp to={trackCount} from={0} duration={1.2} startWhen={!isScanning} />

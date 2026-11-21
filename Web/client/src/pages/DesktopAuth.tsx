@@ -34,7 +34,7 @@ export function DesktopAuth() {
   const [isSigningOut, setIsSigningOut] = useState<boolean>(false);
   const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchedOnceRef = useRef(false);
   const isClaimedRef = useRef(false);
   const isSigningOutRef = useRef(false);
@@ -128,7 +128,7 @@ export function DesktopAuth() {
     if (!code || !isSignedIn) return;
 
     let isMounted = true;
-    let pollTimer: NodeJS.Timeout | null = null;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
     const poll = async () => {
       if (!isMounted || isClaimedRef.current || isSigningOutRef.current) return;
@@ -351,7 +351,7 @@ export function DesktopAuth() {
 
               <div className="flex items-center gap-2 pt-2">
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={fetchCode}
                   disabled={isLoading || attemptsRemaining === 0}

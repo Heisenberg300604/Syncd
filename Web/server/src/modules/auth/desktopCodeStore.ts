@@ -90,7 +90,10 @@ class DesktopCodeStore {
     let rawCode = "";
     const randomBytes = crypto.randomBytes(9);
     for (let i = 0; i < 9; i++) {
-      rawCode += CHARSET[randomBytes[i] % CHARSET.length];
+      const b = randomBytes[i];
+      if (b !== undefined) {
+        rawCode += CHARSET[b % CHARSET.length];
+      }
     }
 
     const expiresAt = now + CODE_TTL_MS;

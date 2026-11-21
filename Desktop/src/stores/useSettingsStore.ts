@@ -46,10 +46,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           gaplessPlayback: all['audio.gapless'] !== 'false',
           trackNotifications: all['ui.notifications'] !== 'false',
           autoQueue: all['playback.autoQueue'] === 'true',
-          selectedAccent: (all['ui.accent'] as 'amber') || 'amber',
+          selectedAccent: ((all['ui.accent'] as 'amber' | 'gold' | 'emerald' | 'cyan') || 'amber'),
           apiUrl: all['network.apiUrl'] || 'http://localhost:5000/api',
           socketUrl: all['network.socketUrl'] || 'http://localhost:5000',
         });
+        if (typeof document !== 'undefined') {
+          document.documentElement.setAttribute('data-accent', all['ui.accent'] || 'amber');
+        }
       }
     } catch (err) {
       console.warn('Failed to load settings from SQLite, using defaults:', err);
@@ -92,6 +95,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   setSelectedAccent: async (accent) => {
     set({ selectedAccent: accent });
+    if (typeof document !== 'undefined') {
+      document.documentElement.setAttribute('data-accent', accent);
+    }
     await get().setSettingValue('ui.accent', accent);
   },
 

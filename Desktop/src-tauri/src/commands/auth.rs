@@ -1,12 +1,12 @@
+use crate::app_state::AppState;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
-use crate::app_state::AppState;
-use sha2::{Digest, Sha256};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +24,8 @@ pub struct AuthCallbackPayload {
     pub username: Option<String>,
 }
 
-static LISTENER_CANCEL_FLAG: parking_lot::Mutex<Option<Arc<AtomicBool>>> = parking_lot::Mutex::new(None);
+static LISTENER_CANCEL_FLAG: parking_lot::Mutex<Option<Arc<AtomicBool>>> =
+    parking_lot::Mutex::new(None);
 
 #[tauri::command]
 pub fn start_auth_listener(app: AppHandle) -> Result<AuthListenerInfo, String> {
@@ -199,9 +200,19 @@ fn parse_auth_request(req: &str) -> (Option<String>, Option<String>, Option<Stri
     if let Some(body_start) = req.find("\r\n\r\n") {
         let body = &req[body_start + 4..];
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(body) {
-            let token = val.get("token").and_then(|v| v.as_str()).map(|s| s.to_string());
-            let refresh = val.get("refreshToken").or_else(|| val.get("refresh_token")).and_then(|v| v.as_str()).map(|s| s.to_string());
-            let state = val.get("state").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let token = val
+                .get("token")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let refresh = val
+                .get("refreshToken")
+                .or_else(|| val.get("refresh_token"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let state = val
+                .get("state")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
             return (token, refresh, state);
         }
     }
@@ -247,11 +258,11 @@ pub fn save_auth_credentials(
     username: Option<String>,
 ) -> Result<(), String> {
     let db = state.user_db.lock();
-    
+
     // Save token and profile to user_account
     let id = user_id.unwrap_or_else(|| "user".to_string());
     let name = username.unwrap_or_else(|| "User".to_string());
-    
+
     let account = crate::database::UserAccount {
         id,
         username: name,
@@ -270,7 +281,7 @@ pub fn save_auth_credentials(
         db.set_setting("auth_refresh_token", &rt)
             .map_err(|e| format!("Failed to save refresh token: {}", e))?;
     }
-    
+
     // Save active token in settings as well for fast retrieval
     db.set_setting("auth_session_token", &token)
         .map_err(|e| format!("Failed to save session token: {}", e))?;
@@ -281,15 +292,28 @@ pub fn save_auth_credentials(
 #[tauri::command]
 pub fn get_auth_credentials(state: State<'_, AppState>) -> Result<StoredAuthSession, String> {
     let db = state.user_db.lock();
-    let account = db.get_user_account().map_err(|e| format!("Failed to read account: {}", e))?;
+    let account = db
+        .get_user_account()
+        .map_err(|e| format!("Failed to read account: {}", e))?;
     let refresh_token = db.get_setting("auth_refresh_token").unwrap_or(None);
-    let session_token = db.get_setting("auth_session_token").unwrap_or(None).or(account.auth_token.clone());
+    let session_token = db
+        .get_setting("auth_session_token")
+        .unwrap_or(None)
+        .or(account.auth_token.clone());
 
     Ok(StoredAuthSession {
         token: session_token,
         refresh_token,
-        user_id: if account.is_logged_in { Some(account.id) } else { None },
-        username: if account.is_logged_in { Some(account.username) } else { None },
+        user_id: if account.is_logged_in {
+            Some(account.id)
+        } else {
+            None
+        },
+        username: if account.is_logged_in {
+            Some(account.username)
+        } else {
+            None
+        },
         is_authenticated: account.is_logged_in,
     })
 }
@@ -297,18 +321,20 @@ pub fn get_auth_credentials(state: State<'_, AppState>) -> Result<StoredAuthSess
 #[tauri::command]
 pub fn clear_auth_credentials(state: State<'_, AppState>) -> Result<(), String> {
     let db = state.user_db.lock();
-    
+
     // Mark account logged out and clear token
-    let mut account = db.get_user_account().unwrap_or_else(|_| crate::database::UserAccount {
-        id: "guest".to_string(),
-        username: "Guest User".to_string(),
-        email: None,
-        avatar_url: None,
-        is_logged_in: false,
-        auth_token: None,
-        created_at: "".to_string(),
-        updated_at: "".to_string(),
-    });
+    let mut account = db
+        .get_user_account()
+        .unwrap_or_else(|_| crate::database::UserAccount {
+            id: "guest".to_string(),
+            username: "Guest User".to_string(),
+            email: None,
+            avatar_url: None,
+            is_logged_in: false,
+            auth_token: None,
+            created_at: "".to_string(),
+            updated_at: "".to_string(),
+        });
     account.is_logged_in = false;
     account.auth_token = None;
     let _ = db.set_user_account(&account);

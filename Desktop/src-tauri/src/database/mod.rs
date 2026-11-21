@@ -1,17 +1,17 @@
 pub mod migrations;
-pub mod user_db;
 pub mod playlist_db;
+pub mod user_db;
 
-pub use user_db::*;
 pub use playlist_db::*;
+pub use user_db::*;
 
+use crate::library::scanner::ScannedTrack;
+use rusqlite::{Connection, Result};
+use serde::{Deserialize, Serialize};
+use sha2::Digest;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use rusqlite::{Connection, Result};
-use sha2::Digest;
-use crate::library::scanner::ScannedTrack;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -72,7 +72,7 @@ impl Database {
             PRAGMA temp_store = MEMORY;
             PRAGMA mmap_size = 268435456;
             PRAGMA cache_size = -64000;
-            "
+            ",
         )?;
 
         // Run migrations
@@ -103,16 +103,34 @@ impl Database {
     }
 
     pub fn get_library_counts(&self) -> Result<(i64, i64, i64, i64)> {
-        let track_count: i64 = self.conn.query_row("SELECT COUNT(*) FROM tracks;", [], |r| r.get(0))?;
-        let album_count: i64 = self.conn.query_row("SELECT COUNT(DISTINCT album) FROM tracks WHERE album != '';", [], |r| r.get(0))?;
-        let artist_count: i64 = self.conn.query_row("SELECT COUNT(DISTINCT artist) FROM tracks WHERE artist != '';", [], |r| r.get(0))?;
-        let folder_count: i64 = self.conn.query_row("SELECT COUNT(*) FROM indexed_folders;", [], |r| r.get(0))?;
+        let track_count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM tracks;", [], |r| r.get(0))?;
+        let album_count: i64 = self.conn.query_row(
+            "SELECT COUNT(DISTINCT album) FROM tracks WHERE album != '';",
+            [],
+            |r| r.get(0),
+        )?;
+        let artist_count: i64 = self.conn.query_row(
+            "SELECT COUNT(DISTINCT artist) FROM tracks WHERE artist != '';",
+            [],
+            |r| r.get(0),
+        )?;
+        let folder_count: i64 =
+            self.conn
+                .query_row("SELECT COUNT(*) FROM indexed_folders;", [], |r| r.get(0))?;
 
         Ok((track_count, album_count, artist_count, folder_count))
     }
 
     pub fn add_indexed_folder(&mut self, path: &str) -> Result<IndexedFolder> {
-        let id = format!("folder_{}", &sha2::Sha256::digest(path.as_bytes())[..8].iter().map(|b| format!("{:02x}", b)).collect::<String>());
+        let id = format!(
+            "folder_{}",
+            &sha2::Sha256::digest(path.as_bytes())[..8]
+                .iter()
+                .map(|b| format!("{:02x}", b))
+                .collect::<String>()
+        );
 
         self.conn.execute(
             "INSERT INTO indexed_folders (id, path) VALUES (?1, ?2)
@@ -162,11 +180,14 @@ impl Database {
         let path_slash = path.replace('\\', "/");
         let path_backslash = path.replace('/', "\\");
 
-        let count: i64 = self.conn.query_row(
-            "SELECT COUNT(*) FROM tracks WHERE path LIKE ?1 || '%' OR path LIKE ?2 || '%';",
-            [&path_slash, &path_backslash],
-            |r| r.get(0)
-        ).unwrap_or(0);
+        let count: i64 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM tracks WHERE path LIKE ?1 || '%' OR path LIKE ?2 || '%';",
+                [&path_slash, &path_backslash],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
 
         self.conn.execute(
             "UPDATE indexed_folders SET last_scanned = datetime('now'), track_count = ?1 WHERE path = ?2;",
@@ -177,11 +198,14 @@ impl Database {
     }
 
     pub fn remove_indexed_folder(&mut self, id: &str) -> Result<Vec<String>> {
-        let folder_path: Option<String> = self.conn.query_row(
-            "SELECT path FROM indexed_folders WHERE id = ?1 OR path = ?1;",
-            [id],
-            |r| r.get(0),
-        ).ok();
+        let folder_path: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT path FROM indexed_folders WHERE id = ?1 OR path = ?1;",
+                [id],
+                |r| r.get(0),
+            )
+            .ok();
 
         let mut deleted_artwork_hashes = Vec::new();
 
@@ -196,9 +220,11 @@ impl Database {
                 let mut stmt = tx.prepare(
                     "SELECT DISTINCT artwork_hash FROM tracks 
                      WHERE (path LIKE ?1 || '%' OR path LIKE ?2 || '%') 
-                     AND artwork_hash IS NOT NULL;"
+                     AND artwork_hash IS NOT NULL;",
                 )?;
-                let rows = stmt.query_map([&prefix_slash, &prefix_backslash], |r| r.get::<_, String>(0))?;
+                let rows = stmt.query_map([&prefix_slash, &prefix_backslash], |r| {
+                    r.get::<_, String>(0)
+                })?;
                 for hash in rows.flatten() {
                     deleted_artwork_hashes.push(hash);
                 }
@@ -210,16 +236,20 @@ impl Database {
                 [&prefix_slash, &prefix_backslash],
             )?;
             // Delete from FTS
-            tx.execute("DELETE FROM tracks_fts WHERE track_id NOT IN (SELECT id FROM tracks);", [])?;
+            tx.execute(
+                "DELETE FROM tracks_fts WHERE track_id NOT IN (SELECT id FROM tracks);",
+                [],
+            )?;
             // Delete folder record
-            tx.execute("DELETE FROM indexed_folders WHERE id = ?1 OR path = ?1;", [id])?;
+            tx.execute(
+                "DELETE FROM indexed_folders WHERE id = ?1 OR path = ?1;",
+                [id],
+            )?;
 
             // If no indexed folders remain, purge any leftover tracks
-            let remaining_folders: i64 = tx.query_row(
-                "SELECT COUNT(*) FROM indexed_folders;",
-                [],
-                |r| r.get(0),
-            ).unwrap_or(0);
+            let remaining_folders: i64 = tx
+                .query_row("SELECT COUNT(*) FROM indexed_folders;", [], |r| r.get(0))
+                .unwrap_or(0);
 
             if remaining_folders == 0 {
                 tx.execute("DELETE FROM tracks;", [])?;
@@ -228,14 +258,19 @@ impl Database {
 
             tx.commit()?;
         } else {
-            self.conn.execute("DELETE FROM indexed_folders WHERE id = ?1 OR path = ?1;", [id])?;
+            self.conn.execute(
+                "DELETE FROM indexed_folders WHERE id = ?1 OR path = ?1;",
+                [id],
+            )?;
         }
 
         Ok(deleted_artwork_hashes)
     }
 
     pub fn get_file_signatures(&self) -> Result<HashMap<PathBuf, (String, u64)>> {
-        let mut stmt = self.conn.prepare("SELECT path, date_modified, file_size_bytes FROM tracks;")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT path, date_modified, file_size_bytes FROM tracks;")?;
         let mut map = HashMap::new();
 
         let rows = stmt.query_map([], |r| {
@@ -283,17 +318,23 @@ impl Database {
                     bitrate_kbps = excluded.bitrate_kbps,
                     file_size_bytes = excluded.file_size_bytes,
                     has_artwork = excluded.has_artwork,
-                    date_modified = excluded.date_modified;"
+                    date_modified = excluded.date_modified;",
             )?;
 
             let mut insert_fts = tx.prepare(
                 "INSERT INTO tracks_fts (track_id, title, artist, album, genre)
-                 VALUES (?1, ?2, ?3, ?4, ?5);"
+                 VALUES (?1, ?2, ?3, ?4, ?5);",
             )?;
 
             for scanned in tracks {
                 let path_str = scanned.path.to_string_lossy().to_string();
-                let track_id = format!("trk_{}", &sha2::Sha256::digest(path_str.as_bytes())[..8].iter().map(|b| format!("{:02x}", b)).collect::<String>());
+                let track_id = format!(
+                    "trk_{}",
+                    &sha2::Sha256::digest(path_str.as_bytes())[..8]
+                        .iter()
+                        .map(|b| format!("{:02x}", b))
+                        .collect::<String>()
+                );
 
                 let meta = &scanned.metadata;
                 insert_track.execute(rusqlite::params![
@@ -332,7 +373,13 @@ impl Database {
         Ok(count)
     }
 
-    pub fn get_tracks(&self, sort_by: &str, order: &str, limit: u32, offset: u32) -> Result<Vec<TrackRow>> {
+    pub fn get_tracks(
+        &self,
+        sort_by: &str,
+        order: &str,
+        limit: u32,
+        offset: u32,
+    ) -> Result<Vec<TrackRow>> {
         let sort_column = match sort_by {
             "title" => "title",
             "artist" => "artist",
@@ -342,7 +389,11 @@ impl Database {
             _ => "title",
         };
 
-        let sort_order = if order.eq_ignore_ascii_case("desc") { "DESC" } else { "ASC" };
+        let sort_order = if order.eq_ignore_ascii_case("desc") {
+            "DESC"
+        } else {
+            "ASC"
+        };
 
         let query = format!(
             "SELECT id, path, title, artist, album, duration_seconds, track_number, year, genre, format, bitrate_kbps, has_artwork, artwork_hash
@@ -383,7 +434,7 @@ impl Database {
         }
 
         // Tokenize search query with prefix matching
-        let clean_query = query.replace('"', "").replace('\'', "");
+        let clean_query = query.replace(['"', '\''], "");
         let formatted = clean_query
             .split_whitespace()
             .map(|w| format!("{}*", w))
@@ -426,7 +477,9 @@ impl Database {
     }
 
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
-        let mut stmt = self.conn.prepare("SELECT value FROM settings WHERE key = ?1;")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT value FROM settings WHERE key = ?1;")?;
         let mut rows = stmt.query([key])?;
         if let Some(row) = rows.next()? {
             Ok(Some(row.get(0)?))
@@ -467,7 +520,11 @@ mod tests {
 
         // Verify schema_migrations table
         let version: i64 = conn
-            .query_row("SELECT version FROM schema_migrations WHERE version = 1;", [], |r| r.get(0))
+            .query_row(
+                "SELECT version FROM schema_migrations WHERE version = 1;",
+                [],
+                |r| r.get(0),
+            )
             .expect("query version");
         assert_eq!(version, 1);
 
@@ -482,14 +539,17 @@ mod tests {
             "INSERT INTO tracks_fts (track_id, title, artist, album, genre)
              VALUES ('track_1', 'Echoes', 'Pink Floyd', 'Meddle', 'Progressive Rock');",
             [],
-        ).expect("insert fts");
+        )
+        .expect("insert fts");
 
         // Test FTS search
-        let match_id: String = conn.query_row(
-            "SELECT track_id FROM tracks_fts WHERE tracks_fts MATCH 'Echoes*';",
-            [],
-            |r| r.get(0),
-        ).expect("fts query");
+        let match_id: String = conn
+            .query_row(
+                "SELECT track_id FROM tracks_fts WHERE tracks_fts MATCH 'Echoes*';",
+                [],
+                |r| r.get(0),
+            )
+            .expect("fts query");
 
         assert_eq!(match_id, "track_1");
     }
@@ -504,7 +564,9 @@ mod tests {
         migrations::run_migrations(&mut db.conn).expect("migrations");
 
         // 1. Add folder
-        let folder = db.add_indexed_folder("C:\\Music\\Jazz").expect("add folder");
+        let folder = db
+            .add_indexed_folder("C:\\Music\\Jazz")
+            .expect("add folder");
         assert_eq!(folder.path, "C:\\Music\\Jazz");
         assert_eq!(folder.track_count, 0);
 
@@ -605,7 +667,9 @@ pub fn migrate_old_data(
     if let Ok(old_conn) = Connection::open(old_db_path) {
         // Migrate settings from old database
         if let Ok(mut stmt) = old_conn.prepare("SELECT key, value FROM settings;") {
-            if let Ok(rows) = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))) {
+            if let Ok(rows) =
+                stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+            {
                 for pair in rows.flatten() {
                     let _ = user_db.set_setting(&pair.0, &pair.1);
                 }
@@ -613,7 +677,9 @@ pub fn migrate_old_data(
         }
 
         // Migrate playlists from old database
-        if let Ok(mut stmt) = old_conn.prepare("SELECT id, name, description, created_at, updated_at FROM playlists;") {
+        if let Ok(mut stmt) =
+            old_conn.prepare("SELECT id, name, description, created_at, updated_at FROM playlists;")
+        {
             if let Ok(rows) = stmt.query_map([], |r| {
                 Ok((
                     r.get::<_, String>(0)?,
@@ -633,7 +699,9 @@ pub fn migrate_old_data(
         }
 
         // Migrate playlist_tracks from old database
-        if let Ok(mut stmt) = old_conn.prepare("SELECT playlist_id, track_id, position, added_at FROM playlist_tracks;") {
+        if let Ok(mut stmt) = old_conn
+            .prepare("SELECT playlist_id, track_id, position, added_at FROM playlist_tracks;")
+        {
             if let Ok(rows) = stmt.query_map([], |r| {
                 Ok((
                     r.get::<_, String>(0)?,
@@ -652,4 +720,3 @@ pub fn migrate_old_data(
         }
     }
 }
-

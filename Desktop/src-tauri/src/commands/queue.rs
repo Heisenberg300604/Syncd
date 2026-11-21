@@ -1,6 +1,6 @@
-use tauri::State;
 use crate::app_state::AppState;
-use crate::database::{QueuedTrackRow, QueuedTrackInput};
+use crate::database::{QueuedTrackInput, QueuedTrackRow};
+use tauri::State;
 
 #[tauri::command]
 pub fn queue_get(state: State<'_, AppState>) -> Result<Vec<QueuedTrackRow>, String> {
@@ -20,20 +20,14 @@ pub fn queue_add_tracks(
 }
 
 #[tauri::command]
-pub fn queue_set_current(
-    state: State<'_, AppState>,
-    track_id: String,
-) -> Result<(), String> {
+pub fn queue_set_current(state: State<'_, AppState>, track_id: String) -> Result<(), String> {
     let db = state.user_db.lock();
     db.set_current_track_in_queue(&track_id)
         .map_err(|e| format!("Failed to set current queue track: {}", e))
 }
 
 #[tauri::command]
-pub fn queue_remove_track(
-    state: State<'_, AppState>,
-    id: String,
-) -> Result<(), String> {
+pub fn queue_remove_track(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let db = state.user_db.lock();
     db.remove_from_playback_queue(&id)
         .map_err(|e| format!("Failed to remove track from queue: {}", e))

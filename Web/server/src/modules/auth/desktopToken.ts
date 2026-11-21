@@ -57,7 +57,11 @@ export function verifyDesktopToken(token: string): DesktopTokenPayload | null {
     return null;
   }
 
-  const [payloadStr, signature] = parts;
+  const payloadStr = parts[0];
+  const signature = parts[1];
+  if (!payloadStr || !signature) {
+    return null;
+  }
   const secret = config.clerkSecretKey || "syncd_fallback_secret_key_desktop";
   const expectedSig = crypto
     .createHmac("sha256", secret)

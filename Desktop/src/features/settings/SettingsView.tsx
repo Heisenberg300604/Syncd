@@ -12,7 +12,13 @@ import {
   Server,
   ExternalLink,
   Clipboard,
+  Download,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+  ArrowUpCircle,
 } from 'lucide-react';
+import { useUpdater } from '../../hooks/useUpdater';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { usePlayerStore } from '../../stores/usePlayerStore';
 import { useLibraryStore } from '../../stores/useLibraryStore';
@@ -27,9 +33,11 @@ import { AnimatedCheckmark } from '../../components/ui/AnimatedCheckmark';
 import { FolderManagerModal } from '../library/components/FolderManagerModal';
 import GlideSelect from '../../components/ui/GlideSelect';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { requestNotificationPermission, showTrackNotification } from '../../services/notificationService';
 
 export function SettingsView() {
   const { appInfo } = useAppStore();
+  const updater = useUpdater();
   const {
     user,
     isAuthenticated,
@@ -78,6 +86,15 @@ export function SettingsView() {
   const [inputSocketUrl, setInputSocketUrl] = useState(socketUrl);
   const [isTestingBackend, setIsTestingBackend] = useState(false);
 
+  const activeAccentHex =
+    selectedAccent === 'gold'
+      ? '#eab308'
+      : selectedAccent === 'emerald'
+      ? '#10b981'
+      : selectedAccent === 'cyan'
+      ? '#06b6d4'
+      : '#f59e0b';
+
   useEffect(() => {
     loadDevices();
     loadStats();
@@ -121,7 +138,7 @@ export function SettingsView() {
       addToast({
         type: 'success',
         title: 'Account Linked',
-        message: 'Welcome to SyncD Desktop!',
+        message: 'Welcome to SyncDesk!',
       });
     } else {
       setCodeSlotsStatus('error');
@@ -337,7 +354,7 @@ export function SettingsView() {
                   message: `Output routed to ${typeof opt.label === 'string' ? opt.label : v}.`,
                 });
               }}
-              accentColor="#f59e0b"
+              accentColor={activeAccentHex}
               surfaceColor="#18181b"
               size="md"
               placement="top"
@@ -460,22 +477,41 @@ export function SettingsView() {
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               {[
-                { id: 'amber', label: 'Warm Amber', bg: 'bg-amber-500', ring: 'ring-amber-500' },
-                { id: 'gold', label: 'Golden Sand', bg: 'bg-yellow-500', ring: 'ring-yellow-500' },
-                { id: 'emerald', label: 'Emerald Sound', bg: 'bg-emerald-500', ring: 'ring-emerald-500' },
-                { id: 'cyan', label: 'Cyber Cyan', bg: 'bg-cyan-500', ring: 'ring-cyan-500' },
-              ].map((accent) => (
-                <button
-                  key={accent.id}
-                  onClick={() => setSelectedAccent(accent.id as typeof selectedAccent)}
-                  className={`w-6 h-6 rounded-full ${accent.bg} transition-all cursor-pointer ${
-                    selectedAccent === accent.id ? `ring-2 ring-offset-2 ring-offset-zinc-950 ${accent.ring}` : 'opacity-60 hover:opacity-100'
-                  }`}
-                  title={accent.label}
-                />
-              ))}
+                { id: 'amber', label: 'Warm Amber', color: '#f59e0b', ring: 'ring-[#f59e0b]' },
+                { id: 'gold', label: 'Golden Sand', color: '#eab308', ring: 'ring-[#eab308]' },
+                { id: 'emerald', label: 'Emerald Sound', color: '#10b981', ring: 'ring-[#10b981]' },
+                { id: 'cyan', label: 'Cyber Cyan', color: '#06b6d4', ring: 'ring-[#06b6d4]' },
+              ].map((accent) => {
+                const isSelected = selectedAccent === accent.id;
+                return (
+                  <button
+                    key={accent.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedAccent(accent.id as typeof selectedAccent);
+                      addToast({
+                        type: 'success',
+                        title: 'Theme Accent Applied',
+                        message: `Switched interface palette to ${accent.label}.`,
+                      });
+                    }}
+                    style={{ backgroundColor: accent.color }}
+                    className={`w-6 h-6 rounded-full transition-all cursor-pointer relative flex items-center justify-center ${
+                      isSelected
+                        ? `ring-2 ring-offset-2 ring-offset-zinc-950 ${accent.ring} scale-110 shadow-sm`
+                        : 'opacity-65 hover:opacity-100 hover:scale-105'
+                    }`}
+                    title={accent.label}
+                    aria-label={accent.label}
+                  >
+                    {isSelected && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-950" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -483,15 +519,74 @@ export function SettingsView() {
             <div>
               <span className="font-medium text-zinc-200 block">Desktop Track Notifications</span>
               <span className="text-[11px] text-zinc-400">
-                Display a brief title and artist notification when playback changes
+                Display a brief title and artist notification in background when playback changes
               </span>
             </div>
-            <input
-              type="checkbox"
-              checked={trackNotifications}
-              onChange={(e) => setTrackNotifications(e.target.checked)}
-              className="accent-amber-500 w-4 h-4 cursor-pointer"
-            />
+            <div className="flex items-center gap-3">
+              {trackNotifications && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const hasPerm = await requestNotificationPermission();
+                    if (!hasPerm && typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+                      addToast({
+                        type: 'error',
+                        title: 'Permission Blocked',
+                        message: 'Desktop notification permission is blocked in system settings.',
+                      });
+                      return;
+                    }
+                    const sent = showTrackNotification({
+                      title: 'SyncDesk Test',
+                      artist: 'Audio Output Ready',
+                      album: 'Bit-Perfect Playback',
+                      force: true,
+                    });
+                    if (sent) {
+                      addToast({
+                        type: 'success',
+                        title: 'Test Notification Sent',
+                        message: 'A desktop notification was dispatched.',
+                      });
+                    }
+                  }}
+                  className="text-[11px] text-zinc-400 hover:text-amber-400 cursor-pointer underline underline-offset-2 transition-colors"
+                >
+                  Test Notification
+                </button>
+              )}
+              <input
+                type="checkbox"
+                checked={trackNotifications}
+                onChange={async (e) => {
+                  const enabled = e.target.checked;
+                  await setTrackNotifications(enabled);
+                  if (enabled) {
+                    const granted = await requestNotificationPermission();
+                    if (granted) {
+                      addToast({
+                        type: 'success',
+                        title: 'Desktop Notifications Enabled',
+                        message: 'You will receive track alerts when the app is in the background.',
+                      });
+                    } else {
+                      addToast({
+                        type: 'warning',
+                        title: 'Notification Permission Needed',
+                        message: 'Please allow notification permissions in your browser or desktop system.',
+                      });
+                    }
+                  } else {
+                    addToast({
+                      type: 'info',
+                      title: 'Notifications Disabled',
+                      message: 'Track change desktop notifications turned off.',
+                    });
+                  }
+                }}
+                className="accent-amber-500 w-4 h-4 cursor-pointer"
+              />
+            </div>
           </div>
         </section>
 
@@ -554,10 +649,124 @@ export function SettingsView() {
           </div>
         </details>
 
-        {/* 6. Application Footer */}
+        {/* 6. Application & System Updates */}
+        <section className="p-5 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 flex flex-col gap-4">
+          <div className="flex items-center justify-between pb-2 border-b border-zinc-800/60">
+            <div className="flex items-center gap-2 text-zinc-200">
+              <ArrowUpCircle className="w-4 h-4 text-amber-500" />
+              <h2 className="text-sm font-semibold">Application & Updates</h2>
+            </div>
+            <Badge variant="codec" className="text-[9px]">
+              TAURI NSIS UPDATER
+            </Badge>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div>
+              <span className="font-medium text-zinc-200 block">Installed Version</span>
+              <span className="text-[11px] text-zinc-400 font-mono">
+                v{updater.currentVersion} (SyncDesk)
+              </span>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => updater.checkForUpdates(false)}
+              disabled={updater.status === 'checking' || updater.status === 'downloading' || updater.status === 'installing'}
+              className="text-xs flex items-center gap-2"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${updater.status === 'checking' ? 'animate-spin' : ''}`} />
+              {updater.status === 'checking' ? 'Checking…' : 'Check for Updates'}
+            </Button>
+          </div>
+
+          {/* State: Up to date */}
+          {updater.status === 'upToDate' && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>SyncDesk is currently up to date (v{updater.currentVersion}).</span>
+            </div>
+          )}
+
+          {/* State: Update available / downloading / installing */}
+          {(updater.status === 'available' || updater.status === 'downloading' || updater.status === 'installing') && (
+            <div className="flex flex-col gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-amber-400 font-medium text-xs">
+                  <Sparkles className="w-4 h-4" />
+                  <span>New Version Available: v{updater.newVersion}</span>
+                </div>
+                {updater.releaseDate && (
+                  <span className="text-[10px] text-zinc-400 font-mono">
+                    {new Date(updater.releaseDate).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+
+              {updater.releaseNotes && (
+                <div className="text-xs text-zinc-300 max-h-24 overflow-y-auto whitespace-pre-wrap p-2.5 bg-zinc-950/80 rounded-lg border border-zinc-800/80 font-mono text-[11px]">
+                  {updater.releaseNotes}
+                </div>
+              )}
+
+              {updater.status === 'downloading' && (
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex justify-between text-[11px] text-zinc-400">
+                    <span>Downloading release package…</span>
+                    <span className="font-semibold text-amber-400">{updater.downloadProgress}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 transition-all duration-200"
+                      style={{ width: `${updater.downloadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {updater.status === 'installing' && (
+                <div className="flex items-center gap-2 text-amber-400 text-xs py-1">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Installing update and relaunching SyncD…</span>
+                </div>
+              )}
+
+              {updater.status === 'available' && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={updater.downloadAndInstall}
+                  className="text-xs flex items-center justify-center gap-2 w-full sm:w-auto self-start"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download and Install v{updater.newVersion}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* State: Error */}
+          {updater.status === 'error' && updater.errorMessage && (
+            <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span className="line-clamp-2">{updater.errorMessage}</span>
+              </div>
+              <button
+                type="button"
+                onClick={updater.resetStatus}
+                className="text-[11px] underline shrink-0 hover:text-red-300 cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* 7. Application Footer */}
         <div className="flex items-center justify-between text-xs text-zinc-400 px-1 pt-2">
-          <span>SyncD Desktop v{appInfo?.version || '1.0.0'}</span>
-          <span>Native Rust + Tauri 2</span>
+          <span>SyncDesk v{appInfo?.version || updater.currentVersion || '0.0.1'}</span>
         </div>
       </div>
 
@@ -631,7 +840,7 @@ export function SettingsView() {
                 slotSize={38}
                 gap={6}
                 radius={8}
-                accentColor="#f59e0b"
+                accentColor={activeAccentHex}
                 status={codeSlotsStatus}
                 onChange={(code) => {
                   setEnteredCode(code);

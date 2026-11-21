@@ -12,7 +12,6 @@ import {
   Search,
   PlusCircle,
   Play,
-  ListPlus,
   Music2,
   ListOrdered,
   MessageSquare,
@@ -37,7 +36,6 @@ export const RoomsView: React.FC = () => {
   const {
     activeRoom,
     members,
-    hostUserId,
     isHost,
     hostPendingDeadline,
     isLoading,

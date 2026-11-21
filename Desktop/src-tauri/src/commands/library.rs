@@ -1,10 +1,10 @@
-use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
-use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
 use crate::app_state::AppState;
 use crate::database::{IndexedFolder, TrackRow};
 use crate::library::artwork::extract_and_cache_artwork;
+use serde::Serialize;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering;
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,7 +34,10 @@ pub fn get_library_stats(state: State<'_, AppState>) -> Result<LibraryStats, Str
 pub fn add_folder(state: State<'_, AppState>, path: String) -> Result<IndexedFolder, String> {
     let p = Path::new(&path);
     if !p.exists() || !p.is_dir() {
-        return Err(format!("Path does not exist or is not a directory: {}", path));
+        return Err(format!(
+            "Path does not exist or is not a directory: {}",
+            path
+        ));
     }
 
     let mut db = state.db.lock();
@@ -169,7 +172,11 @@ pub fn cancel_scan(state: State<'_, AppState>) -> Result<(), String> {
 
 #[tauri::command]
 pub fn scan_library(app_handle: AppHandle, state: State<'_, AppState>) -> Result<usize, String> {
-    if state.is_scanning.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_err() {
+    if state
+        .is_scanning
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
         return Err("Library scan is already running".to_string());
     }
 
@@ -213,13 +220,21 @@ pub fn scan_library(app_handle: AppHandle, state: State<'_, AppState>) -> Result
                     count
                 };
 
-                log::info!("Scan finished. Found: {}, Inserted/Updated: {}, Cancelled: {}", total_found, inserted, was_cancelled);
+                log::info!(
+                    "Scan finished. Found: {}, Inserted/Updated: {}, Cancelled: {}",
+                    total_found,
+                    inserted,
+                    was_cancelled
+                );
 
-                let _ = app.emit("library:scan-complete", serde_json::json!({
-                    "total": total_found,
-                    "inserted": inserted,
-                    "cancelled": was_cancelled
-                }));
+                let _ = app.emit(
+                    "library:scan-complete",
+                    serde_json::json!({
+                        "total": total_found,
+                        "inserted": inserted,
+                        "cancelled": was_cancelled
+                    }),
+                );
             }
             Err(err) => {
                 log::error!("Scan error: {}", err);

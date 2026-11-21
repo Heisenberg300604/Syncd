@@ -2,8 +2,23 @@
 @source "../../index.html";
 @source "../../src";
 
+@theme {
+  --color-amber-50: var(--syncd-accent-50);
+  --color-amber-100: var(--syncd-accent-100);
+  --color-amber-200: var(--syncd-accent-200);
+  --color-amber-300: var(--syncd-accent-300);
+  --color-amber-400: var(--syncd-accent-400);
+  --color-amber-500: var(--syncd-accent-500);
+  --color-amber-600: var(--syncd-accent-600);
+  --color-amber-700: var(--syncd-accent-700);
+  --color-amber-800: var(--syncd-accent-800);
+  --color-amber-900: var(--syncd-accent-900);
+  --color-amber-950: var(--syncd-accent-950);
+}
+
 @layer base {
-  :root {
+  :root,
+  [data-accent="amber"] {
     --syncd-bg-canvas: #09090b;
     --syncd-bg-surface: #121214;
     --syncd-bg-elevated: #1a1a1e;
@@ -18,14 +33,90 @@
     --syncd-text-muted: #71717a;
     --syncd-text-disabled: #52525b;
 
+    /* Amber Accent Palette (Warm Amber) */
+    --syncd-accent-50: #fffbeb;
+    --syncd-accent-100: #fef3c7;
+    --syncd-accent-200: #fde68a;
+    --syncd-accent-300: #fcd34d;
+    --syncd-accent-400: #fbbf24;
+    --syncd-accent-500: #f59e0b;
+    --syncd-accent-600: #d97706;
+    --syncd-accent-700: #b45309;
+    --syncd-accent-800: #92400e;
+    --syncd-accent-900: #78350f;
+    --syncd-accent-950: #451a03;
+
     --syncd-accent-primary: #f59e0b;
     --syncd-accent-hover: #d97706;
-    --syncd-accent-muted: rgba(245, 158, 11, 0.12);
+    --syncd-accent-muted: rgba(245, 158, 11, 0.16);
 
     --syncd-status-success: #10b981;
     --syncd-status-warning: #f59e0b;
     --syncd-status-error: #ef4444;
     --syncd-status-offline: #6b7280;
+  }
+
+  [data-accent="gold"] {
+    --syncd-border-focus: #eab308;
+
+    /* Gold Accent Palette (Golden Sand) */
+    --syncd-accent-50: #fefce8;
+    --syncd-accent-100: #fef9c3;
+    --syncd-accent-200: #fef08a;
+    --syncd-accent-300: #fde047;
+    --syncd-accent-400: #facc15;
+    --syncd-accent-500: #eab308;
+    --syncd-accent-600: #ca8a04;
+    --syncd-accent-700: #a16207;
+    --syncd-accent-800: #854d0e;
+    --syncd-accent-900: #713f12;
+    --syncd-accent-950: #422006;
+
+    --syncd-accent-primary: #eab308;
+    --syncd-accent-hover: #ca8a04;
+    --syncd-accent-muted: rgba(234, 179, 8, 0.16);
+  }
+
+  [data-accent="emerald"] {
+    --syncd-border-focus: #10b981;
+
+    /* Emerald Accent Palette (Emerald Sound) */
+    --syncd-accent-50: #ecfdf5;
+    --syncd-accent-100: #d1fae5;
+    --syncd-accent-200: #a7f3d0;
+    --syncd-accent-300: #6ee7b7;
+    --syncd-accent-400: #34d399;
+    --syncd-accent-500: #10b981;
+    --syncd-accent-600: #059669;
+    --syncd-accent-700: #047857;
+    --syncd-accent-800: #065f46;
+    --syncd-accent-900: #064e3b;
+    --syncd-accent-950: #022c22;
+
+    --syncd-accent-primary: #10b981;
+    --syncd-accent-hover: #059669;
+    --syncd-accent-muted: rgba(16, 185, 129, 0.16);
+  }
+
+  [data-accent="cyan"] {
+    --syncd-border-focus: #06b6d4;
+
+    /* Cyan Accent Palette (Cyber Cyan) */
+    --syncd-accent-50: #ecfeff;
+    --syncd-accent-100: #cffafe;
+    --syncd-accent-200: #a5f3fc;
+    --syncd-accent-300: #67e8f9;
+    --syncd-accent-400: #22d3ee;
+    --syncd-accent-500: #06b6d4;
+    --syncd-accent-600: #0891b2;
+    --syncd-accent-700: #0e7490;
+    --syncd-accent-800: #155e75;
+    --syncd-accent-900: #164e63;
+    --syncd-accent-950: #083344;
+
+    --syncd-accent-primary: #06b6d4;
+    --syncd-accent-hover: #0891b2;
+    --syncd-accent-muted: rgba(6, 182, 212, 0.16);
   }
 
   body {
@@ -61,13 +152,13 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(245, 158, 11, 0.5);
+  background: var(--syncd-accent-primary);
   border: 1.5px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:active {
-  background: rgba(245, 158, 11, 0.85);
+  background: var(--syncd-accent-hover);
   border: 1.5px solid transparent;
   background-clip: padding-box;
 }
@@ -96,12 +187,12 @@
 }
 
 .glass-card:hover {
-  border-color: rgba(245, 158, 11, 0.4);
+  border-color: var(--syncd-accent-primary);
   box-shadow: 
     0 20px 40px -10px rgba(0, 0, 0, 0.8),
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
     inset 0 -1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 0 24px rgba(245, 158, 11, 0.08);
+    inset 0 0 24px var(--syncd-accent-muted);
 }
 
 .glass-card::before {
@@ -185,7 +276,7 @@
     90deg,
     transparent 0%,
     rgba(255, 255, 255, 0.6) 30%,
-    rgba(245, 158, 11, 0.45) 50%,
+    var(--syncd-accent-primary) 50%,
     rgba(255, 255, 255, 0.6) 70%,
     transparent 100%
   );
@@ -250,4 +341,3 @@
     inset 0 -1px 0 rgba(255, 255, 255, 0.15),
     inset 0 0 22px 11px rgba(255, 255, 255, 0.14);
 }
-

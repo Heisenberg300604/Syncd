@@ -1,6 +1,6 @@
-use tauri::State;
 use crate::app_state::AppState;
 use crate::audio::{AudioDeviceDescriptor, AudioPlaybackStatus};
+use tauri::State;
 
 #[tauri::command]
 pub fn audio_play_track(
@@ -53,4 +53,3 @@ pub fn audio_list_devices(
 ) -> Result<Vec<AudioDeviceDescriptor>, String> {
     Ok(state.audio.list_devices())
 }
-

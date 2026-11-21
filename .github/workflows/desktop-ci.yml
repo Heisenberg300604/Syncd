@@ -34,6 +34,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: Desktop/package-lock.json
 
       - name: Install dependencies
         if: hashFiles('Desktop/package.json') != ''

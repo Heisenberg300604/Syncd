@@ -14,7 +14,9 @@
     "core:window:allow-destroy",
     "core:window:allow-show",
     "core:window:allow-hide",
-    "dialog:default"
+    "dialog:default",
+    "updater:default",
+    "process:default"
   ]
 }
 

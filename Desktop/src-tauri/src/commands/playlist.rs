@@ -1,6 +1,6 @@
-use tauri::State;
 use crate::app_state::AppState;
 use crate::database::PlaylistRow;
+use tauri::State;
 
 #[tauri::command]
 pub fn get_playlists(state: State<'_, AppState>) -> Result<Vec<PlaylistRow>, String> {
@@ -28,11 +28,7 @@ pub fn delete_playlist(state: State<'_, AppState>, id: String) -> Result<(), Str
 }
 
 #[tauri::command]
-pub fn rename_playlist(
-    state: State<'_, AppState>,
-    id: String,
-    name: String,
-) -> Result<(), String> {
+pub fn rename_playlist(state: State<'_, AppState>, id: String, name: String) -> Result<(), String> {
     let db = state.playlist_db.lock();
     db.rename_playlist(&id, &name)
         .map_err(|e| format!("Failed to rename playlist: {}", e))

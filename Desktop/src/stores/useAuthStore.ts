@@ -49,6 +49,18 @@ function getInitialUser(): UserProfile | null {
   }
 }
 
+function getInitialEndpoint(key: string, envVal: string | undefined, defaultVal: string): string {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored && !stored.includes('localhost')) {
+      return stored;
+    }
+  } catch {
+    // ignore
+  }
+  return envVal || defaultVal;
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   token: localStorage.getItem(STORAGE_KEY_TOKEN) || null,
   refreshToken: localStorage.getItem(STORAGE_KEY_REFRESH) || null,
@@ -57,9 +69,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   isAuthenticating: false,
   authError: null,
-  apiUrl: localStorage.getItem(STORAGE_KEY_API) || 'http://localhost:5000/api',
-  socketUrl: localStorage.getItem(STORAGE_KEY_SOCKET) || 'http://localhost:5000',
-  webAppUrl: localStorage.getItem(STORAGE_KEY_WEB) || 'http://localhost:5173',
+  apiUrl: getInitialEndpoint(STORAGE_KEY_API, import.meta.env.VITE_API_URL, 'https://syncd-api.onrender.com/api'),
+  socketUrl: getInitialEndpoint(STORAGE_KEY_SOCKET, import.meta.env.VITE_SOCKET_URL, 'https://syncd-api.onrender.com'),
+  webAppUrl: getInitialEndpoint(STORAGE_KEY_WEB, import.meta.env.VITE_WEB_APP_URL, 'https://syncd-tau.vercel.app'),
 
   initializeAuth: async () => {
     set({ isLoading: true });
@@ -95,7 +107,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               effectiveUser?.id,
               effectiveUser?.username
             )
-            .catch(() => {});
+            .catch(() => { });
         }
 
         set({
@@ -218,7 +230,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // 4. Open default system browser to Web handoff page
       const { webAppUrl } = get();
       const authUrl = `${webAppUrl}/desktop-auth?port=${port}&state=${encodeURIComponent(state)}`;
-      
+
       try {
         await tauriBridge.openBrowserUrl(authUrl);
       } catch {
@@ -419,7 +431,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     focusHeartbeatListener = () => {
       if (Date.now() - lastHeartbeat >= HEARTBEAT_INTERVAL) {
         lastHeartbeat = Date.now();
-        get().fetchCurrentUser().catch(() => {});
+        get().fetchCurrentUser().catch(() => { });
       }
     };
     window.addEventListener('focus', focusHeartbeatListener);

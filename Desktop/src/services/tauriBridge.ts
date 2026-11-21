@@ -66,8 +66,8 @@ function mockCommand<T>(cmd: string, _args?: Record<string, unknown>): T {
   switch (cmd) {
     case "get_app_info":
       return {
-        name: "SyncD Desktop",
-        version: "1.0.0",
+        name: "SyncDesk",
+        version: "0.0.1",
         installDir: "F:\\Code Projects\\Syncd\\Desktop",
         databasePath: "F:\\Code Projects\\Syncd\\Desktop\\Index\\library.db",
       } as T;

@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en" style="background-color: #09090b; color: #f4f4f5;">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SyncD Desktop</title>
+    <title>SyncDesk</title>
     <style>
       html, body, #root {
         background-color: #09090b !important;
@@ -16,31 +16,8 @@
       }
     </style>
   </head>
-  <body class="bg-zinc-950 text-zinc-100 antialiased overflow-hidden select-none" style="background-color: #09090b;">
-    <div id="root">
-      <div style="height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background-color: #09090b; color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #f59e0b, #d97706); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(245, 158, 11, 0.35);">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#09090b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 18V5l12-2v13"></path>
-              <circle cx="6" cy="18" r="3"></circle>
-              <circle cx="18" cy="16" r="3"></circle>
-            </svg>
-          </div>
-          <span style="font-weight: 700; font-size: 18px; letter-spacing: -0.02em; color: #f4f4f5;">Sync<span style="color: #f59e0b;">D</span></span>
-        </div>
-        <div style="width: 140px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 9999px; overflow: hidden; position: relative;">
-          <div style="position: absolute; top: 0; left: 0; height: 100%; width: 50%; background: linear-gradient(90deg, transparent, #f59e0b, transparent); border-radius: 9999px; animation: syncd-splash-bar 1.2s infinite ease-in-out;"></div>
-        </div>
-      </div>
-      <style>
-        @keyframes syncd-splash-bar {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(250%); }
-        }
-      </style>
-    </div>
+  <body class="bg-zinc-950 text-zinc-100 antialiased overflow-hidden select-none">
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

@@ -81,6 +81,7 @@ describe("desktop auth linking code store", () => {
     const userProfile = { id: "u1", clerkUserId: clerkId, username: "testuser" };
 
     const { code } = desktopCodeStore.generateCode(clerkId, dummyToken, userProfile);
+    assert.ok(code);
 
     // First exchange succeeds
     const exchange1 = desktopCodeStore.exchangeCode(code);
@@ -103,6 +104,7 @@ describe("desktop auth linking code store", () => {
     const userProfile = { id: "u2", clerkUserId: clerkId, username: "striker" };
 
     const { code } = desktopCodeStore.generateCode(clerkId, dummyToken, userProfile);
+    assert.ok(code);
 
     // Record 2 strikes
     desktopCodeStore.recordStrike(code);
@@ -120,6 +122,8 @@ describe("desktop auth linking code store", () => {
     const clerkId = "user_same";
     const { code: code1 } = desktopCodeStore.generateCode(clerkId, "token1", null);
     const { code: code2 } = desktopCodeStore.generateCode(clerkId, "token2", null);
+    assert.ok(code1);
+    assert.ok(code2);
 
     assert.notEqual(code1, code2);
 

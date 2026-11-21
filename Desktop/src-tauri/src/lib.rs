@@ -1,15 +1,15 @@
 pub mod app_state;
-pub mod database;
-pub mod library;
 pub mod audio;
 pub mod commands;
+pub mod database;
+pub mod library;
 
-use std::path::PathBuf;
-use tauri::Manager;
 use app_state::AppState;
-use database::Database;
 use audio::AudioController;
 use commands::*;
+use database::Database;
+use std::path::PathBuf;
+use tauri::Manager;
 
 pub fn resolve_install_anchor() -> PathBuf {
     if let Ok(override_dir) = std::env::var("SYNCD_DIR") {
@@ -20,7 +20,11 @@ pub fn resolve_install_anchor() -> PathBuf {
         if let Some(parent) = exe_path.parent() {
             let s = parent.to_string_lossy();
             // During development (cargo run), anchor to the Desktop root directory
-            if s.contains("target\\debug") || s.contains("target/debug") || s.contains("target\\release") || s.contains("target/release") {
+            if s.contains("target\\debug")
+                || s.contains("target/debug")
+                || s.contains("target\\release")
+                || s.contains("target/release")
+            {
                 return PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                     .parent()
                     .unwrap_or(parent)
@@ -43,7 +47,10 @@ pub fn run() {
     let db = match Database::init(&db_path) {
         Ok(d) => d,
         Err(err) => {
-            eprintln!("CRITICAL: Failed to initialize SQLite library database: {}", err);
+            eprintln!(
+                "CRITICAL: Failed to initialize SQLite library database: {}",
+                err
+            );
             std::process::exit(1);
         }
     };
@@ -51,7 +58,10 @@ pub fn run() {
     let user_db = match database::UserDatabase::init(&user_db_path) {
         Ok(d) => d,
         Err(err) => {
-            eprintln!("CRITICAL: Failed to initialize SQLite user database: {}", err);
+            eprintln!(
+                "CRITICAL: Failed to initialize SQLite user database: {}",
+                err
+            );
             std::process::exit(1);
         }
     };
@@ -59,7 +69,10 @@ pub fn run() {
     let playlist_db = match database::PlaylistDatabase::init(&playlist_db_path) {
         Ok(d) => d,
         Err(err) => {
-            eprintln!("CRITICAL: Failed to initialize SQLite playlist database: {}", err);
+            eprintln!(
+                "CRITICAL: Failed to initialize SQLite playlist database: {}",
+                err
+            );
             std::process::exit(1);
         }
     };
@@ -83,6 +96,9 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_process::init())
+        // Bypassed for local dev mode (enable when release pubkey is configured)
+        // .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let scope = app.asset_protocol_scope();
             let _ = scope.allow_directory(&artwork_dir, true);
@@ -91,6 +107,7 @@ pub fn run() {
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             get_app_info,
+            get_app_version,
             get_system_health,
             get_setting,
             set_setting,

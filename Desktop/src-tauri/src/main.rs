@@ -4,4 +4,3 @@
 fn main() {
     syncd_desktop_lib::run();
 }
-

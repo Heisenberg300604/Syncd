@@ -6,7 +6,7 @@ pub fn run_migrations(conn: &mut Connection) -> Result<()> {
         "CREATE TABLE IF NOT EXISTS schema_migrations (
             version INTEGER PRIMARY KEY,
             applied_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );"
+        );",
     )?;
 
     let current_version: i64 = conn.query_row(
@@ -103,7 +103,7 @@ pub fn run_migrations(conn: &mut Connection) -> Result<()> {
 
             -- Record migration 1
             INSERT INTO schema_migrations (version) VALUES (1);
-            "
+            ",
         )?;
 
         tx.commit()?;
@@ -112,4 +112,3 @@ pub fn run_migrations(conn: &mut Connection) -> Result<()> {
 
     Ok(())
 }
-

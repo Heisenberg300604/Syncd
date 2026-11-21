@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import type { AudioPlaybackStatus, PlaybackState, AudioDeviceDescriptor } from '../types/audio';
+import { useSettingsStore } from './useSettingsStore';
+import { showTrackNotification } from '../services/notificationService';
 
 export interface CurrentTrack {
   id: string;
@@ -122,6 +124,11 @@ function startSyncLoop(get: () => PlayerState, set: (partial: Partial<PlayerStat
 
     try {
       const audioStatus = await invoke<AudioPlaybackStatus>('audio_get_status');
+      // Strict guard: if user paused while IPC was in flight, discard the response!
+      if (get().status !== 'playing') {
+        return;
+      }
+
       const curDur = audioStatus.durationSeconds > 0
         ? audioStatus.durationSeconds
         : (durationSeconds || currentTrack.durationSeconds || 0);
@@ -133,7 +140,7 @@ function startSyncLoop(get: () => PlayerState, set: (partial: Partial<PlayerStat
       set({
         positionSeconds: isEnded ? curDur : Math.min(audioStatus.positionSeconds, curDur > 0 ? curDur : Infinity),
         durationSeconds: curDur,
-        status: isEnded ? 'ended' : audioStatus.state,
+        status: isEnded ? 'ended' : 'playing',
       });
 
       if (isEnded) {
@@ -189,6 +196,16 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       errorMessage: null,
       hasPlaybackStarted: true,
     });
+
+    const { trackNotifications } = useSettingsStore.getState();
+    if (trackNotifications) {
+      showTrackNotification({
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        artworkUrl: track.artworkUrl,
+      });
+    }
 
     // Update backend user_db with current playing track and queue
     if (newQueue && newQueue.length > 0) {
@@ -332,31 +349,33 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const { currentTrack } = get();
     if (!currentTrack) return;
 
+    // Optimistically update playing state on the exact click tick
+    set({ status: 'playing', hasPlaybackStarted: true });
+    startSyncLoop(get, set);
+
     if (currentTrack.source === 'local') {
       try {
         await invoke('audio_resume');
-        set({ status: 'playing', hasPlaybackStarted: true });
-        startSyncLoop(get, set);
       } catch (err) {
         console.error('Failed to resume audio:', err);
+        set({ status: 'paused' });
+        stopSyncLoop();
       }
-    } else {
-      set({ status: 'playing', hasPlaybackStarted: true });
     }
   },
 
   pause: async () => {
     const { currentTrack } = get();
+    // Instantly halt sync polling and update to paused
+    stopSyncLoop();
+    set({ status: 'paused' });
+
     if (currentTrack?.source === 'local') {
       try {
         await invoke('audio_pause');
-        set({ status: 'paused' });
-        stopSyncLoop();
       } catch (err) {
         console.error('Failed to pause audio:', err);
       }
-    } else {
-      set({ status: 'paused' });
     }
   },
 

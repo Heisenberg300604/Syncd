@@ -9,6 +9,7 @@ import { GlobalSearchModal } from "../components/layout/GlobalSearchModal";
 import { GlobalContextMenu } from "../components/layout/GlobalContextMenu";
 import { ToastContainer } from "../components/feedback/ToastContainer";
 import { OfflineBanner } from "../components/feedback/OfflineBanner";
+import { ErrorBoundary } from "../components/feedback/ErrorBoundary";
 import { ScanProgressBanner } from "../features/library/components/ScanProgressBanner";
 import { HomeView } from "../features/home/HomeView";
 import { useAppStore } from "../stores/useAppStore";
@@ -20,7 +21,7 @@ import { useAuthStore } from "../stores/useAuthStore";
 import { useGlobalShortcuts } from "../hooks/useGlobalShortcuts";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isTauri } from "../services/tauriBridge";
-import { Loader2, AlertCircle } from "lucide-react";
+import { AppLoadingScreen } from "../components/feedback/AppLoadingScreen";
 
 // Code-split heavy secondary views to achieve ultra-fast cold start (<300ms JS evaluation)
 const LibraryView = lazy(() =>
@@ -56,8 +57,16 @@ export function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [isWindowFocused, setIsWindowFocused] = useState(true);
+  const [isAppReady, setIsAppReady] = useState(false);
 
   const isPlayerVisible = usePlayerStore((s) => Boolean(s.currentTrack && s.hasPlaybackStarted));
+  const selectedAccent = useSettingsStore((s) => s.selectedAccent);
+
+  useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-accent", selectedAccent);
+    }
+  }, [selectedAccent]);
 
   useEffect(() => {
     const handleFocus = () => setIsWindowFocused(true);
@@ -126,67 +135,52 @@ export function App() {
     },
   });
 
-  if (isInitializing) {
-    return (
-      <div className="h-screen w-screen bg-zinc-950 flex flex-col items-center justify-center gap-3 select-none">
-        <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
-        <p className="text-xs text-zinc-400 font-medium">Initializing SyncD Desktop Foundation…</p>
-      </div>
-    );
-  }
-
-  if (initError) {
-    return (
-      <div className="h-screen w-screen bg-zinc-950 flex flex-col items-center justify-center p-8 select-none">
-        <div className="max-w-md w-full bg-zinc-900 border border-red-500/30 rounded-2xl p-6 flex flex-col items-center text-center gap-3 shadow-xl">
-          <AlertCircle className="w-10 h-10 text-red-400" />
-          <h2 className="text-sm font-bold text-zinc-100">Native Core Initialization Failed</h2>
-          <p className="text-xs text-zinc-400 leading-relaxed">{initError}</p>
-          <button
-            type="button"
-            onClick={initialize}
-            className="mt-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-semibold cursor-pointer transition-colors"
-          >
-            Retry Initialization
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       data-player-active={isPlayerVisible ? "true" : "false"}
       className="h-screen w-screen bg-zinc-950 flex flex-col overflow-hidden text-zinc-100 relative"
     >
-      {/* Global Ambient Background: 3D Perspective ShapeGrid */}
+      {/* Global Ambient Background: 3D Perspective ShapeGrid (Persistent: Mounts ONCE for entire app lifecycle) */}
       <div className="fixed inset-0 w-full h-full pointer-events-none z-0 overflow-hidden select-none">
-        <ShapeGrid
-          shape="square"
-          direction="down"
-          lineColor="#3f3f46"
-          hoverColor="#ffffff"
-          hoverFillColor="#ffffff"
-          fillOpacity={0.12}
-          cellSize={46}
-          speed={0.4}
-          tiltX={42}
-          tiltY={0}
-          horizonY={-0.35}
-          fade={0}
-          mist={false}
-          rainbow={false}
-          radius={2}
-          trail={0.9}
-          glow={0.4}
-          clickCascade={false}
-          paused={!isWindowFocused}
-          className="w-full h-full"
-          style={{ filter: 'blur(1.2px)' }}
-        />
+        <div className="absolute -inset-6 filter blur-[8px] opacity-75">
+          <ShapeGrid
+            shape="square"
+            direction="down"
+            lineColor="#3f3f46"
+            hoverColor="#ffffff"
+            hoverFillColor="#ffffff"
+            fillOpacity={0.12}
+            cellSize={46}
+            speed={0.35}
+            tiltX={42}
+            tiltY={0}
+            horizonY={-0.35}
+            fade={0}
+            mist={false}
+            rainbow={false}
+            radius={2}
+            trail={0.9}
+            glow={0.4}
+            interactive={false}
+            clickCascade={false}
+            paused={!isWindowFocused}
+            className="w-full h-full"
+          />
+        </div>
         {/* Subtle Edge Feather Vignette & Soft Diffusion Overlay */}
-        <div className="absolute inset-0 backdrop-blur-[0.8px] bg-gradient-to-b from-zinc-950/20 via-transparent to-zinc-950/40 pointer-events-none" />
+        <div className="absolute inset-0 backdrop-blur-[6px] bg-gradient-to-b from-zinc-950/40 via-zinc-950/15 to-zinc-950/65 pointer-events-none" />
       </div>
+
+      {/* Loading Screen Overlay: Runs smoothly once, then seamlessly fades away */}
+      <AnimatePresence>
+        {(isInitializing || !isAppReady) && (
+          <AppLoadingScreen
+            error={initError}
+            onRetry={initialize}
+            onFinished={() => setIsAppReady(true)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Frameless Desktop TitleBar */}
       <TitleBar onSearchClick={() => setIsSearchOpen(true)} />
@@ -266,10 +260,12 @@ export function App() {
       </div>
 
       {/* Floating Glass Dock Player Bar */}
-      <BottomPlayer
-        isDrawerOpen={isDrawerOpen}
-        onToggleDrawer={() => useAppStore.getState().toggleDrawer('queue')}
-      />
+      <ErrorBoundary fallback={null}>
+        <BottomPlayer
+          isDrawerOpen={isDrawerOpen}
+          onToggleDrawer={() => useAppStore.getState().toggleDrawer('queue')}
+        />
+      </ErrorBoundary>
 
       {/* Global Search Dialog Modal (Ctrl+K) */}
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />

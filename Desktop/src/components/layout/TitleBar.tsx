@@ -74,7 +74,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onSearchClick }) => {
       >
         <AppLogo size={18} />
         <span className="font-semibold text-zinc-300 text-[11px] tracking-wide leading-none">
-          SyncD Desktop
+          Sync<span className="text-amber-400">Desk</span>
         </span>
       </div>
 
@@ -87,14 +87,14 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onSearchClick }) => {
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onSearchClick?.(); }}
-          className="h-6 w-72 max-w-sm rounded-md bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800/60 px-2.5 flex items-center justify-between text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+          className="group h-6 w-72 max-w-sm rounded-md bg-zinc-900/80 hover:bg-zinc-800/90 border border-zinc-800/60 hover:border-amber-500/40 px-2.5 flex items-center justify-between text-[11px] text-zinc-400 hover:text-zinc-200 transition-all cursor-pointer shadow-xs"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
           <span className="flex items-center gap-1.5">
-            <Search className="w-3 h-3" />
-            Search library, tracks, rooms...
+            <Search className="w-3 h-3 text-amber-400 transition-colors" />
+            <span>Search library, tracks, rooms...</span>
           </span>
-          <kbd className="text-[9px] font-mono bg-zinc-800 text-zinc-500 px-1 rounded border border-zinc-700/60">
+          <kbd className="text-[9px] font-mono bg-zinc-800/90 text-zinc-500 group-hover:text-amber-400 group-hover:border-amber-500/30 px-1 rounded border border-zinc-700/60 transition-colors">
             Ctrl K
           </kbd>
         </button>
@@ -111,7 +111,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onSearchClick }) => {
           data-tauri-drag-region="false"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           onClick={handleMinimize}
-          className="w-11 flex items-center justify-center text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
+          className="w-11 flex items-center justify-center text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
           aria-label="Minimize"
         >
           <Minus className="w-3.5 h-3.5" />
@@ -122,7 +122,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ onSearchClick }) => {
           data-tauri-drag-region="false"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           onClick={handleMaximize}
-          className="w-11 flex items-center justify-center text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 transition-colors cursor-pointer"
+          className="w-11 flex items-center justify-center text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors cursor-pointer"
           aria-label={isMaximized ? "Restore" : "Maximize"}
         >
           {isMaximized ? (

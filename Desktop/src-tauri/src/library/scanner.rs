@@ -1,10 +1,10 @@
+use crate::library::metadata::{extract_metadata, ExtractedMetadata};
+use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use walkdir::WalkDir;
-use serde::Serialize;
-use crate::library::metadata::{extract_metadata, ExtractedMetadata};
 
 const SUPPORTED_EXTENSIONS: &[&str] = &[
     "mp3", "flac", "wav", "m4a", "aac", "ogg", "opus", "alac", "aiff",
@@ -30,6 +30,12 @@ pub struct ScannedTrack {
 
 pub struct LibraryScanner {
     cancel_flag: Arc<AtomicBool>,
+}
+
+impl Default for LibraryScanner {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LibraryScanner {

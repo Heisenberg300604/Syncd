@@ -7,45 +7,36 @@ interface PlayPauseProps {
   className?: string;
 }
 
-export const AnimatedPlayPause: React.FC<PlayPauseProps> = ({ isPlaying, className = 'w-5 h-5' }) => {
+export const AnimatedPlayPause: React.FC<PlayPauseProps> = ({ isPlaying, className = 'w-4 h-4' }) => {
   return (
-    <motion.div
-      className={`relative flex items-center justify-center ${className}`}
-      whileHover={{ scale: 1.08 }}
-      whileTap={{ scale: 0.94 }}
-      transition={{ type: 'spring', stiffness: 800, damping: 25 }}
-    >
-      <AnimatePresence mode="popLayout" initial={false}>
-        {isPlaying ? (
-          <motion.svg
-            key="pause"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="w-full h-full text-zinc-950"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 850, damping: 28 }}
-          >
-            <rect x="6" y="4" width="4" height="16" rx="1.5" />
-            <rect x="14" y="4" width="4" height="16" rx="1.5" />
-          </motion.svg>
-        ) : (
-          <motion.svg
-            key="play"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="w-full h-full text-zinc-950 ml-0.5"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 850, damping: 28 }}
-          >
-            <path d="M5 4.5a1.5 1.5 0 0 1 2.3-1.27l12 7.5a1.5 1.5 0 0 1 0 2.54l-12 7.5A1.5 1.5 0 0 1 5 19.5v-15Z" />
-          </motion.svg>
-        )}
-      </AnimatePresence>
-    </motion.div>
+    <div className={`relative flex items-center justify-center ${className} select-none pointer-events-none`}>
+      {/* Pause Bars */}
+      <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className={`w-full h-full text-zinc-950 absolute inset-0 transition-all duration-150 ease-out ${
+          isPlaying
+            ? 'opacity-100 scale-100 rotate-0'
+            : 'opacity-0 scale-75 -rotate-45'
+        }`}
+      >
+        <rect x="6" y="4" width="4" height="16" rx="1.5" />
+        <rect x="14" y="4" width="4" height="16" rx="1.5" />
+      </svg>
+
+      {/* Play Triangle */}
+      <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className={`w-full h-full text-zinc-950 absolute inset-0 transition-all duration-150 ease-out ${
+          !isPlaying
+            ? 'opacity-100 scale-100 rotate-0'
+            : 'opacity-0 scale-75 rotate-45'
+        }`}
+      >
+        <path d="M6 4.5a1.5 1.5 0 0 1 2.3-1.27l12 7.5a1.5 1.5 0 0 1 0 2.54l-12 7.5A1.5 1.5 0 0 1 6 19.5v-15Z" />
+      </svg>
+    </div>
   );
 };
 

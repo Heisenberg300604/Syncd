@@ -58,7 +58,7 @@ export const joinRoomHandler = asyncHandler(
 );
 
 export const getRoom = asyncHandler(async (req: Request, res: Response) => {
-  const { userId } = getAuth(req);
+  const userId = getEffectiveUserId(req);
 
   if (!userId) {
     res.status(401).json({ authenticated: false, message: "Unauthorized" });

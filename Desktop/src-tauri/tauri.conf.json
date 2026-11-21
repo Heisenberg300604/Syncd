@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "SyncD Desktop",
-  "version": "1.0.0",
-  "identifier": "com.syncd.desktop",
+  "productName": "SyncDesk",
+  "version": "0.0.1",
+  "identifier": "com.syncdesk.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "SyncD Desktop",
+        "title": "SyncDesk",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,
@@ -32,10 +32,18 @@
           "allow": []
         }
       },
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://*.ytimg.com https://*.ggpht.com data: blob:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost http://localhost:5000 ws://localhost:5000 https://api.syncd.com wss://api.syncd.com; media-src 'self' asset: http://asset.localhost; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none';",
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https://*.ytimg.com https://*.ggpht.com data: blob:; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost http://localhost:5000 ws://localhost:5000 https://api.syncd.com wss://api.syncd.com https://syncd-api.onrender.com wss://syncd-api.onrender.com https://syncd-tau.vercel.app; media-src 'self' asset: http://asset.localhost; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none';",
       "devCsp": null,
       "capabilities": ["default"]
     }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/icon.ico"
+    ]
   },
   "plugins": {}
 }

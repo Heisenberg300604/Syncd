@@ -21,11 +21,11 @@ interface AppState {
   initialize: () => Promise<void>;
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>((set) => ({
   currentView: "home",
   appInfo: null,
   health: null,
-  isInitializing: false,
+  isInitializing: true,
   initError: null,
   isDrawerOpen: false,
   drawerTab: "queue",
@@ -46,14 +46,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   setDrawerTab: (tab) => set({ drawerTab: tab }),
 
   initialize: async () => {
+    set({ isInitializing: true, initError: null });
     try {
       const [appInfo, health] = await Promise.all([
         invokeCommand<AppInfo>("get_app_info"),
         invokeCommand<SystemHealth>("get_system_health"),
       ]);
-      set({ appInfo, health });
+      set({ appInfo, health, isInitializing: false });
     } catch (err) {
       console.warn("Native core health check non-fatal warning:", err);
+      set({ isInitializing: false });
     }
   },
 }));

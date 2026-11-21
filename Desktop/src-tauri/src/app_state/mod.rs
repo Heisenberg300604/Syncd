@@ -1,10 +1,10 @@
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-use parking_lot::Mutex;
 use crate::audio::AudioController;
-use crate::database::{Database, UserDatabase, PlaylistDatabase};
+use crate::database::{Database, PlaylistDatabase, UserDatabase};
 use crate::library::scanner::LibraryScanner;
+use parking_lot::Mutex;
+use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 pub struct AppState {
     pub db: Arc<Mutex<Database>>,

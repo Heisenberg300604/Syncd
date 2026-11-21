@@ -1,9 +1,9 @@
-use std::path::Path;
-use std::fs;
-use serde::{Deserialize, Serialize};
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::probe::Probe;
 use lofty::tag::Accessor;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -75,7 +75,9 @@ pub fn extract_metadata(path: &Path) -> Result<ExtractedMetadata, String> {
     let duration_seconds = properties.duration().as_secs_f64();
     let bitrate_kbps = properties.audio_bitrate();
 
-    let primary_tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
+    let primary_tag = tagged_file
+        .primary_tag()
+        .or_else(|| tagged_file.first_tag());
 
     let title = primary_tag
         .and_then(|t| t.title().as_deref().map(str::to_string))
