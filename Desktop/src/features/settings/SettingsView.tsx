@@ -894,7 +894,7 @@ export function SettingsView() {
 
         {/* 7. Application Footer */}
         <div className="flex items-center justify-between text-xs text-zinc-400 px-1 pt-2">
-          <span>SyncDesk v{appInfo?.version || updater.currentVersion || '0.0.1'}</span>
+          <span>SyncDesk v{appInfo?.version || updater.currentVersion || '0.0.2'}</span>
         </div>
       </div>
       </div>

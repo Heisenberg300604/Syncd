@@ -1,6 +1,6 @@
 [package]
 name = "syncdesk"
-version = "0.0.1"
+version = "0.0.2"
 description = "SyncDesk Native Music Player and Social Listening Platform"
 authors = ["SyncDesk Team"]
 edition = "2021"

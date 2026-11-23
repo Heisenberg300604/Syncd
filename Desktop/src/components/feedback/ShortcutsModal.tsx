@@ -117,7 +117,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose 
 
       <div className="pt-2 border-t border-zinc-850 flex items-center justify-between text-[11px] text-zinc-500">
         <span>Press <kbd className="px-1 py-0.5 rounded bg-zinc-850 text-zinc-400 font-mono text-[10px] border border-zinc-750">Esc</kbd> anytime to close</span>
-        <span className="font-mono text-amber-500/80">SyncDesk v0.0.1</span>
+        <span className="font-mono text-amber-500/80">SyncDesk v0.0.2</span>
       </div>
     </Modal>
   );
