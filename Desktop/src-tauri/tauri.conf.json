@@ -41,7 +41,7 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
-    "category": "AudioVideo",
+    "category": "Music",
     "shortDescription": "SyncDesk Native Music Player",
     "longDescription": "High-fidelity bit-perfect desktop playback and social listening room synchronization",
     "icon": [
