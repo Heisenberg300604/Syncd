@@ -97,7 +97,7 @@ impl Database {
                      OR t.path LIKE REPLACE(f.path, '/', '\\') || '%'
                      OR t.path LIKE REPLACE(f.path, '\\', '/') || '%'
                  )
-             );"
+             );",
         );
 
         log::info!("SQLite database initialized at: {}", db_path.display());
@@ -117,9 +117,11 @@ impl Database {
     }
 
     pub fn get_library_counts(&self) -> Result<(i64, i64, i64, i64)> {
-        let track_count: i64 = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM tracks WHERE is_library = 1;", [], |r| r.get(0))?;
+        let track_count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM tracks WHERE is_library = 1;",
+            [],
+            |r| r.get(0),
+        )?;
         let album_count: i64 = self.conn.query_row(
             "SELECT COUNT(DISTINCT album) FROM tracks WHERE is_library = 1 AND album != '';",
             [],
@@ -301,7 +303,11 @@ impl Database {
         Ok(map)
     }
 
-    pub fn batch_upsert_tracks(&mut self, tracks: &[ScannedTrack], is_library: bool) -> Result<usize> {
+    pub fn batch_upsert_tracks(
+        &mut self,
+        tracks: &[ScannedTrack],
+        is_library: bool,
+    ) -> Result<usize> {
         if tracks.is_empty() {
             return Ok(0);
         }
@@ -518,7 +524,10 @@ impl Database {
         );
 
         let mut stmt = self.conn.prepare(&query)?;
-        let params: Vec<&dyn rusqlite::ToSql> = track_ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+        let params: Vec<&dyn rusqlite::ToSql> = track_ids
+            .iter()
+            .map(|id| id as &dyn rusqlite::ToSql)
+            .collect();
         let rows = stmt.query_map(params.as_slice(), |r| {
             Ok(TrackRow {
                 id: r.get(0)?,
@@ -929,7 +938,9 @@ mod tests {
             },
         ];
 
-        let count = db.batch_upsert_tracks(&scanned, true).expect("batch upsert");
+        let count = db
+            .batch_upsert_tracks(&scanned, true)
+            .expect("batch upsert");
         assert_eq!(count, 2);
 
         // Verify counts

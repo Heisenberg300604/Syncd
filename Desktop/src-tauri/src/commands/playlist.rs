@@ -81,7 +81,11 @@ pub fn update_playlist(
 }
 
 fn get_playlist_artwork_dir(state: &AppState) -> PathBuf {
-    let dir = state.install_dir.join("Data").join("artwork").join("playlists");
+    let dir = state
+        .install_dir
+        .join("Data")
+        .join("artwork")
+        .join("playlists");
     let _ = std::fs::create_dir_all(&dir);
     dir
 }
@@ -120,8 +124,7 @@ pub fn save_playlist_cover(
     cleanup_old_covers(&artwork_dir, &playlist_id);
 
     let target_file = artwork_dir.join(format!("{}.{}", playlist_id, ext));
-    std::fs::copy(src, &target_file)
-        .map_err(|e| format!("Failed to copy cover image: {}", e))?;
+    std::fs::copy(src, &target_file).map_err(|e| format!("Failed to copy cover image: {}", e))?;
 
     let target_path_str = target_file.to_string_lossy().to_string();
 

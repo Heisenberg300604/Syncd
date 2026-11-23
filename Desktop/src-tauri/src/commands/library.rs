@@ -371,7 +371,11 @@ pub fn update_album_metadata(
                 let mut hasher = Sha256::new();
                 hasher.update(&bytes);
                 let hash = format!("{:x}", hasher.finalize());
-                let ext = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") { "png" } else { "jpg" };
+                let ext = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+                    "png"
+                } else {
+                    "jpg"
+                };
                 let _ = std::fs::create_dir_all(&artwork_dir);
                 let cached_file = artwork_dir.join(format!("{}.{}", hash, ext));
                 let _ = std::fs::write(&cached_file, &bytes);
@@ -402,15 +406,18 @@ pub fn update_album_metadata(
     let mut errors = Vec::new();
 
     for track in tracks {
-        let (extracted, new_artwork_hash, _renamed) =
-            match write_track_metadata_to_file(Path::new(&track.path), &update_template, &artwork_dir) {
-                Ok(res) => res,
-                Err(err) => {
-                    log::warn!("Failed to write metadata for track {}: {}", track.id, err);
-                    errors.push(format!("{}: {}", track.title, err));
-                    continue;
-                }
-            };
+        let (extracted, new_artwork_hash, _renamed) = match write_track_metadata_to_file(
+            Path::new(&track.path),
+            &update_template,
+            &artwork_dir,
+        ) {
+            Ok(res) => res,
+            Err(err) => {
+                log::warn!("Failed to write metadata for track {}: {}", track.id, err);
+                errors.push(format!("{}: {}", track.title, err));
+                continue;
+            }
+        };
 
         let mut db = state.db.lock();
         match db.update_track_metadata(&track.id, &extracted, new_artwork_hash.as_deref(), None) {
@@ -423,7 +430,10 @@ pub fn update_album_metadata(
     }
 
     if updated_tracks.is_empty() && !errors.is_empty() {
-        return Err(format!("Failed to update album tracks: {}", errors.join("; ")));
+        return Err(format!(
+            "Failed to update album tracks: {}",
+            errors.join("; ")
+        ));
     }
 
     Ok(updated_tracks)
@@ -463,7 +473,11 @@ pub fn create_album_from_tracks(
                 let mut hasher = Sha256::new();
                 hasher.update(&bytes);
                 let hash = format!("{:x}", hasher.finalize());
-                let ext = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") { "png" } else { "jpg" };
+                let ext = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+                    "png"
+                } else {
+                    "jpg"
+                };
                 let _ = std::fs::create_dir_all(&artwork_dir);
                 let cached_file = artwork_dir.join(format!("{}.{}", hash, ext));
                 let _ = std::fs::write(&cached_file, &bytes);

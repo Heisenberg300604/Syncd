@@ -100,7 +100,8 @@ pub fn probe_symphonia_duration(path: &Path) -> Option<f64> {
         .iter()
         .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)?;
 
-    if let (Some(n_frames), Some(tb)) = (track.codec_params.n_frames, track.codec_params.time_base) {
+    if let (Some(n_frames), Some(tb)) = (track.codec_params.n_frames, track.codec_params.time_base)
+    {
         let time = tb.calc_time(n_frames);
         let sec = time.seconds as f64 + time.frac;
         if sec > 0.0 {
@@ -247,7 +248,8 @@ pub fn read_detailed_metadata(
     track_id: Option<String>,
     existing_artwork_hash: Option<String>,
 ) -> Result<DetailedAudioMetadata, String> {
-    let file_metadata = fs::metadata(path).map_err(|e| format!("Cannot read file metadata: {}", e))?;
+    let file_metadata =
+        fs::metadata(path).map_err(|e| format!("Cannot read file metadata: {}", e))?;
     let file_size_bytes = file_metadata.len();
     let date_modified = file_metadata
         .modified()
@@ -453,7 +455,14 @@ pub fn write_track_metadata_to_file(
     path: &Path,
     update: &TrackMetadataUpdate,
     artwork_dir: &Path,
-) -> Result<(ExtractedMetadata, Option<String>, Option<std::path::PathBuf>), String> {
+) -> Result<
+    (
+        ExtractedMetadata,
+        Option<String>,
+        Option<std::path::PathBuf>,
+    ),
+    String,
+> {
     if !path.exists() || !path.is_file() {
         return Err(format!("Audio file does not exist: {}", path.display()));
     }
@@ -515,7 +524,8 @@ pub fn write_track_metadata_to_file(
     } else if let Some(ref art_path_str) = update.artwork_path {
         let art_path = Path::new(art_path_str);
         if art_path.exists() && art_path.is_file() {
-            let bytes = fs::read(art_path).map_err(|e| format!("Failed to read artwork file: {}", e))?;
+            let bytes =
+                fs::read(art_path).map_err(|e| format!("Failed to read artwork file: {}", e))?;
             if !bytes.is_empty() {
                 let mime = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
                     MimeType::Png
@@ -677,10 +687,7 @@ pub fn write_track_metadata_to_file(
                 };
 
                 let target_path = parent_dir.join(&with_ext);
-                let current_filename = path
-                    .file_name()
-                    .and_then(|f| f.to_str())
-                    .unwrap_or("");
+                let current_filename = path.file_name().and_then(|f| f.to_str()).unwrap_or("");
 
                 if with_ext != current_filename {
                     if target_path.exists()
@@ -695,9 +702,8 @@ pub fn write_track_metadata_to_file(
 
                     if target_path.exists() {
                         let tmp_rename = parent_dir.join(format!("syncd_rename_{}.tmp", timestamp));
-                        fs::rename(path, &tmp_rename).map_err(|e| {
-                            format!("Failed to stage file for renaming: {}", e)
-                        })?;
+                        fs::rename(path, &tmp_rename)
+                            .map_err(|e| format!("Failed to stage file for renaming: {}", e))?;
                         fs::rename(&tmp_rename, &target_path).map_err(|e| {
                             format!("Failed to rename file to '{}': {}", with_ext, e)
                         })?;
@@ -753,7 +759,12 @@ mod tests {
 
         let mut id3_tag = Tag::new(TagType::Id3v2);
         id3_tag.set_title("ID3 Title".to_string());
-        let pic = Picture::new_unchecked(PictureType::CoverFront, Some(MimeType::Jpeg), None, vec![1, 2, 3, 4]);
+        let pic = Picture::new_unchecked(
+            PictureType::CoverFront,
+            Some(MimeType::Jpeg),
+            None,
+            vec![1, 2, 3, 4],
+        );
         id3_tag.push_picture(pic);
         let r1 = id3_tag.save_to_path(&test_wav, WriteOptions::default());
         println!("R1 RES: {:?}", r1);
@@ -763,8 +774,20 @@ mod tests {
         let r2 = riff_tag.save_to_path(&test_wav, WriteOptions::default());
         println!("R2 RES: {:?}", r2);
 
-        let reloaded = Probe::open(&test_wav).unwrap().guess_file_type().unwrap().read().unwrap();
-        println!("RELOADED TAGS: {:?}", reloaded.tags().iter().map(|t| (t.tag_type(), t.pictures().len(), t.title())).collect::<Vec<_>>());
+        let reloaded = Probe::open(&test_wav)
+            .unwrap()
+            .guess_file_type()
+            .unwrap()
+            .read()
+            .unwrap();
+        println!(
+            "RELOADED TAGS: {:?}",
+            reloaded
+                .tags()
+                .iter()
+                .map(|t| (t.tag_type(), t.pictures().len(), t.title()))
+                .collect::<Vec<_>>()
+        );
 
         let _ = std::fs::remove_file(&test_wav);
     }
@@ -829,10 +852,15 @@ mod tests {
             .read()
             .unwrap();
 
-        let id3_tag = reloaded.tag(TagType::Id3v2).expect("ID3v2 tag must be present on WAV");
+        let id3_tag = reloaded
+            .tag(TagType::Id3v2)
+            .expect("ID3v2 tag must be present on WAV");
         assert_eq!(id3_tag.title().as_deref(), Some("Verified WAV Title"));
         assert_eq!(id3_tag.artist().as_deref(), Some("Verified WAV Artist"));
-        assert!(!id3_tag.pictures().is_empty(), "Embedded picture must be present in ID3v2 tag");
+        assert!(
+            !id3_tag.pictures().is_empty(),
+            "Embedded picture must be present in ID3v2 tag"
+        );
         assert_eq!(id3_tag.track(), Some(1));
         assert_eq!(id3_tag.track_total(), Some(10));
 
@@ -858,7 +886,10 @@ mod tests {
         let res2 = write_track_metadata_to_file(&test_wav, &clear_update, &artwork_dir);
         assert!(res2.is_ok(), "Clear update failed: {:?}", res2);
         let (extracted2, _, _) = res2.unwrap();
-        assert_eq!(extracted2.track_number, None, "Extracted track number should be None after setting to 0");
+        assert_eq!(
+            extracted2.track_number, None,
+            "Extracted track number should be None after setting to 0"
+        );
 
         let reloaded2 = Probe::open(&test_wav)
             .unwrap()
@@ -866,9 +897,19 @@ mod tests {
             .unwrap()
             .read()
             .unwrap();
-        let id3_tag2 = reloaded2.tag(TagType::Id3v2).expect("ID3v2 tag must be present");
-        assert_eq!(id3_tag2.track(), None, "Tag track should be None after removal");
-        assert_eq!(id3_tag2.track_total(), None, "Tag track total should be None after removal");
+        let id3_tag2 = reloaded2
+            .tag(TagType::Id3v2)
+            .expect("ID3v2 tag must be present");
+        assert_eq!(
+            id3_tag2.track(),
+            None,
+            "Tag track should be None after removal"
+        );
+        assert_eq!(
+            id3_tag2.track_total(),
+            None,
+            "Tag track total should be None after removal"
+        );
 
         let _ = std::fs::remove_file(&test_wav);
     }

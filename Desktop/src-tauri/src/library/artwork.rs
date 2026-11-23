@@ -21,10 +21,7 @@ pub fn extract_and_cache_artwork(
 
     if let Some(tagged_file) = tagged_file_opt {
         // Search across ALL tags (ID3v2, Vorbis, etc.) for an embedded picture
-        let picture = tagged_file
-            .tags()
-            .iter()
-            .find_map(|t| t.pictures().first());
+        let picture = tagged_file.tags().iter().find_map(|t| t.pictures().first());
 
         if let Some(picture) = picture {
             let data = picture.data();
@@ -95,7 +92,11 @@ fn find_folder_artwork(audio_path: &Path, artwork_dir: &Path) -> Result<Option<P
             if path.is_file() {
                 if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                     let ext_lower = ext.to_lowercase();
-                    if ext_lower == "jpg" || ext_lower == "jpeg" || ext_lower == "png" || ext_lower == "webp" {
+                    if ext_lower == "jpg"
+                        || ext_lower == "jpeg"
+                        || ext_lower == "png"
+                        || ext_lower == "webp"
+                    {
                         if let Ok(dest) = cache_image_file(&path, artwork_dir) {
                             return Ok(Some(dest));
                         }
@@ -128,7 +129,11 @@ fn cache_image_file(image_path: &Path, artwork_dir: &Path) -> Result<PathBuf, St
     let dest = artwork_dir.join(format!("{}.{}", hash, ext));
     if !dest.exists() {
         fs::write(&dest, &data).map_err(|e| e.to_string())?;
-        log::info!("Cached folder artwork from {:?}: {}", image_path.file_name(), dest.display());
+        log::info!(
+            "Cached folder artwork from {:?}: {}",
+            image_path.file_name(),
+            dest.display()
+        );
     }
 
     Ok(dest)

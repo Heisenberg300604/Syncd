@@ -55,7 +55,10 @@ impl PlaylistDatabase {
 
         // Ensure cover_url and import_folder_path columns exist
         let _ = conn.execute("ALTER TABLE playlists ADD COLUMN cover_url TEXT;", []);
-        let _ = conn.execute("ALTER TABLE playlists ADD COLUMN import_folder_path TEXT;", []);
+        let _ = conn.execute(
+            "ALTER TABLE playlists ADD COLUMN import_folder_path TEXT;",
+            [],
+        );
 
         Ok(Self {
             conn,
@@ -147,7 +150,13 @@ impl PlaylistDatabase {
         Ok(row)
     }
 
-    pub fn update_playlist(&self, id: &str, name: &str, description: Option<&str>, cover_url: Option<&str>) -> Result<()> {
+    pub fn update_playlist(
+        &self,
+        id: &str,
+        name: &str,
+        description: Option<&str>,
+        cover_url: Option<&str>,
+    ) -> Result<()> {
         self.conn.execute(
             "UPDATE playlists SET name = ?1, description = ?2, cover_url = ?3, updated_at = datetime('now') WHERE id = ?4;",
             rusqlite::params![name, description, cover_url, id],
@@ -206,7 +215,11 @@ impl PlaylistDatabase {
         }
     }
 
-    pub fn add_tracks_to_playlist(&mut self, playlist_id: &str, track_ids: &[String]) -> Result<usize> {
+    pub fn add_tracks_to_playlist(
+        &mut self,
+        playlist_id: &str,
+        track_ids: &[String],
+    ) -> Result<usize> {
         if track_ids.is_empty() {
             return Ok(0);
         }
@@ -229,7 +242,8 @@ impl PlaylistDatabase {
             )?;
 
             for (i, tid) in track_ids.iter().enumerate() {
-                let affected = stmt.execute(rusqlite::params![playlist_id, tid, max_pos + 1 + i as i64])?;
+                let affected =
+                    stmt.execute(rusqlite::params![playlist_id, tid, max_pos + 1 + i as i64])?;
                 if affected > 0 {
                     added += 1;
                 }
