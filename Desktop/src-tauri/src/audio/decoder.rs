@@ -135,7 +135,10 @@ impl StereoResampler {
     fn push_stereo(&mut self, stereo_samples: &[f32], producer: &mut Producer<f32>) {
         if self.source_rate == self.target_rate {
             // Direct pass-through in lockstep pairs when rates match
-            for chunk in stereo_samples.chunks_exact(2) {
+            for chunk in stereo_samples.chunks(2) {
+                if chunk.len() < 2 {
+                    break;
+                }
                 while producer.slots() < 2 {
                     std::thread::sleep(Duration::from_millis(1));
                 }

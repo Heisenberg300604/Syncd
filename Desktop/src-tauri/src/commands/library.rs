@@ -554,19 +554,15 @@ pub fn reveal_in_folder(path: String) -> Result<(), String> {
     {
         use std::process::Command;
         let clean_path = path.replace('/', "\\");
-        let status = Command::new("explorer")
+        let _ = Command::new("explorer")
             .arg(format!("/select,{}", clean_path))
             .status();
-        if status.is_ok() {
-            return Ok(());
-        }
     }
 
     #[cfg(target_os = "macos")]
     {
         use std::process::Command;
         let _ = Command::new("open").arg("-R").arg(&path).status();
-        return Ok(());
     }
 
     #[cfg(target_os = "linux")]
@@ -574,7 +570,6 @@ pub fn reveal_in_folder(path: String) -> Result<(), String> {
         use std::process::Command;
         if let Some(parent) = p.parent() {
             let _ = Command::new("xdg-open").arg(parent).status();
-            return Ok(());
         }
     }
 
