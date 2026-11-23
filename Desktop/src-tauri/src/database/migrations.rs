@@ -110,5 +110,22 @@ pub fn run_migrations(conn: &mut Connection) -> Result<()> {
         log::info!("Database migration 001 applied successfully.");
     }
 
+    // Migration 2: Track library flag to isolate playlist-only imports from permanent library
+    if current_version < 2 {
+        log::info!("Applying database migration 002_track_library_flag...");
+        let tx = conn.transaction()?;
+
+        tx.execute_batch(
+            "
+            ALTER TABLE tracks ADD COLUMN is_library INTEGER NOT NULL DEFAULT 1;
+            CREATE INDEX IF NOT EXISTS idx_tracks_is_library ON tracks(is_library);
+            INSERT INTO schema_migrations (version) VALUES (2);
+            ",
+        )?;
+
+        tx.commit()?;
+        log::info!("Database migration 002 applied successfully.");
+    }
+
     Ok(())
 }

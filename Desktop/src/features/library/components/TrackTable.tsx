@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Pause, Music, Disc, Clock } from 'lucide-react';
+import { Play, Pause, Music, Disc, Clock, Edit3 } from 'lucide-react';
 import type { TrackRow } from '../../../types/library';
 import { usePlayerStore } from '../../../stores/usePlayerStore';
 import { useLibraryStore } from '../../../stores/useLibraryStore';
@@ -9,6 +9,7 @@ import { CodecBadge } from '../../../components/ui/CodecBadge';
 interface TrackTableProps {
   tracks: TrackRow[];
   isLoading?: boolean;
+  onEditMetadata?: (track: TrackRow) => void;
 }
 
 function formatDuration(totalSeconds: number): string {
@@ -18,7 +19,7 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
 
-export const TrackTable: React.FC<TrackTableProps> = ({ tracks, isLoading }) => {
+export const TrackTable: React.FC<TrackTableProps> = ({ tracks, isLoading, onEditMetadata }) => {
   const { currentTrack, status, playTrack, play, pause } = usePlayerStore();
   const { selectedTrackId, setSelectedTrackId, getArtwork, artworkCache } = useLibraryStore();
 
@@ -241,9 +242,24 @@ export const TrackTable: React.FC<TrackTableProps> = ({ tracks, isLoading }) => 
                     />
                   </td>
 
-                  {/* Duration */}
+                  {/* Duration & Edit Action */}
                   <td className="py-2 px-3 text-right text-zinc-400 font-mono text-[11px] pr-4">
-                    {formatDuration(track.durationSeconds)}
+                    <div className="flex items-center justify-end gap-2">
+                      {onEditMetadata && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditMetadata(track);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 transition-all cursor-pointer"
+                          title="Edit Track Metadata & File Tags"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <span>{formatDuration(track.durationSeconds)}</span>
+                    </div>
                   </td>
                 </tr>
               );
@@ -257,32 +273,57 @@ export const TrackTable: React.FC<TrackTableProps> = ({ tracks, isLoading }) => 
 };
 
 const TrackThumbnail: React.FC<{ trackId: string; artworkHash: string | null }> = ({ trackId, artworkHash }) => {
-  const { getArtworkUrl, artworkCache, getArtwork } = useLibraryStore();
+  const { getArtworkUrl, artworkCache, getArtwork, invalidateArtworkUrl } = useLibraryStore();
   const syncSrc = getArtworkUrl(artworkHash) || artworkCache[trackId] || null;
   const [src, setSrc] = useState<string | null>(syncSrc);
+  const [hasError, setHasError] = useState(false);
 
   React.useEffect(() => {
-    if (syncSrc) {
+    if (syncSrc && !hasError) {
       setSrc(syncSrc);
       return;
     }
     let isMounted = true;
     getArtwork(trackId).then((img) => {
-      if (isMounted && img) setSrc(img);
+      if (isMounted) {
+        if (img) {
+          setSrc(img);
+          setHasError(false);
+        } else {
+          setHasError(true);
+        }
+      }
     });
     return () => {
       isMounted = false;
     };
-  }, [trackId, syncSrc, getArtwork]);
+  }, [trackId, syncSrc, hasError, getArtwork]);
 
-  if (!src) {
+  const handleError = () => {
+    if (artworkHash) {
+      invalidateArtworkUrl(artworkHash);
+    }
+    invalidateArtworkUrl(trackId);
+
+    getArtwork(trackId).then((img) => {
+      if (img && img !== src) {
+        setSrc(img);
+        setHasError(false);
+      } else {
+        setHasError(true);
+      }
+    }).catch(() => setHasError(true));
+  };
+
+  if (!src || hasError) {
     return <Music className="w-4 h-4 opacity-40 text-amber-400" />;
   }
 
   return (
     <img
       src={src}
-      alt="Album Artwork"
+      alt=""
+      onError={handleError}
       className="w-full h-full object-cover"
       loading="lazy"
       decoding="async"

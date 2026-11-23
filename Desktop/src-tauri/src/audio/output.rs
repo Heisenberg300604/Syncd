@@ -73,29 +73,51 @@ impl AudioOutputStream {
                 let dur = dur_clone.clone();
                 let cb_ended = on_ended_clone.clone();
                 let fl = needs_flush.clone();
+                let ramp_step = 1.0 / (sample_rate as f32 * 0.005).max(1.0); // 5ms micro-ramp step
+                let mut current_gain = 0.0f32;
+
                 device.build_output_stream(
                     &stream_config,
                     move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                         if fl.swap(false, Ordering::SeqCst) {
                             while consumer.pop().is_ok() {}
+                            current_gain = 0.0;
                         }
 
                         let is_active = p.load(Ordering::Relaxed);
                         let muted = m.load(Ordering::Relaxed);
-                        let vol = if muted || !is_active { 0.0 } else { *v.read() };
+                        let target_vol = if muted || !is_active { 0.0 } else { *v.read() };
 
                         let mut frames_read = 0;
                         let mut had_samples = false;
                         for frame in data.chunks_mut(ch_count) {
-                            if is_active {
-                                let left_opt = consumer.pop();
-                                let right_opt = consumer.pop();
-                                if left_opt.is_ok() || right_opt.is_ok() {
-                                    had_samples = true;
-                                }
+                            // 5ms smooth gain ramping eliminates digital clicks and pops
+                            if (current_gain - target_vol).abs() <= ramp_step {
+                                current_gain = target_vol;
+                            } else if current_gain < target_vol {
+                                current_gain += ramp_step;
+                            } else {
+                                current_gain -= ramp_step;
+                            }
 
-                                let left = left_opt.unwrap_or(0.0) * vol;
-                                let right = right_opt.unwrap_or(0.0) * vol;
+                            if current_gain > 0.00001 || is_active {
+                                // Paired L+R popping guarantees stereo channels never desynchronize
+                                let (left_raw, right_raw) = match consumer.pop() {
+                                    Ok(l) => match consumer.pop() {
+                                        Ok(r) => {
+                                            had_samples = true;
+                                            (l, r)
+                                        }
+                                        Err(_) => {
+                                            had_samples = true;
+                                            (l, l)
+                                        }
+                                    },
+                                    Err(_) => (0.0, 0.0),
+                                };
+
+                                let left = left_raw * current_gain;
+                                let right = right_raw * current_gain;
 
                                 if frame.len() >= 2 {
                                     frame[0] = left;
@@ -143,29 +165,49 @@ impl AudioOutputStream {
                 let dur = dur_clone.clone();
                 let cb_ended = on_ended_clone.clone();
                 let fl = needs_flush.clone();
+                let ramp_step = 1.0 / (sample_rate as f32 * 0.005).max(1.0);
+                let mut current_gain = 0.0f32;
+
                 device.build_output_stream(
                     &stream_config,
                     move |data: &mut [i16], _: &cpal::OutputCallbackInfo| {
                         if fl.swap(false, Ordering::SeqCst) {
                             while consumer.pop().is_ok() {}
+                            current_gain = 0.0;
                         }
 
                         let is_active = p.load(Ordering::Relaxed);
                         let muted = m.load(Ordering::Relaxed);
-                        let vol = if muted || !is_active { 0.0 } else { *v.read() };
+                        let target_vol = if muted || !is_active { 0.0 } else { *v.read() };
 
                         let mut frames_read = 0;
                         let mut had_samples = false;
                         for frame in data.chunks_mut(ch_count) {
-                            if is_active {
-                                let left_opt = consumer.pop();
-                                let right_opt = consumer.pop();
-                                if left_opt.is_ok() || right_opt.is_ok() {
-                                    had_samples = true;
-                                }
+                            if (current_gain - target_vol).abs() <= ramp_step {
+                                current_gain = target_vol;
+                            } else if current_gain < target_vol {
+                                current_gain += ramp_step;
+                            } else {
+                                current_gain -= ramp_step;
+                            }
 
-                                let left = (left_opt.unwrap_or(0.0) * vol).clamp(-1.0, 1.0);
-                                let right = (right_opt.unwrap_or(0.0) * vol).clamp(-1.0, 1.0);
+                            if current_gain > 0.00001 || is_active {
+                                let (left_raw, right_raw) = match consumer.pop() {
+                                    Ok(l) => match consumer.pop() {
+                                        Ok(r) => {
+                                            had_samples = true;
+                                            (l, r)
+                                        }
+                                        Err(_) => {
+                                            had_samples = true;
+                                            (l, l)
+                                        }
+                                    },
+                                    Err(_) => (0.0, 0.0),
+                                };
+
+                                let left = (left_raw * current_gain).clamp(-1.0, 1.0);
+                                let right = (right_raw * current_gain).clamp(-1.0, 1.0);
 
                                 let l_i16 = (left * 32767.0) as i16;
                                 let r_i16 = (right * 32767.0) as i16;

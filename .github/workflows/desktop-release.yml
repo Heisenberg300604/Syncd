@@ -16,15 +16,47 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release-windows:
-    name: Build & Publish Windows Installer
+  release:
+    name: Build & Publish (${{ matrix.platform }})
     permissions:
       contents: write
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            args: '--bundles nsis'
+          - platform: linux
+            os: ubuntu-22.04
+            args: '--bundles deb,appimage'
+          - platform: macos
+            os: macos-latest
+            args: '--bundles dmg'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libasound2-dev
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,12 +75,7 @@ jobs:
 
       - name: Install Frontend Dependencies
         working-directory: Desktop
-        run: |
-          if (Test-Path package-lock.json) {
-            npm ci
-          } else {
-            npm install
-          }
+        run: npm ci
 
       - name: Build & Publish Release
         uses: tauri-apps/tauri-action@v0
@@ -56,6 +83,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || '' }}
         with:
           projectPath: Desktop
           tagName: ${{ inputs.version || github.ref_name }}
@@ -68,7 +101,8 @@ jobs:
             - Social listening room synchronization
             - Native auto-updating desktop client
 
-            Download the Windows installer below or update directly within SyncDesk (Settings -> Application & Updates).
+            Download the installer for your platform below or update directly within SyncDesk (Settings -> Application & Updates).
           releaseDraft: false
           prerelease: false
-          args: '--bundles nsis'
+          args: ${{ matrix.args }}
+

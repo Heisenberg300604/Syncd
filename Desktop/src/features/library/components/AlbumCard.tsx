@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, Disc3, Music2 } from 'lucide-react';
+import { Play, Pause, Disc3, Music2, Edit3 } from 'lucide-react';
 import type { AlbumGroup } from '../../../types/album';
 import { usePlayerStore } from '../../../stores/usePlayerStore';
 import { useLibraryStore } from '../../../stores/useLibraryStore';
@@ -7,6 +7,7 @@ import { useLibraryStore } from '../../../stores/useLibraryStore';
 export interface AlbumCardProps {
   album: AlbumGroup;
   onOpenDetail: (album: AlbumGroup) => void;
+  onEditAlbum?: (album: AlbumGroup) => void;
 }
 
 const MusicFolderIcon: React.FC<{ className?: string }> = ({ className = 'w-3 h-3' }) => (
@@ -48,9 +49,9 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
 
-export const AlbumCard: React.FC<AlbumCardProps> = ({ album, onOpenDetail }) => {
+export const AlbumCard: React.FC<AlbumCardProps> = ({ album, onOpenDetail, onEditAlbum }) => {
   const { currentTrack, status, playTrack, play, pause } = usePlayerStore();
-  const { getArtworkUrl, artworkCache, getArtwork } = useLibraryStore();
+  const { getArtworkUrl, artworkCache, getArtwork, invalidateArtworkUrl } = useLibraryStore();
 
   const syncArtwork =
     (album.artworkHash ? getArtworkUrl(album.artworkHash) : null) ||
@@ -58,6 +59,7 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album, onOpenDetail }) => 
     null;
 
   const [artwork, setArtwork] = useState<string | null>(syncArtwork);
+  const [hasError, setHasError] = useState(false);
 
   const isCurrentAlbum = Boolean(
     currentTrack && album.tracks.some((t) => t.id === currentTrack.id)
@@ -65,20 +67,47 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album, onOpenDetail }) => 
   const isPlayingThisAlbum = isCurrentAlbum && status === 'playing';
 
   useEffect(() => {
-    if (syncArtwork) {
+    if (syncArtwork && !hasError) {
       setArtwork(syncArtwork);
       return;
     }
     let isMounted = true;
-    if (album.hasArtwork && !artwork) {
+    if (album.hasArtwork && (!artwork || hasError)) {
       getArtwork(album.representativeTrackId).then((src) => {
-        if (isMounted && src) setArtwork(src);
+        if (isMounted) {
+          if (src) {
+            setArtwork(src);
+            setHasError(false);
+          } else {
+            setHasError(true);
+          }
+        }
       });
     }
     return () => {
       isMounted = false;
     };
-  }, [album.representativeTrackId, album.hasArtwork, syncArtwork, artwork, getArtwork]);
+  }, [album.representativeTrackId, album.hasArtwork, syncArtwork, artwork, hasError, getArtwork]);
+
+  const handleImageError = () => {
+    if (album.artworkHash) {
+      invalidateArtworkUrl(album.artworkHash);
+    }
+    invalidateArtworkUrl(album.representativeTrackId);
+
+    if (album.hasArtwork) {
+      getArtwork(album.representativeTrackId).then((src) => {
+        if (src && src !== artwork) {
+          setArtwork(src);
+          setHasError(false);
+        } else {
+          setHasError(true);
+        }
+      }).catch(() => setHasError(true));
+    } else {
+      setHasError(true);
+    }
+  };
 
   const handlePlayAlbum = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -116,11 +145,12 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album, onOpenDetail }) => 
     await playTrack(queueTracks[0], queueTracks);
   };
 
-  const hasNoArtwork = !album.hasArtwork || !artwork;
+  const hasNoArtwork = !album.hasArtwork || !artwork || hasError;
 
   return (
     <div
       onClick={() => onOpenDetail(album)}
+      data-album-id={album.id}
       className={`group cursor-pointer select-none transition-all duration-200 flex flex-col justify-between p-3 rounded-2xl w-full overflow-hidden ${
         hasNoArtwork
           ? 'bg-zinc-900/70 hover:bg-zinc-850 border border-zinc-800/80 hover:border-amber-500/40 shadow-md backdrop-blur-sm'
@@ -129,10 +159,11 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album, onOpenDetail }) => 
     >
       {/* Artwork Container */}
       <div className="relative aspect-square w-full rounded-xl overflow-hidden flex items-center justify-center bg-zinc-950/40">
-        {artwork ? (
+        {artwork && !hasError ? (
           <img
             src={artwork}
-            alt={album.album}
+            alt=""
+            onError={handleImageError}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
             decoding="async"
@@ -163,6 +194,21 @@ export const AlbumCard: React.FC<AlbumCardProps> = ({ album, onOpenDetail }) => 
             )}
           </button>
         </div>
+
+        {/* Edit Album Button on Card */}
+        {onEditAlbum && !album.isUnknownAlbum && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditAlbum(album);
+            }}
+            className="absolute top-2 left-2 p-1.5 rounded-lg bg-black/60 text-zinc-300 hover:text-amber-400 hover:bg-black/80 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer z-10"
+            title="Edit Album Metadata & Tags"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
+        )}
 
         {/* Scaled Merged Header Pill (Image 1 & Image 2) */}
         <div className="absolute top-2 right-2 z-10 pointer-events-none">

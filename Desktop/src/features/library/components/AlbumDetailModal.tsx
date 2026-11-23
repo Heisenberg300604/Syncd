@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, ListPlus, X, Clock, Disc3, Music2 } from 'lucide-react';
+import { Play, Pause, ListPlus, X, Clock, Disc3, Music2, Edit3 } from 'lucide-react';
 import type { AlbumGroup } from '../../../types/album';
 import type { TrackRow } from '../../../types/library';
 import { usePlayerStore } from '../../../stores/usePlayerStore';
@@ -11,6 +11,8 @@ export interface AlbumDetailModalProps {
   isOpen: boolean;
   album: AlbumGroup | null;
   onClose: () => void;
+  onEditAlbum?: (album: AlbumGroup) => void;
+  onEditTrack?: (track: TrackRow) => void;
 }
 
 function formatDuration(totalSeconds: number): string {
@@ -24,16 +26,30 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   isOpen,
   album,
   onClose,
+  onEditAlbum,
+  onEditTrack,
 }) => {
   const { currentTrack, status, playTrack, enqueueTracks, play, pause } = usePlayerStore();
   const { getArtworkUrl, artworkCache, getArtwork, selectedTrackId, setSelectedTrackId } = useLibraryStore();
   const { addToast } = useToastStore();
 
   const [artwork, setArtwork] = useState<string | null>(null);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!album) {
       setArtwork(null);
+      setHasError(false);
       return;
     }
 
@@ -42,7 +58,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
       artworkCache[album.representativeTrackId] ||
       null;
 
-    if (sync) {
+    if (sync && !hasError) {
       setArtwork(sync);
       return;
     }
@@ -50,14 +66,40 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
     let isMounted = true;
     if (album.hasArtwork) {
       getArtwork(album.representativeTrackId).then((src) => {
-        if (isMounted && src) setArtwork(src);
+        if (isMounted) {
+          if (src) {
+            setArtwork(src);
+            setHasError(false);
+          } else {
+            setHasError(true);
+          }
+        }
       });
     }
 
     return () => {
       isMounted = false;
     };
-  }, [album, getArtworkUrl, artworkCache, getArtwork]);
+  }, [album, hasError, getArtworkUrl, artworkCache, getArtwork]);
+
+  const handleImageError = () => {
+    if (album?.artworkHash) {
+      useLibraryStore.getState().invalidateArtworkUrl(album.artworkHash);
+    }
+    if (album?.representativeTrackId) {
+      useLibraryStore.getState().invalidateArtworkUrl(album.representativeTrackId);
+      getArtwork(album.representativeTrackId).then((src) => {
+        if (src && src !== artwork) {
+          setArtwork(src);
+          setHasError(false);
+        } else {
+          setHasError(true);
+        }
+      }).catch(() => setHasError(true));
+    } else {
+      setHasError(true);
+    }
+  };
 
   if (!isOpen || !album) return null;
 
@@ -129,13 +171,20 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in select-none"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-3xl bg-zinc-950 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ring-1 ring-white/[0.08]"
         onClick={(e) => e.stopPropagation()}
+        data-album-id={album.id}
       >
         {/* Album Header Banner */}
-        <div className="relative p-6 bg-gradient-to-b from-zinc-900 to-zinc-950 border-b border-zinc-800/80 flex flex-col sm:flex-row items-center sm:items-end gap-6">
+        <div
+          data-album-id={album.id}
+          className="relative p-6 bg-gradient-to-b from-zinc-900 to-zinc-950 border-b border-zinc-800/80 flex flex-col sm:flex-row items-center sm:items-end gap-6"
+        >
           <button
             type="button"
             onClick={onClose}
@@ -147,10 +196,11 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
 
           {/* Large Album Artwork */}
           <div className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl shrink-0 flex items-center justify-center">
-            {artwork ? (
+            {artwork && !hasError ? (
               <img
                 src={artwork}
-                alt={album.album}
+                alt=""
+                onError={handleImageError}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -214,6 +264,18 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                 <ListPlus className="w-4 h-4" />
                 <span>Add to Queue</span>
               </button>
+
+              {onEditAlbum && (
+                <button
+                  type="button"
+                  onClick={() => onEditAlbum(album)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-zinc-900 hover:bg-zinc-800 active:scale-95 border border-zinc-800 text-zinc-300 hover:text-amber-400 text-xs font-semibold transition-all cursor-pointer"
+                  title="Batch Edit Album Tags & Artwork across all audio files"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Edit Album</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -240,6 +302,7 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                 return (
                   <tr
                     key={track.id}
+                    data-track-id={track.id}
                     onClick={() => setSelectedTrackId(track.id)}
                     onDoubleClick={() => handlePlaySpecificTrack(track, idx)}
                     className={`group transition-colors cursor-pointer ${
@@ -304,9 +367,24 @@ export const AlbumDetailModal: React.FC<AlbumDetailModalProps> = ({
                       )}
                     </td>
 
-                    {/* Duration */}
+                    {/* Duration & Track Edit Action */}
                     <td className="py-2.5 px-3 text-right pr-4 font-mono text-zinc-400 tabular-nums">
-                      {formatDuration(track.durationSeconds)}
+                      <div className="flex items-center justify-end gap-2">
+                        {onEditTrack && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditTrack(track);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 transition-all cursor-pointer"
+                            title="Edit Track Metadata & File Tags"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <span>{formatDuration(track.durationSeconds)}</span>
+                      </div>
                     </td>
                   </tr>
                 );

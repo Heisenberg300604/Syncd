@@ -31,6 +31,7 @@ pub struct TrackRow {
     pub title: String,
     pub artist: String,
     pub album: String,
+    pub album_artist: Option<String>,
     pub duration_seconds: f64,
     pub track_number: Option<u32>,
     pub year: Option<u32>,
@@ -86,6 +87,19 @@ impl Database {
             [],
         );
 
+        // Self-heal: ensure tracks not inside indexed folders are marked as playlist-only (is_library = 0)
+        let _ = conn.execute_batch(
+            "UPDATE tracks SET is_library = 0
+             WHERE id NOT IN (
+                 SELECT t.id FROM tracks t
+                 JOIN indexed_folders f ON (
+                     t.path LIKE f.path || '%' 
+                     OR t.path LIKE REPLACE(f.path, '/', '\\') || '%'
+                     OR t.path LIKE REPLACE(f.path, '\\', '/') || '%'
+                 )
+             );"
+        );
+
         log::info!("SQLite database initialized at: {}", db_path.display());
 
         Ok(Self {
@@ -105,14 +119,14 @@ impl Database {
     pub fn get_library_counts(&self) -> Result<(i64, i64, i64, i64)> {
         let track_count: i64 = self
             .conn
-            .query_row("SELECT COUNT(*) FROM tracks;", [], |r| r.get(0))?;
+            .query_row("SELECT COUNT(*) FROM tracks WHERE is_library = 1;", [], |r| r.get(0))?;
         let album_count: i64 = self.conn.query_row(
-            "SELECT COUNT(DISTINCT album) FROM tracks WHERE album != '';",
+            "SELECT COUNT(DISTINCT album) FROM tracks WHERE is_library = 1 AND album != '';",
             [],
             |r| r.get(0),
         )?;
         let artist_count: i64 = self.conn.query_row(
-            "SELECT COUNT(DISTINCT artist) FROM tracks WHERE artist != '';",
+            "SELECT COUNT(DISTINCT artist) FROM tracks WHERE is_library = 1 AND artist != '';",
             [],
             |r| r.get(0),
         )?;
@@ -287,7 +301,7 @@ impl Database {
         Ok(map)
     }
 
-    pub fn batch_upsert_tracks(&mut self, tracks: &[ScannedTrack]) -> Result<usize> {
+    pub fn batch_upsert_tracks(&mut self, tracks: &[ScannedTrack], is_library: bool) -> Result<usize> {
         if tracks.is_empty() {
             return Ok(0);
         }
@@ -300,16 +314,19 @@ impl Database {
                 "INSERT INTO tracks (
                     id, path, title, artist, album, album_artist, duration_seconds,
                     track_number, disc_number, year, genre, format, bitrate_kbps,
-                    file_size_bytes, has_artwork, date_modified
+                    file_size_bytes, has_artwork, date_modified, is_library
                 ) VALUES (
-                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17
                 )
                 ON CONFLICT(path) DO UPDATE SET
                     title = excluded.title,
                     artist = excluded.artist,
                     album = excluded.album,
                     album_artist = excluded.album_artist,
-                    duration_seconds = excluded.duration_seconds,
+                    duration_seconds = CASE 
+                        WHEN tracks.duration_seconds > 0.0 THEN tracks.duration_seconds 
+                        ELSE excluded.duration_seconds 
+                    END,
                     track_number = excluded.track_number,
                     disc_number = excluded.disc_number,
                     year = excluded.year,
@@ -318,7 +335,8 @@ impl Database {
                     bitrate_kbps = excluded.bitrate_kbps,
                     file_size_bytes = excluded.file_size_bytes,
                     has_artwork = excluded.has_artwork,
-                    date_modified = excluded.date_modified;",
+                    date_modified = excluded.date_modified,
+                    is_library = MAX(tracks.is_library, excluded.is_library);",
             )?;
 
             let mut insert_fts = tx.prepare(
@@ -354,6 +372,7 @@ impl Database {
                     meta.file_size_bytes as i64,
                     if meta.has_artwork { 1 } else { 0 },
                     &meta.date_modified,
+                    if is_library { 1 } else { 0 },
                 ])?;
 
                 // Update FTS
@@ -396,8 +415,9 @@ impl Database {
         };
 
         let query = format!(
-            "SELECT id, path, title, artist, album, duration_seconds, track_number, year, genre, format, bitrate_kbps, has_artwork, artwork_hash
+            "SELECT id, path, title, artist, album, album_artist, duration_seconds, track_number, year, genre, format, bitrate_kbps, has_artwork, artwork_hash
              FROM tracks
+             WHERE is_library = 1
              ORDER BY {} {}
              LIMIT ?1 OFFSET ?2;",
             sort_column, sort_order
@@ -412,14 +432,15 @@ impl Database {
                     title: r.get(2)?,
                     artist: r.get(3)?,
                     album: r.get(4)?,
-                    duration_seconds: r.get(5)?,
-                    track_number: r.get(6)?,
-                    year: r.get(7)?,
-                    genre: r.get(8)?,
-                    format: r.get(9)?,
-                    bitrate_kbps: r.get(10)?,
-                    has_artwork: r.get::<_, i64>(11)? == 1,
-                    artwork_hash: r.get(12)?,
+                    album_artist: r.get(5)?,
+                    duration_seconds: r.get(6)?,
+                    track_number: r.get(7)?,
+                    year: r.get(8)?,
+                    genre: r.get(9)?,
+                    format: r.get(10)?,
+                    bitrate_kbps: r.get(11)?,
+                    has_artwork: r.get::<_, i64>(12)? == 1,
+                    artwork_hash: r.get(13)?,
                 })
             })?
             .filter_map(Result::ok)
@@ -442,12 +463,12 @@ impl Database {
             .join(" ");
 
         let sql = "
-            SELECT t.id, t.path, t.title, t.artist, t.album, t.duration_seconds,
+            SELECT t.id, t.path, t.title, t.artist, t.album, t.album_artist, t.duration_seconds,
                    t.track_number, t.year, t.genre, t.format, t.bitrate_kbps,
                    t.has_artwork, t.artwork_hash
             FROM tracks_fts f
             JOIN tracks t ON t.id = f.track_id
-            WHERE tracks_fts MATCH ?1
+            WHERE tracks_fts MATCH ?1 AND t.is_library = 1
             LIMIT ?2;
         ";
 
@@ -460,20 +481,295 @@ impl Database {
                     title: r.get(2)?,
                     artist: r.get(3)?,
                     album: r.get(4)?,
-                    duration_seconds: r.get(5)?,
-                    track_number: r.get(6)?,
-                    year: r.get(7)?,
-                    genre: r.get(8)?,
-                    format: r.get(9)?,
-                    bitrate_kbps: r.get(10)?,
-                    has_artwork: r.get::<_, i64>(11)? == 1,
-                    artwork_hash: r.get(12)?,
+                    album_artist: r.get(5)?,
+                    duration_seconds: r.get(6)?,
+                    track_number: r.get(7)?,
+                    year: r.get(8)?,
+                    genre: r.get(9)?,
+                    format: r.get(10)?,
+                    bitrate_kbps: r.get(11)?,
+                    has_artwork: r.get::<_, i64>(12)? == 1,
+                    artwork_hash: r.get(13)?,
                 })
             })?
             .filter_map(Result::ok)
             .collect();
 
         Ok(tracks)
+    }
+
+    pub fn get_tracks_by_ids(&self, track_ids: &[String]) -> Result<Vec<TrackRow>> {
+        if track_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let placeholders = track_ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(",");
+
+        let query = format!(
+            "SELECT id, path, title, artist, album, album_artist, duration_seconds, track_number, year, genre, format, bitrate_kbps, has_artwork, artwork_hash
+             FROM tracks
+             WHERE id IN ({});",
+            placeholders
+        );
+
+        let mut stmt = self.conn.prepare(&query)?;
+        let params: Vec<&dyn rusqlite::ToSql> = track_ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+        let rows = stmt.query_map(params.as_slice(), |r| {
+            Ok(TrackRow {
+                id: r.get(0)?,
+                path: r.get(1)?,
+                title: r.get(2)?,
+                artist: r.get(3)?,
+                album: r.get(4)?,
+                album_artist: r.get(5)?,
+                duration_seconds: r.get(6)?,
+                track_number: r.get(7)?,
+                year: r.get(8)?,
+                genre: r.get(9)?,
+                format: r.get(10)?,
+                bitrate_kbps: r.get(11)?,
+                has_artwork: r.get::<_, i64>(12)? == 1,
+                artwork_hash: r.get(13)?,
+            })
+        })?;
+
+        let mut map = std::collections::HashMap::new();
+        for row in rows.flatten() {
+            let mut track = row;
+            // Self-heal 0-duration if missing
+            if track.duration_seconds <= 0.0 {
+                let track_path = std::path::PathBuf::from(&track.path);
+                if let Some(dur) = crate::library::metadata::probe_symphonia_duration(&track_path) {
+                    if dur > 0.0 {
+                        let _ = self.conn.execute(
+                            "UPDATE tracks SET duration_seconds = ?1 WHERE id = ?2;",
+                            rusqlite::params![dur, &track.id],
+                        );
+                        track.duration_seconds = dur;
+                    }
+                }
+            }
+            map.insert(track.id.clone(), track);
+        }
+
+        let mut ordered = Vec::new();
+        for id in track_ids {
+            if let Some(track) = map.remove(id) {
+                ordered.push(track);
+            }
+        }
+
+        Ok(ordered)
+    }
+
+    pub fn get_track_by_id(&self, track_id: &str) -> Result<Option<TrackRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, path, title, artist, album, album_artist, duration_seconds,
+                    track_number, year, genre, format, bitrate_kbps,
+                    has_artwork, artwork_hash
+             FROM tracks WHERE id = ?1 LIMIT 1;",
+        )?;
+
+        let mut rows = stmt.query_map([track_id], |r| {
+            Ok(TrackRow {
+                id: r.get(0)?,
+                path: r.get(1)?,
+                title: r.get(2)?,
+                artist: r.get(3)?,
+                album: r.get(4)?,
+                album_artist: r.get(5)?,
+                duration_seconds: r.get(6)?,
+                track_number: r.get(7)?,
+                year: r.get(8)?,
+                genre: r.get(9)?,
+                format: r.get(10)?,
+                bitrate_kbps: r.get(11)?,
+                has_artwork: r.get::<_, i64>(12)? == 1,
+                artwork_hash: r.get(13)?,
+            })
+        })?;
+
+        if let Some(res) = rows.next() {
+            Ok(Some(res?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn update_track_metadata(
+        &mut self,
+        track_id: &str,
+        meta: &crate::library::metadata::ExtractedMetadata,
+        artwork_hash: Option<&str>,
+        new_path: Option<&str>,
+    ) -> Result<TrackRow> {
+        let tx = self.conn.transaction()?;
+
+        if let Some(path) = new_path {
+            tx.execute(
+                "UPDATE tracks SET path = ?1 WHERE id = ?2;",
+                rusqlite::params![path, track_id],
+            )?;
+        }
+
+        if !meta.has_artwork {
+            tx.execute(
+                "UPDATE tracks SET
+                    title = ?1,
+                    artist = ?2,
+                    album = ?3,
+                    album_artist = ?4,
+                    duration_seconds = ?5,
+                    track_number = ?6,
+                    disc_number = ?7,
+                    year = ?8,
+                    genre = ?9,
+                    format = ?10,
+                    bitrate_kbps = ?11,
+                    file_size_bytes = ?12,
+                    has_artwork = 0,
+                    artwork_hash = NULL,
+                    date_modified = ?13
+                 WHERE id = ?14;",
+                rusqlite::params![
+                    &meta.title,
+                    &meta.artist,
+                    &meta.album,
+                    &meta.album_artist,
+                    meta.duration_seconds,
+                    meta.track_number,
+                    meta.disc_number,
+                    meta.year,
+                    &meta.genre,
+                    &meta.format,
+                    meta.bitrate_kbps,
+                    meta.file_size_bytes as i64,
+                    &meta.date_modified,
+                    track_id,
+                ],
+            )?;
+        } else if let Some(hash) = artwork_hash {
+            tx.execute(
+                "UPDATE tracks SET
+                    title = ?1,
+                    artist = ?2,
+                    album = ?3,
+                    album_artist = ?4,
+                    duration_seconds = ?5,
+                    track_number = ?6,
+                    disc_number = ?7,
+                    year = ?8,
+                    genre = ?9,
+                    format = ?10,
+                    bitrate_kbps = ?11,
+                    file_size_bytes = ?12,
+                    has_artwork = 1,
+                    artwork_hash = ?13,
+                    date_modified = ?14
+                 WHERE id = ?15;",
+                rusqlite::params![
+                    &meta.title,
+                    &meta.artist,
+                    &meta.album,
+                    &meta.album_artist,
+                    meta.duration_seconds,
+                    meta.track_number,
+                    meta.disc_number,
+                    meta.year,
+                    &meta.genre,
+                    &meta.format,
+                    meta.bitrate_kbps,
+                    meta.file_size_bytes as i64,
+                    hash,
+                    &meta.date_modified,
+                    track_id,
+                ],
+            )?;
+        } else {
+            tx.execute(
+                "UPDATE tracks SET
+                    title = ?1,
+                    artist = ?2,
+                    album = ?3,
+                    album_artist = ?4,
+                    duration_seconds = ?5,
+                    track_number = ?6,
+                    disc_number = ?7,
+                    year = ?8,
+                    genre = ?9,
+                    format = ?10,
+                    bitrate_kbps = ?11,
+                    file_size_bytes = ?12,
+                    has_artwork = ?13,
+                    date_modified = ?14
+                 WHERE id = ?15;",
+                rusqlite::params![
+                    &meta.title,
+                    &meta.artist,
+                    &meta.album,
+                    &meta.album_artist,
+                    meta.duration_seconds,
+                    meta.track_number,
+                    meta.disc_number,
+                    meta.year,
+                    &meta.genre,
+                    &meta.format,
+                    meta.bitrate_kbps,
+                    meta.file_size_bytes as i64,
+                    if meta.has_artwork { 1 } else { 0 },
+                    &meta.date_modified,
+                    track_id,
+                ],
+            )?;
+        }
+
+        // Sync FTS5 index
+        let _ = tx.execute("DELETE FROM tracks_fts WHERE track_id = ?1;", [track_id]);
+        tx.execute(
+            "INSERT INTO tracks_fts (track_id, title, artist, album, genre)
+             VALUES (?1, ?2, ?3, ?4, ?5);",
+            rusqlite::params![
+                track_id,
+                &meta.title,
+                &meta.artist,
+                &meta.album,
+                meta.genre.as_deref().unwrap_or(""),
+            ],
+        )?;
+
+        let updated_row: TrackRow = tx.query_row(
+            "SELECT id, path, title, artist, album, album_artist, duration_seconds,
+                    track_number, year, genre, format, bitrate_kbps,
+                    has_artwork, artwork_hash
+             FROM tracks WHERE id = ?1;",
+            [track_id],
+            |r| {
+                Ok(TrackRow {
+                    id: r.get(0)?,
+                    path: r.get(1)?,
+                    title: r.get(2)?,
+                    artist: r.get(3)?,
+                    album: r.get(4)?,
+                    album_artist: r.get(5)?,
+                    duration_seconds: r.get(6)?,
+                    track_number: r.get(7)?,
+                    year: r.get(8)?,
+                    genre: r.get(9)?,
+                    format: r.get(10)?,
+                    bitrate_kbps: r.get(11)?,
+                    has_artwork: r.get::<_, i64>(12)? == 1,
+                    artwork_hash: r.get(13)?,
+                })
+            },
+        )?;
+
+        tx.commit()?;
+        Ok(updated_row)
     }
 
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
@@ -633,7 +929,7 @@ mod tests {
             },
         ];
 
-        let count = db.batch_upsert_tracks(&scanned).expect("batch upsert");
+        let count = db.batch_upsert_tracks(&scanned, true).expect("batch upsert");
         assert_eq!(count, 2);
 
         // Verify counts

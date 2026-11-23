@@ -18,8 +18,12 @@ import { TrackCardSkeleton } from './components/TrackCardSkeleton';
 import { AlbumCard } from './components/AlbumCard';
 import { AlbumDetailModal } from './components/AlbumDetailModal';
 import { AlbumSectionList } from './components/AlbumSectionList';
+import { TrackMetadataModal } from './components/TrackMetadataModal';
+import { AlbumMetadataModal } from './components/AlbumMetadataModal';
 import { groupTracksByAlbum, type AlbumGroup } from '../../types/album';
 import { RubberSegment } from '../../components/ui/RubberSegment';
+import { useSettingsStore } from '../../stores/useSettingsStore';
+import type { TrackRow } from '../../types/library';
 
 export const LibraryView: React.FC = () => {
   const {
@@ -41,16 +45,37 @@ export const LibraryView: React.FC = () => {
     startScan,
     setSort,
     setupEventListeners,
+    editingTrack,
+    isTrackMetadataModalOpen,
+    openTrackMetadata,
+    closeTrackMetadata,
+    editingAlbum,
+    isAlbumMetadataModalOpen,
+    openAlbumMetadata,
+    closeAlbumMetadata,
   } = useLibraryStore();
 
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
-  const [selectedAlbum, setSelectedAlbum] = useState<AlbumGroup | null>(null);
+  const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
   const albumGroups = useMemo(() => {
     if (sortBy !== 'album') return [];
     return groupTracksByAlbum(tracks, localSearch, sortOrder);
   }, [tracks, sortBy, localSearch, sortOrder]);
+
+  const activeAlbum = useMemo(() => {
+    if (!selectedAlbumId) return null;
+    return albumGroups.find((a) => a.id === selectedAlbumId) || null;
+  }, [selectedAlbumId, albumGroups]);
+
+  const handleEditTrack = (track: TrackRow) => {
+    openTrackMetadata(track);
+  };
+
+  const handleEditAlbum = (album: AlbumGroup) => {
+    openAlbumMetadata(album);
+  };
 
   // Setup background event listeners on mount
   useEffect(() => {
@@ -90,11 +115,16 @@ export const LibraryView: React.FC = () => {
   };
 
   const hasNoFolders = folders.length === 0;
+  const isTopbar = useSettingsStore((s) => s.navLayout) === 'topbar';
 
   return (
     <div className="flex-1 overflow-y-auto flex flex-col select-none">
       {/* Header Bar */}
-      <div className="p-6 pb-4 border-b border-zinc-800/60 bg-zinc-950/70 backdrop-blur-xs flex flex-col gap-4">
+      <div
+        className={`${
+          isTopbar ? 'pt-20 px-6 sm:px-10 lg:px-12' : 'p-6'
+        } pb-4 border-b border-zinc-800/60 bg-zinc-950/70 backdrop-blur-xs flex flex-col gap-4 transition-all duration-200`}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2.5">
@@ -215,7 +245,7 @@ export const LibraryView: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 px-6 pb-28">
+      <div className={`flex-1 ${isTopbar ? 'px-6 sm:px-10 lg:px-12' : 'px-6'} pb-28`}>
         {hasNoFolders ? (
           <div className="min-h-[420px] rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/40 flex flex-col items-center justify-center p-8 text-center mt-2">
             <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-amber-500 mb-4 shadow-inner">
@@ -266,35 +296,64 @@ export const LibraryView: React.FC = () => {
                 <AlbumCard
                   key={album.id}
                   album={album}
-                  onOpenDetail={(a) => setSelectedAlbum(a)}
+                  onOpenDetail={(a) => setSelectedAlbumId(a.id)}
+                  onEditAlbum={handleEditAlbum}
                 />
               ))}
             </div>
           ) : (
-            <AlbumSectionList albumGroups={albumGroups} />
+            <AlbumSectionList
+              albumGroups={albumGroups}
+              onEditAlbum={handleEditAlbum}
+              onEditTrack={handleEditTrack}
+            />
           )
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 mt-2 pb-6">
             {tracks.map((track) => (
-              <TrackCard key={track.id} track={track} />
+              <TrackCard key={track.id} track={track} onEditMetadata={handleEditTrack} />
             ))}
           </div>
         ) : (
-          <TrackTable tracks={tracks} isLoading={isLoading} />
+          <TrackTable
+            tracks={tracks}
+            isLoading={isLoading}
+            onEditMetadata={handleEditTrack}
+          />
         )}
       </div>
 
+      {/* 1. Base Level Modals (z-50) */}
       {/* Album Detail Modal */}
       <AlbumDetailModal
-        isOpen={Boolean(selectedAlbum)}
-        album={selectedAlbum}
-        onClose={() => setSelectedAlbum(null)}
+        isOpen={Boolean(activeAlbum)}
+        album={activeAlbum}
+        onClose={() => setSelectedAlbumId(null)}
+        onEditAlbum={handleEditAlbum}
+        onEditTrack={handleEditTrack}
       />
 
       {/* Folder Manager Modal */}
       <FolderManagerModal
         isOpen={isFolderModalOpen}
         onClose={() => setIsFolderModalOpen(false)}
+      />
+
+      {/* 2. Top-Level Modals (z-[70]) - open cleanly on top of Album Detail */}
+      {/* Track Metadata Modal */}
+      <TrackMetadataModal
+        isOpen={isTrackMetadataModalOpen}
+        track={editingTrack}
+        zIndex="z-[70]"
+        onClose={closeTrackMetadata}
+      />
+
+      {/* Album Metadata Editor Modal */}
+      <AlbumMetadataModal
+        isOpen={isAlbumMetadataModalOpen}
+        album={editingAlbum}
+        zIndex="z-[70]"
+        onClose={closeAlbumMetadata}
       />
     </div>
   );

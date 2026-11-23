@@ -38,53 +38,101 @@ jobs:
           cache-dependency-path: Desktop/package-lock.json
 
       - name: Install dependencies
-        if: hashFiles('Desktop/package.json') != ''
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: npm ci
 
       - name: Typecheck
-        if: hashFiles('Desktop/tsconfig.json') != ''
         run: npx tsc --noEmit
 
       - name: Build frontend
-        if: hashFiles('Desktop/package.json') != ''
-        run: npm run build --if-present
+        run: npm run build
 
-  rust:
-    name: Desktop Core (Rust Format, Clippy & Tests)
-    runs-on: windows-latest
+  desktop-ci:
+    name: Desktop CI (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: Desktop/src-tauri
+        shell: bash
+        working-directory: Desktop
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            bundle_args: '--bundles nsis'
+          - platform: linux
+            os: ubuntu-22.04
+            bundle_args: '--bundles deb,appimage'
+          - platform: macos
+            os: macos-latest
+            bundle_args: '--bundles dmg'
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libasound2-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Desktop/package-lock.json
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
       - name: Setup Rust toolchain
-        if: hashFiles('Desktop/src-tauri/Cargo.toml') != ''
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
       - name: Rust Cache
-        if: hashFiles('Desktop/src-tauri/Cargo.toml') != ''
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: Desktop/src-tauri
 
-      - name: Check formatting
-        if: hashFiles('Desktop/src-tauri/Cargo.toml') != ''
+      - name: Check Rust formatting
+        working-directory: Desktop/src-tauri
         run: cargo fmt --all --check
 
       - name: Clippy lints
-        if: hashFiles('Desktop/src-tauri/Cargo.toml') != ''
+        working-directory: Desktop/src-tauri
         run: cargo clippy -- -D warnings
 
       - name: Run unit & integration tests
-        if: hashFiles('Desktop/src-tauri/Cargo.toml') != ''
+        working-directory: Desktop/src-tauri
         run: cargo test
+
+      - name: Build Desktop application bundle
+        run: npm run tauri build -- ${{ matrix.bundle_args }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
+        env:
+          CI: true
+
+      - name: Upload Desktop Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: syncdesk-${{ matrix.platform }}
+          path: |
+            Desktop/src-tauri/target/release/bundle/nsis/*.exe
+            Desktop/src-tauri/target/release/bundle/deb/*.deb
+            Desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            Desktop/src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+
 

@@ -31,8 +31,10 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Badge } from '../../components/ui/Badge';
 import { YouTubeRoomPlayer } from './components/YouTubeRoomPlayer';
 import CodeSlots from '../../components/ui/CodeSlots';
+import { useSettingsStore } from '../../stores/useSettingsStore';
 
 export const RoomsView: React.FC = () => {
+  const isTopbar = useSettingsStore((s) => s.navLayout) === 'topbar';
   const {
     activeRoom,
     members,
@@ -189,8 +191,13 @@ export const RoomsView: React.FC = () => {
   // Inside Active Listening Room
   if (activeRoom) {
     return (
-      <div className="flex-1 overflow-y-auto p-8 pb-28 flex flex-col gap-6 select-none w-full max-w-6xl">
-        {/* Active Room Top Bar */}
+      <div className="flex-1 overflow-y-auto w-full select-none scrollbar-thin">
+        <div
+          className={`w-full max-w-6xl mx-auto ${
+            isTopbar ? 'pt-20 px-6 sm:px-10 lg:px-12' : 'p-8'
+          } pb-28 flex flex-col gap-6 transition-all duration-200`}
+        >
+          {/* Active Room Top Bar */}
         <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 p-3.5 bg-zinc-900/50 backdrop-blur-xl border border-zinc-800/80 rounded-2xl relative z-40 shadow-md">
           <div className="flex items-center gap-3 shrink-0">
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
@@ -393,6 +400,7 @@ export const RoomsView: React.FC = () => {
         <div className="flex flex-col gap-6 w-full max-w-5xl mx-auto relative z-10">
           <YouTubeRoomPlayer onFocusSearch={() => searchInputRef.current?.focus()} />
         </div>
+        </div>
 
         {/* Leave Room Confirmation Dialog */}
         <ConfirmDialog
@@ -444,7 +452,11 @@ export const RoomsView: React.FC = () => {
 
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-transparent border-b border-zinc-800/60">
-        <div className="relative z-10 flex flex-col items-center justify-center text-center px-8 py-16 gap-6">
+        <div
+          className={`relative z-10 flex flex-col items-center justify-center text-center px-8 ${
+            isTopbar ? 'pt-24 pb-16' : 'py-16'
+          } gap-6 transition-all duration-200`}
+        >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-semibold uppercase tracking-widest">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
             Live Social Rooms
@@ -482,7 +494,7 @@ export const RoomsView: React.FC = () => {
       </div>
 
       {/* Feature Cards */}
-      <div className="p-8">
+      <div className={`max-w-6xl mx-auto w-full ${isTopbar ? 'p-8 sm:px-10 lg:px-12' : 'p-8'}`}>
         <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-500 mb-5">What you get</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[

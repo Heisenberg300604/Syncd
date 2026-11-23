@@ -15,6 +15,7 @@ import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useToastStore } from '../../stores/useToastStore';
 import { CodecBadge } from '../ui/CodecBadge';
 import CometDial from '../ui/CometDial';
+import { cleanTrackTitle } from '../../utils/trackNumbering';
 import {
   AnimatedPlayPause,
   AnimatedSkip,
@@ -73,6 +74,11 @@ export function BottomPlayer({ isDrawerOpen = false, onToggleDrawer }: BottomPla
   const [dragSeekPercent, setDragSeekPercent] = useState<number | null>(null);
   const [hoverPercent, setHoverPercent] = useState<number | null>(null);
   const [hoverTime, setHoverTime] = useState<number | null>(null);
+  const [artworkError, setArtworkError] = useState(false);
+
+  useEffect(() => {
+    setArtworkError(false);
+  }, [currentTrack?.id, currentTrack?.artworkUrl]);
 
   const isVisible = Boolean(currentTrack && hasPlaybackStarted);
 
@@ -231,8 +237,13 @@ export function BottomPlayer({ isDrawerOpen = false, onToggleDrawer }: BottomPla
         data-track-id={currentTrack?.id}
       >
         <div className="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-800/80 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
-          {currentTrack?.artworkUrl ? (
-            <img src={currentTrack.artworkUrl} alt={currentTrack.title} className="w-full h-full object-cover" />
+          {currentTrack?.artworkUrl && !artworkError ? (
+            <img
+              src={currentTrack.artworkUrl}
+              alt=""
+              onError={() => setArtworkError(true)}
+              className="w-full h-full object-cover"
+            />
           ) : isPlaying ? (
             <Disc className="w-5 h-5 text-amber-500 animate-spin" />
           ) : (
@@ -241,8 +252,8 @@ export function BottomPlayer({ isDrawerOpen = false, onToggleDrawer }: BottomPla
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
-            <p className="text-xs font-semibold text-zinc-100 truncate">
-              {currentTrack?.title || 'No track loaded'}
+            <p className="text-xs font-semibold text-zinc-100 truncate" title={currentTrack?.title || undefined}>
+              {currentTrack?.title ? cleanTrackTitle(currentTrack.title) : 'No track loaded'}
             </p>
             {currentTrack?.format && (
               <CodecBadge

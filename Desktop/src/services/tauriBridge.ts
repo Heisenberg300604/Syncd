@@ -1,4 +1,11 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import type { TrackRow } from "../types/library";
+import type {
+  DetailedAudioMetadata,
+  TrackMetadataUpdate,
+  AlbumMetadataUpdatePayload,
+  CreateAlbumPayload,
+} from "../types/metadata";
 
 export interface AppInfo {
   name: string;
@@ -118,5 +125,14 @@ export const tauriBridge = {
   getAuthCredentials: () => invokeCommand<StoredAuthSession>("get_auth_credentials"),
   clearAuthCredentials: () => invokeCommand<void>("clear_auth_credentials"),
   openBrowserUrl: (url: string) => invokeCommand<void>("open_browser_url", { url }),
+  readTrackMetadata: (trackId: string) =>
+    invokeCommand<DetailedAudioMetadata>("read_track_metadata", { trackId }),
+  updateTrackMetadata: (trackId: string, update: TrackMetadataUpdate) =>
+    invokeCommand<TrackRow>("update_track_metadata", { trackId, update }),
+  updateAlbumMetadata: (trackIds: string[], payload: AlbumMetadataUpdatePayload) =>
+    invokeCommand<TrackRow[]>("update_album_metadata", { trackIds, payload }),
+  createAlbumFromTracks: (payload: CreateAlbumPayload) =>
+    invokeCommand<TrackRow[]>("create_album_from_tracks", { payload }),
+  revealInFolder: (path: string) => invokeCommand<void>("reveal_in_folder", { path }),
 };
 

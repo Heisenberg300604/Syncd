@@ -35,8 +35,9 @@ export function extractPrimaryArtist(artistStr?: string | null): string {
 
 /**
  * Smart Album Grouping:
- * Consolidates tracks belonging to the same album into a single Album entity,
- * resolving different featuring artists into the unified primary artist.
+ * Consolidates tracks belonging to the same album into a single Album entity.
+ * Tracks with the same Album name are automatically grouped into ONE album,
+ * intelligently resolving compilation/collaboration artists and preserving track ordering.
  */
 export function groupTracksByAlbum(
   tracks: TrackRow[],
@@ -50,11 +51,56 @@ export function groupTracksByAlbum(
     const albumTitle = isMissingAlbum ? 'Singles & Unknown Album' : track.album.trim();
     const primaryArtist = isMissingAlbum ? 'Various Artists' : extractPrimaryArtist(track.artist);
 
-    // Grouping key: Normalized album title + primary artist
-    // This merges all songs in "Different World" (regardless of feat. artists) into ONE album
-    const key = isMissingAlbum
-      ? '__singles_unknown__'
-      : `${albumTitle.toLowerCase().trim()}___${primaryArtist.toLowerCase().trim()}`;
+    // Grouping key:
+    // Tracks with the same Album Title belong to the same album!
+    let key: string;
+    if (isMissingAlbum) {
+      key = '__singles_unknown__';
+    } else {
+      const normAlbum = albumTitle.toLowerCase().trim();
+      const explicitAlbumArtist = track.albumArtist?.trim().toLowerCase();
+      if (explicitAlbumArtist) {
+        key = `${normAlbum}___${explicitAlbumArtist}`;
+      } else {
+        // Check if an existing group with this album name already exists
+        let matchedKey: string | null = null;
+        const trackFolder = track.path
+          ? track.path.replace(/\\/g, '/').split('/').slice(0, -1).join('/').toLowerCase()
+          : '';
+        const trackPrimary = primaryArtist.toLowerCase();
+
+        for (const [existingKey, group] of albumMap.entries()) {
+          if (existingKey === '__singles_unknown__') continue;
+          if (group.album.toLowerCase().trim() !== normAlbum) continue;
+
+          // Check if tracks share the same parent folder (e.g. D:\THE WALKER LEGACY)
+          const groupFolders = new Set(
+            group.tracks.map((t) =>
+              t.path ? t.path.replace(/\\/g, '/').split('/').slice(0, -1).join('/').toLowerCase() : ''
+            )
+          );
+          if (trackFolder && groupFolders.has(trackFolder)) {
+            matchedKey = existingKey;
+            break;
+          }
+
+          // Check if tracks share artists
+          const groupArtists = new Set(
+            group.tracks.map((t) => extractPrimaryArtist(t.artist).toLowerCase())
+          );
+          if (groupArtists.has(trackPrimary)) {
+            matchedKey = existingKey;
+            break;
+          }
+
+          // Same album title in the library -> merge into the existing album group
+          matchedKey = existingKey;
+          break;
+        }
+
+        key = matchedKey || normAlbum;
+      }
+    }
 
     let group = albumMap.get(key);
     if (!group) {
@@ -89,8 +135,9 @@ export function groupTracksByAlbum(
     }
   }
 
-  // Finalize each album group: sort child tracks & resolve dominant format
+  // Finalize each album group: sort child tracks, resolve unified album artist & dominant format
   for (const group of albumMap.values()) {
+    // 1. Sort child tracks by track number, then by file title
     group.tracks.sort((a, b) => {
       if (a.trackNumber != null && b.trackNumber != null && a.trackNumber !== b.trackNumber) {
         return a.trackNumber - b.trackNumber;
@@ -98,6 +145,64 @@ export function groupTracksByAlbum(
       return a.title.localeCompare(b.title);
     });
 
+    // 2. Resolve unified Album Artist
+    if (group.isUnknownAlbum) {
+      group.artist = 'Various Artists';
+    } else {
+      const explicitAlbumArtist = group.tracks.find((t) => t.albumArtist?.trim())?.albumArtist?.trim();
+
+      if (explicitAlbumArtist) {
+        group.artist = explicitAlbumArtist;
+      } else {
+        const distinctArtists = Array.from(
+          new Set(group.tracks.map((t) => extractPrimaryArtist(t.artist)).filter(Boolean))
+        );
+
+        if (distinctArtists.length === 1) {
+          group.artist = distinctArtists[0];
+        } else {
+          // Count frequency of artists in the album
+          const counts = new Map<string, number>();
+          for (const t of group.tracks) {
+            const pa = extractPrimaryArtist(t.artist);
+            counts.set(pa, (counts.get(pa) || 0) + 1);
+          }
+          let topArtist = '';
+          let maxCount = 0;
+          for (const [art, count] of counts.entries()) {
+            if (count > maxCount) {
+              maxCount = count;
+              topArtist = art;
+            }
+          }
+
+          // Check if an artist name shares words with the album title (e.g. "The Walkers" in "THE W4LKER LEG4CY")
+          const cleanAlbumName = group.album
+            .toLowerCase()
+            .replace(/4/g, 'a')
+            .replace(/3/g, 'e')
+            .replace(/1/g, 'i')
+            .replace(/0/g, 'o')
+            .replace(/[^a-z0-9]/g, ' ');
+          const albumKeywords = cleanAlbumName.split(/\s+/).filter((w) => w.length > 2);
+
+          const matchingArtist = distinctArtists.find((art) => {
+            const artWords = art.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter((w) => w.length > 2);
+            return artWords.some((aw) => albumKeywords.some((kw) => kw.includes(aw) || aw.includes(kw)));
+          });
+
+          if (matchingArtist) {
+            group.artist = matchingArtist;
+          } else if (maxCount > group.tracks.length * 0.5) {
+            group.artist = topArtist;
+          } else {
+            group.artist = 'Various Artists';
+          }
+        }
+      }
+    }
+
+    // 3. Dominant format resolution
     const formats = Array.from(new Set(group.tracks.map((t) => t.format).filter(Boolean)));
     if (formats.some((f) => f.toLowerCase() === 'flac')) {
       group.format = 'FLAC';

@@ -11,6 +11,8 @@ export interface ModalProps {
   children: React.ReactNode;
   className?: string;
   maxWidth?: "sm" | "md" | "lg" | "xl";
+  zIndex?: string;
+  overlayClassName?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -21,10 +23,13 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   className,
   maxWidth = "md",
+  zIndex = "z-50",
+  overlayClassName,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
+        e.stopImmediatePropagation();
         onClose();
       }
     };
@@ -45,10 +50,16 @@ export const Modal: React.FC<ModalProps> = ({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/80 backdrop-blur-xs select-none animate-in fade-in duration-150"
+      className={twMerge(
+        clsx(
+          "fixed inset-0 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm select-none animate-in fade-in duration-150",
+          zIndex,
+          overlayClassName
+        )
+      )}
     >
       <div
-        className="fixed inset-0"
+        className="fixed inset-0 bg-transparent"
         onClick={onClose}
         aria-hidden="true"
       />

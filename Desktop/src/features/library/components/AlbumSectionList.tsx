@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Pause, ListPlus, ChevronDown, ChevronRight, Disc3, Music2, Clock } from 'lucide-react';
+import { Play, Pause, ListPlus, ChevronDown, ChevronRight, Disc3, Music2, Clock, Edit3 } from 'lucide-react';
 import type { AlbumGroup } from '../../../types/album';
 import type { TrackRow } from '../../../types/library';
 import { usePlayerStore } from '../../../stores/usePlayerStore';
@@ -9,6 +9,8 @@ import { CodecBadge } from '../../../components/ui/CodecBadge';
 
 export interface AlbumSectionListProps {
   albumGroups: AlbumGroup[];
+  onEditAlbum?: (album: AlbumGroup) => void;
+  onEditTrack?: (track: TrackRow) => void;
 }
 
 function formatDuration(totalSeconds: number): string {
@@ -18,7 +20,82 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
 
-export const AlbumSectionList: React.FC<AlbumSectionListProps> = ({ albumGroups }) => {
+const AlbumThumbnail: React.FC<{ album: AlbumGroup }> = ({ album }) => {
+  const { getArtworkUrl, artworkCache, getArtwork, invalidateArtworkUrl } = useLibraryStore();
+  const sync =
+    (album.artworkHash ? getArtworkUrl(album.artworkHash) : null) ||
+    artworkCache[album.representativeTrackId] ||
+    null;
+  const [src, setSrc] = useState<string | null>(sync);
+  const [hasError, setHasError] = useState(false);
+
+  React.useEffect(() => {
+    if (sync && !hasError) {
+      setSrc(sync);
+      return;
+    }
+    let isMounted = true;
+    if (album.hasArtwork) {
+      getArtwork(album.representativeTrackId).then((resolved) => {
+        if (isMounted) {
+          if (resolved) {
+            setSrc(resolved);
+            setHasError(false);
+          } else {
+            setHasError(true);
+          }
+        }
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [album.representativeTrackId, album.hasArtwork, sync, hasError, getArtwork]);
+
+  const handleError = () => {
+    if (album.artworkHash) {
+      invalidateArtworkUrl(album.artworkHash);
+    }
+    invalidateArtworkUrl(album.representativeTrackId);
+    if (album.hasArtwork) {
+      getArtwork(album.representativeTrackId).then((resolved) => {
+        if (resolved && resolved !== src) {
+          setSrc(resolved);
+          setHasError(false);
+        } else {
+          setHasError(true);
+        }
+      }).catch(() => setHasError(true));
+    } else {
+      setHasError(true);
+    }
+  };
+
+  if (!src || hasError) {
+    return album.isUnknownAlbum ? (
+      <Music2 className="w-5 h-5 text-zinc-600" />
+    ) : (
+      <Disc3 className="w-5 h-5 text-zinc-600" />
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      onError={handleError}
+      className="w-full h-full object-cover"
+      loading="lazy"
+      decoding="async"
+    />
+  );
+};
+
+export const AlbumSectionList: React.FC<AlbumSectionListProps> = ({
+  albumGroups,
+  onEditAlbum,
+  onEditTrack,
+}) => {
   const { currentTrack, status, playTrack, enqueueTracks, play, pause } = usePlayerStore();
   const { selectedTrackId, setSelectedTrackId, getArtworkUrl, artworkCache } = useLibraryStore();
   const { addToast } = useToastStore();
@@ -141,11 +218,6 @@ export const AlbumSectionList: React.FC<AlbumSectionListProps> = ({ albumGroups 
         );
         const isPlayingThisAlbum = isCurrentAlbum && status === 'playing';
 
-        const artwork =
-          (album.artworkHash ? getArtworkUrl(album.artworkHash) : null) ||
-          artworkCache[album.representativeTrackId] ||
-          null;
-
         return (
           <div
             key={album.id}
@@ -158,6 +230,7 @@ export const AlbumSectionList: React.FC<AlbumSectionListProps> = ({ albumGroups 
             {/* Album Header Bar */}
             <div
               onClick={() => toggleCollapse(album.id)}
+              data-album-id={album.id}
               className="flex items-center justify-between gap-4 p-3.5 bg-zinc-900/60 hover:bg-zinc-900/90 border-b border-zinc-850 cursor-pointer transition-colors"
             >
               <div className="flex items-center gap-3.5 min-w-0">
@@ -175,18 +248,7 @@ export const AlbumSectionList: React.FC<AlbumSectionListProps> = ({ albumGroups 
 
                 {/* Thumbnail Art */}
                 <div className="w-10 h-10 rounded-xl overflow-hidden bg-zinc-950 border border-zinc-850 shrink-0 flex items-center justify-center">
-                  {artwork ? (
-                    <img
-                      src={artwork}
-                      alt={album.album}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : album.isUnknownAlbum ? (
-                    <Music2 className="w-5 h-5 text-zinc-600" />
-                  ) : (
-                    <Disc3 className="w-5 h-5 text-zinc-600" />
-                  )}
+                  <AlbumThumbnail album={album} />
                 </div>
 
                 {/* Album Details */}
@@ -231,11 +293,25 @@ export const AlbumSectionList: React.FC<AlbumSectionListProps> = ({ albumGroups 
                 <button
                   type="button"
                   onClick={(e) => handleEnqueueAlbum(album, e)}
-                  className="p-1.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border border-zinc-750 transition-colors cursor-pointer"
+                  className="p-1.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 border border-zinc-755 transition-colors cursor-pointer"
                   title="Add album to playback queue"
                 >
                   <ListPlus className="w-4 h-4" />
                 </button>
+
+                {onEditAlbum && !album.isUnknownAlbum && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEditAlbum(album);
+                    }}
+                    className="p-1.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 text-zinc-300 hover:text-amber-400 border border-zinc-755 transition-colors cursor-pointer"
+                    title="Edit Album Metadata & Tags"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -261,6 +337,7 @@ export const AlbumSectionList: React.FC<AlbumSectionListProps> = ({ albumGroups 
                     return (
                       <tr
                         key={track.id}
+                        data-track-id={track.id}
                         onClick={() => setSelectedTrackId(track.id)}
                         onDoubleClick={() => handlePlayTrack(track, album)}
                         className={`group transition-colors cursor-pointer ${
@@ -329,9 +406,24 @@ export const AlbumSectionList: React.FC<AlbumSectionListProps> = ({ albumGroups 
                           )}
                         </td>
 
-                        {/* Duration */}
+                        {/* Duration & Track Edit */}
                         <td className="py-2 px-3 text-right pr-4 font-mono text-zinc-400 tabular-nums">
-                          {formatDuration(track.durationSeconds)}
+                          <div className="flex items-center justify-end gap-2">
+                            {onEditTrack && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditTrack(track);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 transition-all cursor-pointer"
+                                title="Edit Track Metadata & File Tags"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <span>{formatDuration(track.durationSeconds)}</span>
+                          </div>
                         </td>
                       </tr>
                     );

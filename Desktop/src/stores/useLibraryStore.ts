@@ -3,6 +3,7 @@ import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { soundService } from '../services/soundService';
 import type { IndexedFolder, TrackRow, ScanProgress, ScanCompleteEvent, LibraryStats } from '../types/library';
+import type { AlbumGroup } from '../types/album';
 
 const getInitialViewMode = (): 'list' | 'grid' => {
   try {
@@ -40,11 +41,25 @@ interface LibraryState {
   loadStats: () => Promise<void>;
   loadArtworkDir: () => Promise<void>;
   getArtworkUrl: (artworkHash: string | null | undefined) => string | null;
+  invalidateArtworkUrl: (key: string) => void;
   setSort: (sortBy: 'title' | 'artist' | 'album' | 'duration' | 'year', sortOrder: 'asc' | 'desc') => void;
   setSelectedTrackId: (id: string | null) => void;
   setViewMode: (mode: 'list' | 'grid') => void;
   getArtwork: (trackId: string) => Promise<string | null>;
+  updateTrackDuration: (trackId: string, durationSeconds: number) => void;
+  updateTrackInStore: (updatedTrack: TrackRow) => void;
+  updateTracksInStore: (updatedTracks: TrackRow[]) => void;
   setupEventListeners: () => Promise<() => void>;
+
+  // Global Metadata Modal States
+  editingTrack: TrackRow | null;
+  isTrackMetadataModalOpen: boolean;
+  openTrackMetadata: (track: TrackRow) => void;
+  closeTrackMetadata: () => void;
+  editingAlbum: AlbumGroup | null;
+  isAlbumMetadataModalOpen: boolean;
+  openAlbumMetadata: (album: AlbumGroup) => void;
+  closeAlbumMetadata: () => void;
 }
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
@@ -62,6 +77,16 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   artworkCache: {},
   artworkDir: null,
   viewMode: getInitialViewMode(),
+
+  // Global Metadata Modal States
+  editingTrack: null,
+  isTrackMetadataModalOpen: false,
+  openTrackMetadata: (track: TrackRow) => set({ editingTrack: track, isTrackMetadataModalOpen: true }),
+  closeTrackMetadata: () => set({ editingTrack: null, isTrackMetadataModalOpen: false }),
+  editingAlbum: null,
+  isAlbumMetadataModalOpen: false,
+  openAlbumMetadata: (album: AlbumGroup) => set({ editingAlbum: album, isAlbumMetadataModalOpen: true }),
+  closeAlbumMetadata: () => set({ editingAlbum: null, isAlbumMetadataModalOpen: false }),
 
   loadFolders: async () => {
     try {
@@ -247,7 +272,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
     try {
       const separator = artworkDir.includes('/') ? '/' : '\\';
-      const fullPath = `${artworkDir}${separator}${artworkHash}.jpg`;
+      const fullPath = artworkHash.includes('.')
+        ? `${artworkDir}${separator}${artworkHash}`
+        : `${artworkDir}${separator}${artworkHash}.jpg`;
       const assetUrl = convertFileSrc(fullPath);
       // Cache the computed asset URL synchronously
       artworkCache[artworkHash] = assetUrl;
@@ -255,6 +282,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     } catch {
       return null;
     }
+  },
+
+  invalidateArtworkUrl: (key) => {
+    set((state) => {
+      const nextCache = { ...state.artworkCache };
+      delete nextCache[key];
+      return { artworkCache: nextCache };
+    });
   },
 
   setSort: (sortBy, sortOrder) => {
@@ -283,8 +318,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       const filePath = await invoke<string | null>('get_artwork', { trackId });
       if (filePath) {
         const assetUrl = convertFileSrc(filePath);
+        const fileName = filePath.split(/[/\\]/).pop();
+        const hashStem = fileName ? fileName.replace(/\.[^/.]+$/, '') : null;
         set((state) => ({
-          artworkCache: { ...state.artworkCache, [trackId]: assetUrl },
+          artworkCache: {
+            ...state.artworkCache,
+            [trackId]: assetUrl,
+            ...(hashStem ? { [hashStem]: assetUrl } : {}),
+          },
         }));
         return assetUrl;
       }
@@ -292,6 +333,42 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       console.error('Failed to load artwork for track:', trackId, err);
     }
     return null;
+  },
+
+  updateTrackDuration: (trackId: string, durationSeconds: number) => {
+    if (durationSeconds <= 0) return;
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === trackId ? { ...t, durationSeconds } : t
+      ),
+    }));
+  },
+
+  updateTrackInStore: (updatedTrack: TrackRow) => {
+    const currentTracks = get().tracks;
+    const newTracks = currentTracks.map((t) => (t.id === updatedTrack.id ? updatedTrack : t));
+    const newCache = { ...get().artworkCache };
+    delete newCache[updatedTrack.id];
+    if (updatedTrack.artworkHash) {
+      get().invalidateArtworkUrl(updatedTrack.artworkHash);
+    }
+    set({ tracks: newTracks, artworkCache: newCache });
+    get().loadStats();
+  },
+
+  updateTracksInStore: (updatedTracks: TrackRow[]) => {
+    const updateMap = new Map(updatedTracks.map((t) => [t.id, t]));
+    const currentTracks = get().tracks;
+    const newTracks = currentTracks.map((t) => updateMap.get(t.id) || t);
+    const newCache = { ...get().artworkCache };
+    for (const t of updatedTracks) {
+      delete newCache[t.id];
+      if (t.artworkHash) {
+        get().invalidateArtworkUrl(t.artworkHash);
+      }
+    }
+    set({ tracks: newTracks, artworkCache: newCache });
+    get().loadStats();
   },
 
   setupEventListeners: async () => {

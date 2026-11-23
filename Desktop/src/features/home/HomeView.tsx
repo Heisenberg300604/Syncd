@@ -13,8 +13,10 @@ import { SplitText } from '../../components/ui/SplitText';
 import { TrackCard } from '../library/components/TrackCard';
 import { TrackCardSkeleton } from '../library/components/TrackCardSkeleton';
 import { isTauri } from '../../services/tauriBridge';
+import { useSettingsStore } from '../../stores/useSettingsStore';
 
 export function HomeView() {
+  const isTopbar = useSettingsStore((s) => s.navLayout) === 'topbar';
   const { setCurrentView } = useAppStore();
   const { tracks, isLoading, loadTracks, addFolder } = useLibraryStore();
   const { addToast } = useToastStore();
@@ -71,8 +73,8 @@ export function HomeView() {
       <section
         className={`relative flex flex-col items-center justify-center text-center px-6 transition-all duration-300 overflow-hidden ${
           hasTracks
-            ? 'min-h-[440px] py-16 border-b border-zinc-900/80 bg-transparent'
-            : 'flex-1 min-h-full py-16 border-b-0 bg-transparent'
+            ? `min-h-[440px] ${isTopbar ? 'pt-24 pb-16' : 'py-16'} border-b border-zinc-900/80 bg-transparent`
+            : `flex-1 min-h-full ${isTopbar ? 'pt-24 pb-16' : 'py-16'} border-b-0 bg-transparent`
         }`}
       >
         {/* Subtle ambient luxury backlight glow */}

@@ -12,6 +12,7 @@ interface SettingsState {
   sfxEnabled: boolean;
   sfxVolume: number;
   selectedAccent: 'amber' | 'gold' | 'emerald' | 'cyan';
+  navLayout: 'sidebar' | 'topbar';
   apiUrl: string;
   socketUrl: string;
 
@@ -26,6 +27,7 @@ interface SettingsState {
   setSfxEnabled: (enabled: boolean) => Promise<void>;
   setSfxVolume: (volume: number) => Promise<void>;
   setSelectedAccent: (accent: 'amber' | 'gold' | 'emerald' | 'cyan') => Promise<void>;
+  setNavLayout: (layout: 'sidebar' | 'topbar') => Promise<void>;
   setEndpoints: (apiUrl: string, socketUrl: string) => Promise<void>;
 }
 
@@ -39,6 +41,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   sfxEnabled: true,
   sfxVolume: 0.7,
   selectedAccent: 'amber',
+  navLayout: 'sidebar',
   apiUrl: 'http://localhost:5000/api',
   socketUrl: 'http://localhost:5000',
 
@@ -49,6 +52,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         const sfxEnabled = all['audio.sfxEnabled'] !== 'false';
         const parsedVol = parseFloat(all['audio.sfxVolume'] || '0.7');
         const sfxVolume = isNaN(parsedVol) ? 0.7 : Math.max(0, Math.min(1, parsedVol));
+        const rawNavLayout = all['ui.navLayout'];
+        const navLayout: 'sidebar' | 'topbar' = rawNavLayout === 'topbar' ? 'topbar' : 'sidebar';
 
         set({
           isLoaded: true,
@@ -60,6 +65,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           sfxEnabled,
           sfxVolume,
           selectedAccent: ((all['ui.accent'] as 'amber' | 'gold' | 'emerald' | 'cyan') || 'amber'),
+          navLayout,
           apiUrl: all['network.apiUrl'] || 'http://localhost:5000/api',
           socketUrl: all['network.socketUrl'] || 'http://localhost:5000',
         });
@@ -138,6 +144,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       document.documentElement.setAttribute('data-accent', accent);
     }
     await get().setSettingValue('ui.accent', accent);
+  },
+
+  setNavLayout: async (layout: 'sidebar' | 'topbar') => {
+    set({ navLayout: layout });
+    soundService.play('toggle:on');
+    await get().setSettingValue('ui.navLayout', layout);
   },
 
   setEndpoints: async (apiUrl: string, socketUrl: string) => {

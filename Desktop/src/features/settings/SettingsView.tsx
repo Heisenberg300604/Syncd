@@ -64,6 +64,7 @@ export function SettingsView() {
     sfxEnabled,
     sfxVolume,
     selectedAccent,
+    navLayout,
     setSelectedDevice,
     setVolumeNormalization,
     setGaplessPlayback,
@@ -72,6 +73,7 @@ export function SettingsView() {
     setSfxEnabled,
     setSfxVolume,
     setSelectedAccent,
+    setNavLayout,
   } = useSettingsStore();
   const [socialPresence, setSocialPresence] = useState(true);
 
@@ -193,9 +195,16 @@ export function SettingsView() {
     });
   };
 
+  const isTopbar = navLayout === 'topbar';
+
   return (
-    <div className="flex-1 overflow-y-auto p-8 pb-28 flex flex-col gap-8 w-full max-w-5xl select-none">
-      {/* Top Header */}
+    <div className="flex-1 overflow-y-auto w-full select-none scrollbar-thin">
+      <div
+        className={`w-full max-w-5xl mx-auto ${
+          isTopbar ? 'pt-20 px-6 sm:px-10 lg:px-12' : 'p-8'
+        } pb-28 flex flex-col gap-8 transition-all duration-200`}
+      >
+        {/* Top Header */}
       <div>
         <h1 className="text-xl font-bold tracking-tight text-zinc-100">Preferences</h1>
         <p className="text-xs text-zinc-400 mt-0.5">
@@ -525,6 +534,176 @@ export function SettingsView() {
             </div>
           </div>
 
+          {/* Navigation Layout Switcher Cards (Sidebar vs Topbar) */}
+          <div className="flex flex-col gap-3 pt-4 border-t border-zinc-800/60">
+            <div>
+              <span className="font-medium text-zinc-200 block text-xs">Navigation Layout</span>
+              <span className="text-[11px] text-zinc-400">
+                Choose between classic vertical sidebar or an integrated full-width top navigation bar
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* Option 1: Sidebar (Default) */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (navLayout !== 'sidebar') {
+                    setNavLayout('sidebar');
+                    addToast({
+                      type: 'success',
+                      title: 'Layout Updated',
+                      message: 'Switched to classic Sidebar navigation.',
+                    });
+                  }
+                }}
+                className={`group relative flex flex-col p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  navLayout === 'sidebar'
+                    ? 'bg-zinc-900/90 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.08)] ring-1 ring-amber-500/30'
+                    : 'bg-zinc-900/30 border-zinc-800/80 hover:bg-zinc-900/60 hover:border-zinc-700'
+                }`}
+              >
+                {/* Wireframe Mockup Preview */}
+                <div className="w-full h-20 rounded-lg bg-zinc-950 border border-zinc-800/80 p-1.5 flex flex-col gap-1 overflow-hidden pointer-events-none mb-3">
+                  {/* Mock TitleBar */}
+                  <div className="h-2 w-full bg-zinc-900 rounded-xs flex items-center justify-between px-1">
+                    <div className="w-4 h-1 bg-zinc-700 rounded-full" />
+                    <div className="w-8 h-1 bg-zinc-800 rounded-full" />
+                    <div className="flex gap-0.5">
+                      <div className="w-1 h-1 bg-zinc-700 rounded-full" />
+                      <div className="w-1 h-1 bg-zinc-700 rounded-full" />
+                    </div>
+                  </div>
+                  {/* Mock Body: Sidebar + Main Area */}
+                  <div className="flex-1 flex gap-1 overflow-hidden">
+                    {/* Mock Sidebar */}
+                    <div
+                      className={`w-7 h-full rounded-xs p-0.5 flex flex-col gap-0.5 ${
+                        navLayout === 'sidebar'
+                          ? 'bg-amber-500/15 border border-amber-500/30'
+                          : 'bg-zinc-900 border border-zinc-800'
+                      }`}
+                    >
+                      <div
+                        className={`w-full h-1 rounded-full ${
+                          navLayout === 'sidebar' ? 'bg-amber-400' : 'bg-zinc-600'
+                        }`}
+                      />
+                      <div className="w-4/5 h-1 bg-zinc-700 rounded-full" />
+                      <div className="w-3/5 h-1 bg-zinc-700 rounded-full" />
+                      <div className="w-4/5 h-1 bg-zinc-700 rounded-full" />
+                    </div>
+                    {/* Mock Main Content */}
+                    <div className="flex-1 h-full bg-zinc-900/60 rounded-xs p-1 flex flex-col gap-1">
+                      <div className="w-1/2 h-1.5 bg-zinc-800 rounded-xs" />
+                      <div className="grid grid-cols-3 gap-0.5 flex-1">
+                        <div className="bg-zinc-850 rounded-xs" />
+                        <div className="bg-zinc-850 rounded-xs" />
+                        <div className="bg-zinc-850 rounded-xs" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span
+                      className={`text-xs font-semibold block transition-colors ${
+                        navLayout === 'sidebar' ? 'text-amber-400' : 'text-zinc-200 group-hover:text-zinc-100'
+                      }`}
+                    >
+                      Sidebar (Default)
+                    </span>
+                    <span className="text-[11px] text-zinc-400 leading-tight">
+                      Classic desktop navigation with dedicated badges and resize handle.
+                    </span>
+                  </div>
+                  {navLayout === 'sidebar' && (
+                    <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 ml-2" />
+                  )}
+                </div>
+              </button>
+
+              {/* Option 2: Floating Pill Navigation */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (navLayout !== 'topbar') {
+                    setNavLayout('topbar');
+                    addToast({
+                      type: 'success',
+                      title: 'Layout Updated',
+                      message: 'Switched to Floating Pill & Title Bar layout.',
+                    });
+                  }
+                }}
+                className={`group relative flex flex-col p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  navLayout === 'topbar'
+                    ? 'bg-zinc-900/90 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.08)] ring-1 ring-amber-500/30'
+                    : 'bg-zinc-900/30 border-zinc-800/80 hover:bg-zinc-900/60 hover:border-zinc-700'
+                }`}
+              >
+                {/* Wireframe Mockup Preview */}
+                <div className="w-full h-20 rounded-lg bg-zinc-950 border border-zinc-800/80 p-1.5 flex flex-col gap-1 overflow-hidden pointer-events-none mb-3">
+                  {/* Mock TitleBar (Top) */}
+                  <div className="h-2 w-full bg-zinc-900 rounded-xs flex items-center justify-between px-1">
+                    <div className="w-4 h-1 bg-zinc-700 rounded-full" />
+                    <div className="w-8 h-1 bg-zinc-800 rounded-full" />
+                    <div className="flex gap-0.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
+                      <div className="w-1 h-1 bg-zinc-700 rounded-full" />
+                    </div>
+                  </div>
+
+                  {/* Mock Floating Pill (Centered Island) */}
+                  <div className="w-full flex justify-center py-0.5">
+                    <div
+                      className={`h-2.5 px-2 rounded-full flex items-center gap-1 ${
+                        navLayout === 'topbar'
+                          ? 'bg-amber-500/20 border border-amber-500/40 shadow-xs'
+                          : 'bg-zinc-850 border border-zinc-750'
+                      }`}
+                    >
+                      <div className={`w-1 h-1 rounded-full ${navLayout === 'topbar' ? 'bg-amber-400' : 'bg-zinc-500'}`} />
+                      <div className="w-1 h-1 rounded-full bg-zinc-600" />
+                      <div className="w-1 h-1 rounded-full bg-zinc-600" />
+                      <div className="w-1 h-1 rounded-full bg-zinc-600" />
+                    </div>
+                  </div>
+
+                  {/* Mock Body: Full Width Viewport */}
+                  <div className="flex-1 w-full bg-zinc-900/60 rounded-xs p-1 flex flex-col gap-1">
+                    <div className="w-1/3 h-1.5 bg-zinc-800 rounded-xs" />
+                    <div className="grid grid-cols-4 gap-0.5 flex-1">
+                      <div className="bg-zinc-850 rounded-xs" />
+                      <div className="bg-zinc-850 rounded-xs" />
+                      <div className="bg-zinc-850 rounded-xs" />
+                      <div className="bg-zinc-850 rounded-xs" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span
+                      className={`text-xs font-semibold block transition-colors ${
+                        navLayout === 'topbar' ? 'text-amber-400' : 'text-zinc-200 group-hover:text-zinc-100'
+                      }`}
+                    >
+                      Floating Pill & Title Bar
+                    </span>
+                    <span className="text-[11px] text-zinc-400 leading-tight">
+                      Dedicated title bar with a glassmorphic floating navigation capsule.
+                    </span>
+                  </div>
+                  {navLayout === 'topbar' && (
+                    <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 ml-2" />
+                  )}
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between text-xs pt-2 border-t border-zinc-850">
             <div>
               <span className="font-medium text-zinc-200 block">Desktop Track Notifications</span>
@@ -717,6 +896,7 @@ export function SettingsView() {
         <div className="flex items-center justify-between text-xs text-zinc-400 px-1 pt-2">
           <span>SyncDesk v{appInfo?.version || updater.currentVersion || '0.0.1'}</span>
         </div>
+      </div>
       </div>
 
       {/* Music Folder Manager Modal */}

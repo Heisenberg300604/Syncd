@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ListMusic,
   Plus,
@@ -11,16 +11,31 @@ import {
   Check,
   X,
   ListPlus,
+  Edit3,
+  Image as ImageIcon,
+  Upload,
+  FolderPlus,
+  FolderSearch,
+  CheckCircle2,
+  Loader2,
+  Database,
 } from 'lucide-react';
+import { open } from '@tauri-apps/plugin-dialog';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { soundService } from '../../services/soundService';
 import { usePlaylistStore, type Playlist } from '../../stores/usePlaylistStore';
 import { useLibraryStore } from '../../stores/useLibraryStore';
 import { usePlayerStore } from '../../stores/usePlayerStore';
 import { useToastStore } from '../../stores/useToastStore';
+import type { TrackRow } from '../../types/library';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { PlaylistCover } from './components/PlaylistCover';
 import { RubberSegment } from '../../components/ui/RubberSegment';
 import { CodecBadge } from '../../components/ui/CodecBadge';
+import { cleanTrackTitle, sortTracksByNumber } from '../../utils/trackNumbering';
+import { TrackMetadataModal } from '../library/components/TrackMetadataModal';
+import { useSettingsStore } from '../../stores/useSettingsStore';
 
 function formatSeconds(total: number): string {
   if (!total || isNaN(total) || total <= 0) return '0:00';
@@ -33,25 +48,51 @@ const PlaylistTrackThumbnail: React.FC<{
   trackId: string;
   artworkHash: string | null;
 }> = ({ trackId, artworkHash }) => {
-  const { getArtworkUrl, artworkCache, getArtwork } = useLibraryStore();
+  const { getArtworkUrl, artworkCache, getArtwork, invalidateArtworkUrl } = useLibraryStore();
   const syncSrc = getArtworkUrl(artworkHash) || artworkCache[trackId] || null;
   const [src, setSrc] = useState<string | null>(syncSrc);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
-    if (syncSrc) {
+    if (syncSrc && !hasError) {
       setSrc(syncSrc);
       return;
     }
     let isMounted = true;
     getArtwork(trackId).then((img) => {
-      if (isMounted && img) setSrc(img);
+      if (isMounted) {
+        if (img) {
+          setSrc(img);
+          setHasError(false);
+        } else {
+          setHasError(true);
+        }
+      }
     });
     return () => {
       isMounted = false;
     };
-  }, [trackId, syncSrc, getArtwork]);
+  }, [trackId, syncSrc, hasError, getArtwork]);
 
-  if (!src) {
+  const handleError = () => {
+    if (artworkHash) {
+      invalidateArtworkUrl(artworkHash);
+    }
+    invalidateArtworkUrl(trackId);
+
+    getArtwork(trackId)
+      .then((img) => {
+        if (img && img !== src) {
+          setSrc(img);
+          setHasError(false);
+        } else {
+          setHasError(true);
+        }
+      })
+      .catch(() => setHasError(true));
+  };
+
+  if (!src || hasError) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-zinc-900 text-zinc-600">
         <Music className="w-4 h-4" />
@@ -62,7 +103,8 @@ const PlaylistTrackThumbnail: React.FC<{
   return (
     <img
       src={src}
-      alt="Track Artwork"
+      alt=""
+      onError={handleError}
       className="w-full h-full object-cover"
       loading="lazy"
       decoding="async"
@@ -71,42 +113,249 @@ const PlaylistTrackThumbnail: React.FC<{
 };
 
 export function PlaylistsView() {
+  const isTopbar = useSettingsStore((s) => s.navLayout) === 'topbar';
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
+
+  // Create Playlist state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
   const [newPlaylistDesc, setNewPlaylistDesc] = useState('');
+  const [newPlaylistCover, setNewPlaylistCover] = useState<{
+    path?: string;
+    base64?: string;
+    preview: string;
+  } | null>(null);
+
+  // Folder scanning state inside Create Playlist modal
+  const [isScanningFolder, setIsScanningFolder] = useState(false);
+  const [scannedResult, setScannedResult] = useState<{
+    folderName: string;
+    folderPath: string;
+    trackIds: string[];
+    trackCount: number;
+  } | null>(null);
+  const [addToLibrary, setAddToLibrary] = useState(true);
+
+  // Edit Playlist state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editPlaylistName, setEditPlaylistName] = useState('');
+  const [editPlaylistDesc, setEditPlaylistDesc] = useState('');
+  const [editPlaylistCover, setEditPlaylistCover] = useState<{
+    path?: string;
+    base64?: string;
+    preview: string;
+  } | null>(null);
+  const [removeCoverMarked, setRemoveCoverMarked] = useState(false);
+
+  // Add Tracks state
   const [isAddTracksModalOpen, setIsAddTracksModalOpen] = useState(false);
   const [trackSearch, setTrackSearch] = useState('');
+
+  // Track Metadata Editor state
+  const [editingTrack, setEditingTrack] = useState<TrackRow | null>(null);
+  const [isTrackMetadataModalOpen, setIsTrackMetadataModalOpen] = useState(false);
+
+  // Hidden file input refs for fallback
+  const createFileInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     playlists,
     activePlaylistId,
     setActivePlaylistId,
     createPlaylist,
+    updatePlaylist,
+    savePlaylistCover,
+    deletePlaylistCover,
     deletePlaylist,
     addTrackToPlaylist,
+    addTracksToPlaylist,
+    scanFolderForPlaylist,
     removeTrackFromPlaylist,
+    getPlaylistFullTracks,
   } = usePlaylistStore();
 
   const { tracks: libraryTracks, getArtworkUrl, artworkCache } = useLibraryStore();
-  const { playTrack, currentTrack, status, enqueueTracks } = usePlayerStore();
+  const { playTrack, currentTrack, status, enqueueTracks, durationSeconds } = usePlayerStore();
   const { addToast } = useToastStore();
 
+  const [playlistTracksMap, setPlaylistTracksMap] = useState<Record<string, TrackRow[]>>({});
+
   const activePlaylist = playlists.find((p) => p.id === activePlaylistId) || null;
+
+  useEffect(() => {
+    if (!activePlaylistId) return;
+    getPlaylistFullTracks(activePlaylistId).then((tracks) => {
+      if (tracks && tracks.length > 0) {
+        setPlaylistTracksMap((prev) => ({ ...prev, [activePlaylistId]: tracks }));
+      }
+    });
+  }, [activePlaylistId, activePlaylist?.trackIds, getPlaylistFullTracks]);
+
+  // Arranged & sorted tracks with track number logic (1..N ascending, then unnumbered)
+  const sortedPlaylistTracks = useMemo(() => {
+    if (!activePlaylist) return [];
+    const fullTracks = playlistTracksMap[activePlaylist.id];
+    const plTracks =
+      fullTracks && fullTracks.length > 0
+        ? fullTracks
+        : libraryTracks.filter((t) => activePlaylist.trackIds.includes(t.id));
+    return sortTracksByNumber(plTracks);
+  }, [activePlaylist, playlistTracksMap, libraryTracks]);
+
+  // Pick image via native dialog or file input
+  const handleSelectImage = async (
+    onSelected: (data: { path?: string; base64?: string; preview: string }) => void,
+    fallbackRef: React.RefObject<HTMLInputElement | null>
+  ) => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+        title: 'Select Playlist Cover Image',
+      });
+
+      if (selected && typeof selected === 'string') {
+        const preview = convertFileSrc(selected);
+        onSelected({ path: selected, preview });
+        return;
+      }
+    } catch {
+      // Fallback to browser file input
+      fallbackRef.current?.click();
+    }
+  };
+
+  const handleFileInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    onSelected: (data: { path?: string; base64?: string; preview: string }) => void
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        onSelected({
+          base64: reader.result,
+          preview: reader.result,
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Folder scanning handler
+  const handleScanFolder = async () => {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: 'Select Music Folder to Scan for Playlist',
+      });
+
+      if (!selected || typeof selected !== 'string') return;
+
+      setIsScanningFolder(true);
+      const res = await scanFolderForPlaylist(selected, false);
+
+      // Natural number sort the track IDs using their metadata
+      let sortedIds = res.trackIds;
+      try {
+        const fullTracks = await invoke<TrackRow[]>('get_tracks_by_ids', { trackIds: res.trackIds });
+        if (fullTracks && fullTracks.length > 0) {
+          const sorted = sortTracksByNumber(fullTracks);
+          sortedIds = sorted.map((t) => t.id);
+        }
+      } catch {
+        // Fallback to original order
+      }
+
+      setScannedResult({
+        folderName: res.folderName,
+        folderPath: res.folderPath,
+        trackIds: sortedIds.length > 0 ? sortedIds : res.trackIds,
+        trackCount: res.trackCount,
+      });
+
+      // Auto-fill playlist name if blank
+      if (!newPlaylistName.trim()) {
+        setNewPlaylistName(res.folderName);
+      }
+
+      // Smart pre-fill detected cover if available (3:A)
+      if (res.detectedCoverUrl && !newPlaylistCover) {
+        setNewPlaylistCover({
+          path: res.detectedCoverUrl,
+          preview: convertFileSrc(res.detectedCoverUrl),
+        });
+      }
+
+      addToast({
+        type: 'success',
+        title: 'Folder Scanned',
+        message: `Found ${res.trackCount} tracks in "${res.folderName}".`,
+      });
+    } catch (err: unknown) {
+      console.error('Failed to scan folder for playlist:', err);
+      addToast({
+        type: 'error',
+        title: 'Scan Failed',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setIsScanningFolder(false);
+    }
+  };
 
   const handleCreate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!newPlaylistName.trim()) return;
 
     try {
-      const created = await createPlaylist(newPlaylistName, newPlaylistDesc);
+      const created = await createPlaylist(
+        newPlaylistName,
+        newPlaylistDesc,
+        newPlaylistCover?.path,
+        scannedResult?.folderPath,
+        addToLibrary
+      );
+
+      // Save custom cover if base64 data was supplied
+      if (newPlaylistCover?.base64) {
+        await savePlaylistCover(created.id, {
+          base64: newPlaylistCover.base64,
+        });
+      }
+
+      // Add scanned tracks if present
+      if (scannedResult && scannedResult.trackIds.length > 0) {
+        await addTracksToPlaylist(created.id, scannedResult.trackIds);
+      }
+
+      // If user selected to add to permanent library, refresh library store
+      if (addToLibrary && scannedResult) {
+        await useLibraryStore.getState().loadTracks();
+        await useLibraryStore.getState().loadFolders();
+        await useLibraryStore.getState().loadStats();
+      }
+
       addToast({
         type: 'success',
         title: 'Playlist Created',
-        message: `"${created.name}" is ready for music.`,
+        message: scannedResult
+          ? `"${created.name}" created with ${scannedResult.trackCount} tracks.`
+          : `"${created.name}" is ready for music.`,
       });
+
+      // Navigate directly into newly created playlist
+      setActivePlaylistId(created.id);
+
       setNewPlaylistName('');
       setNewPlaylistDesc('');
+      setNewPlaylistCover(null);
+      setScannedResult(null);
       setIsCreateModalOpen(false);
     } catch (err) {
       addToast({
@@ -117,10 +366,49 @@ export function PlaylistsView() {
     }
   };
 
+  const handleSaveEdit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!activePlaylist || !editPlaylistName.trim()) return;
+
+    try {
+      if (removeCoverMarked) {
+        await deletePlaylistCover(activePlaylist.id);
+        await updatePlaylist(activePlaylist.id, editPlaylistName, editPlaylistDesc, 'none');
+      } else if (editPlaylistCover) {
+        const savedCover = await savePlaylistCover(activePlaylist.id, {
+          path: editPlaylistCover.path,
+          base64: editPlaylistCover.base64,
+        });
+        await updatePlaylist(activePlaylist.id, editPlaylistName, editPlaylistDesc, savedCover || undefined);
+      } else {
+        await updatePlaylist(activePlaylist.id, editPlaylistName, editPlaylistDesc);
+      }
+
+      addToast({
+        type: 'edit',
+        title: 'Playlist Updated',
+        message: `Changes saved to "${editPlaylistName}".`,
+      });
+
+      setIsEditModalOpen(false);
+      setEditPlaylistCover(null);
+      setRemoveCoverMarked(false);
+    } catch (err) {
+      addToast({
+        type: 'error',
+        title: 'Update Failed',
+        message: String(err),
+      });
+    }
+  };
+
   const handleDelete = async (playlist: Playlist, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
       await deletePlaylist(playlist.id);
+      await useLibraryStore.getState().loadTracks();
+      await useLibraryStore.getState().loadFolders();
+      await useLibraryStore.getState().loadStats();
       addToast({
         type: 'delete',
         title: 'Playlist Deleted',
@@ -137,11 +425,36 @@ export function PlaylistsView() {
 
   const handlePlayPlaylist = async (playlist: Playlist, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const playlistTrackRows = libraryTracks.filter((t) =>
-      playlist.trackIds.includes(t.id)
-    );
 
-    if (playlistTrackRows.length === 0) {
+    let rawTracks: TrackRow[] = [];
+
+    // 1. If currently inside active playlist view and already sorted
+    if (playlist.id === activePlaylist?.id && sortedPlaylistTracks.length > 0) {
+      rawTracks = sortedPlaylistTracks;
+    } else if (playlistTracksMap[playlist.id]?.length > 0) {
+      // 2. Cached in map
+      rawTracks = playlistTracksMap[playlist.id];
+    } else {
+      // 3. Fetch directly from SQLite database via getPlaylistFullTracks
+      try {
+        const fetched = await getPlaylistFullTracks(playlist.id);
+        if (fetched && fetched.length > 0) {
+          rawTracks = fetched;
+          setPlaylistTracksMap((prev) => ({ ...prev, [playlist.id]: fetched }));
+        }
+      } catch (err) {
+        console.error('Failed to get playlist full tracks:', err);
+      }
+    }
+
+    // 4. Fallback to library tracks filter if database lookup returned nothing
+    if (rawTracks.length === 0) {
+      rawTracks = libraryTracks.filter((t) => playlist.trackIds.includes(t.id));
+    }
+
+    const tracksToPlay = sortTracksByNumber(rawTracks);
+
+    if (tracksToPlay.length === 0) {
       addToast({
         type: 'warning',
         title: 'Empty Playlist',
@@ -150,8 +463,9 @@ export function PlaylistsView() {
       return;
     }
 
-    const queueTracks = playlistTrackRows.map((t) => ({
+    const queueTracks = tracksToPlay.map((t) => ({
       id: t.id,
+      trackId: t.id,
       title: t.title,
       artist: t.artist,
       album: t.album,
@@ -184,11 +498,36 @@ export function PlaylistsView() {
 
   return (
     <div className="flex-1 overflow-y-auto flex flex-col select-none">
+      {/* Hidden file inputs for image upload fallbacks */}
+      <input
+        type="file"
+        ref={createFileInputRef}
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => handleFileInputChange(e, setNewPlaylistCover)}
+      />
+      <input
+        type="file"
+        ref={editFileInputRef}
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          handleFileInputChange(e, (data) => {
+            setEditPlaylistCover(data);
+            setRemoveCoverMarked(false);
+          });
+        }}
+      />
+
       {/* Detail View of an open playlist */}
       {activePlaylist ? (
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <div className="p-6 border-b border-zinc-800/60 bg-zinc-950/70 backdrop-blur-xs flex flex-col gap-4">
+          <div
+            className={`${
+              isTopbar ? 'pt-20 px-6 sm:px-10 lg:px-12' : 'p-6'
+            } border-b border-zinc-800/60 bg-zinc-950/70 backdrop-blur-xs flex flex-col gap-4 transition-all duration-200`}
+          >
             <button
               type="button"
               onClick={() => setActivePlaylistId(null)}
@@ -200,7 +539,7 @@ export function PlaylistsView() {
 
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div className="flex items-center gap-4">
-                <PlaylistCover playlist={activePlaylist} size="lg" />
+                <PlaylistCover playlist={activePlaylist} tracks={sortedPlaylistTracks} size="lg" />
                 <div>
                   <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
                     {activePlaylist.name}
@@ -233,11 +572,16 @@ export function PlaylistsView() {
                   variant="secondary"
                   size="sm"
                   onClick={async () => {
-                    const plTracks = libraryTracks.filter((t) =>
-                      activePlaylist.trackIds.includes(t.id)
-                    );
-                    if (plTracks.length === 0) return;
-                    const formatted = plTracks.map((t) => ({
+                    let rawTracks = sortedPlaylistTracks;
+                    if (rawTracks.length === 0 && activePlaylist) {
+                      try {
+                        rawTracks = await getPlaylistFullTracks(activePlaylist.id);
+                      } catch (err) {
+                        console.error('Failed to get playlist full tracks for queue:', err);
+                      }
+                    }
+                    if (!rawTracks || rawTracks.length === 0) return;
+                    const formatted = sortTracksByNumber(rawTracks).map((t) => ({
                       id: t.id,
                       trackId: t.id,
                       title: t.title,
@@ -278,6 +622,22 @@ export function PlaylistsView() {
                 </Button>
 
                 <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setEditPlaylistName(activePlaylist.name);
+                    setEditPlaylistDesc(activePlaylist.description || '');
+                    setEditPlaylistCover(null);
+                    setRemoveCoverMarked(false);
+                    setIsEditModalOpen(true);
+                  }}
+                  className="px-3 py-2 text-xs"
+                  title="Edit Playlist details and cover image"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </Button>
+
+                <Button
                   variant="danger"
                   size="sm"
                   onClick={(e) => {
@@ -295,7 +655,7 @@ export function PlaylistsView() {
 
           {/* Tracks Table in Playlist */}
           <div className="flex-1 p-6 pb-28">
-            {activePlaylist.trackIds.length === 0 ? (
+            {sortedPlaylistTracks.length === 0 ? (
               <div className="min-h-[280px] rounded-2xl border border-dashed border-zinc-800 flex flex-col items-center justify-center p-8 text-center bg-zinc-900/20">
                 <Music className="w-8 h-8 text-zinc-600 mb-3" />
                 <p className="text-sm font-semibold text-zinc-200">No tracks in this playlist yet</p>
@@ -326,10 +686,9 @@ export function PlaylistsView() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-850">
-                    {activePlaylist.trackIds.map((trackId, index) => {
-                      const track = libraryTracks.find((t) => t.id === trackId);
-                      if (!track) return null;
+                    {sortedPlaylistTracks.map((track, index) => {
                       const isCurrent = currentTrack?.id === track.id;
+                      const cleanTitle = cleanTrackTitle(track.title);
 
                       return (
                         <tr
@@ -337,19 +696,18 @@ export function PlaylistsView() {
                           data-track-id={track.id}
                           className="hover:bg-zinc-900/60 transition-colors group cursor-pointer"
                           onClick={() => {
-                            const queue = libraryTracks
-                              .filter((t) => activePlaylist.trackIds.includes(t.id))
-                              .map((t) => ({
-                                id: t.id,
-                                title: t.title,
-                                artist: t.artist,
-                                album: t.album,
-                                durationSeconds: t.durationSeconds,
-                                source: 'local' as const,
-                                path: t.path,
-                                format: t.format,
-                                bitrateKbps: t.bitrateKbps ?? undefined,
-                              }));
+                            const queue = sortedPlaylistTracks.map((t) => ({
+                              id: t.id,
+                              title: t.title,
+                              artist: t.artist,
+                              album: t.album,
+                              durationSeconds: t.durationSeconds,
+                              artworkUrl: getArtworkUrl(t.artworkHash) || artworkCache[t.id] || undefined,
+                              source: 'local' as const,
+                              path: t.path,
+                              format: t.format,
+                              bitrateKbps: t.bitrateKbps ?? undefined,
+                            }));
                             playTrack(
                               {
                                 id: track.id,
@@ -357,6 +715,7 @@ export function PlaylistsView() {
                                 artist: track.artist,
                                 album: track.album,
                                 durationSeconds: track.durationSeconds,
+                                artworkUrl: getArtworkUrl(track.artworkHash) || artworkCache[track.id] || undefined,
                                 source: 'local',
                                 path: track.path,
                                 format: track.format,
@@ -382,8 +741,11 @@ export function PlaylistsView() {
                                 />
                               </div>
                               <div className="flex flex-col min-w-0">
-                                <span className="font-semibold text-zinc-100 group-hover:text-amber-400 transition-colors truncate">
-                                  {track.title}
+                                <span
+                                  className="font-semibold text-zinc-100 group-hover:text-amber-400 transition-colors truncate"
+                                  title={track.title}
+                                >
+                                  {cleanTitle}
                                 </span>
                                 {track.format && (
                                   <div className="mt-0.5">
@@ -400,25 +762,45 @@ export function PlaylistsView() {
                           <td className="py-2.5 px-4 text-zinc-400">{track.artist}</td>
                           <td className="py-2.5 px-4 text-zinc-400">{track.album}</td>
                           <td className="py-2.5 px-4 text-right font-mono text-zinc-400">
-                            {formatSeconds(track.durationSeconds)}
+                            {formatSeconds(
+                              track.durationSeconds > 0
+                                ? track.durationSeconds
+                                : currentTrack?.id === track.id && durationSeconds > 0
+                                ? durationSeconds
+                                : 0
+                            )}
                           </td>
                           <td className="py-2.5 px-4 text-center">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeTrackFromPlaylist(activePlaylist.id, track.id);
-                                addToast({
-                                  type: 'edit',
-                                  title: 'Track Removed',
-                                  message: `Removed "${track.title}" from playlist.`,
-                                });
-                              }}
-                              className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                              title="Remove from playlist"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingTrack(track);
+                                  setIsTrackMetadataModalOpen(true);
+                                }}
+                                className="p-1 rounded text-zinc-500 hover:text-amber-400 hover:bg-zinc-800 transition-colors cursor-pointer"
+                                title="Edit Track Metadata & File Tags"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeTrackFromPlaylist(activePlaylist.id, track.id);
+                                  addToast({
+                                    type: 'edit',
+                                    title: 'Track Removed',
+                                    message: `Removed "${cleanTitle}" from playlist.`,
+                                  });
+                                }}
+                                className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                title="Remove from playlist"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -433,7 +815,11 @@ export function PlaylistsView() {
         /* Overview of all Playlists */
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <div className="p-6 pb-4 border-b border-zinc-800/60 bg-zinc-950/70 backdrop-blur-xs flex items-center justify-between gap-4">
+          <div
+            className={`${
+              isTopbar ? 'pt-20 px-6 sm:px-10 lg:px-12' : 'p-6'
+            } pb-4 border-b border-zinc-800/60 bg-zinc-950/70 backdrop-blur-xs flex items-center justify-between gap-4 transition-all duration-200`}
+          >
             <div>
               <h1 className="text-xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
                 <span>Playlists</span>
@@ -475,7 +861,14 @@ export function PlaylistsView() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => setIsCreateModalOpen(true)}
+                onClick={() => {
+                  setNewPlaylistName('');
+                  setNewPlaylistDesc('');
+                  setNewPlaylistCover(null);
+                  setScannedResult(null);
+                  setAddToLibrary(true);
+                  setIsCreateModalOpen(true);
+                }}
                 className="px-3.5 py-1.5 text-xs"
               >
                 <Plus className="w-4 h-4" />
@@ -485,7 +878,7 @@ export function PlaylistsView() {
           </div>
 
           {/* Body */}
-          <div className="flex-1 p-6 pb-28">
+          <div className={`flex-1 ${isTopbar ? 'p-6 sm:px-10 lg:px-12' : 'p-6'} pb-28`}>
             {playlists.length === 0 ? (
               <div className="flex-1 min-h-[400px] flex flex-col items-center justify-center p-8 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-600 mb-5 shadow-inner">
@@ -498,7 +891,14 @@ export function PlaylistsView() {
                 <Button
                   variant="primary"
                   size="md"
-                  onClick={() => setIsCreateModalOpen(true)}
+                  onClick={() => {
+                    setNewPlaylistName('');
+                    setNewPlaylistDesc('');
+                    setNewPlaylistCover(null);
+                    setScannedResult(null);
+                    setAddToLibrary(true);
+                    setIsCreateModalOpen(true);
+                  }}
                   className="text-xs px-5 py-2.5"
                 >
                   <Plus className="w-4 h-4" />
@@ -613,10 +1013,179 @@ export function PlaylistsView() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         title="Create New Playlist"
-        description="Name your custom playlist and start adding tracks."
-        maxWidth="sm"
+        description="Name your custom playlist, optionally scan a folder, or set a custom cover."
+        maxWidth="md"
       >
         <form onSubmit={handleCreate} className="flex flex-col gap-4">
+          {/* Scan Folder for Tracks Section */}
+          <div className="flex flex-col gap-2 p-3 rounded-xl bg-zinc-900/50 border border-zinc-800/80">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FolderSearch className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-semibold text-zinc-200">Import Tracks From Folder</span>
+              </div>
+              {scannedResult ? (
+                <button
+                  type="button"
+                  onClick={() => setScannedResult(null)}
+                  className="text-[11px] text-zinc-400 hover:text-rose-400 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Clear</span>
+                </button>
+              ) : null}
+            </div>
+
+            {scannedResult ? (
+              <div className="flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-amber-200 truncate">
+                      {scannedResult.folderName}
+                    </p>
+                    <p className="text-[10px] text-amber-400/80 font-mono">
+                      {scannedResult.trackCount} tracks discovered
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleScanFolder}
+                  disabled={isScanningFolder}
+                  className="px-2.5 py-1 rounded-md bg-zinc-850 hover:bg-zinc-800 text-[11px] text-zinc-300 transition-colors cursor-pointer shrink-0 ml-2"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] text-zinc-400 leading-tight">
+                  Quickly populate this playlist with all audio files from a local directory.
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleScanFolder}
+                  disabled={isScanningFolder}
+                  className="text-xs shrink-0 px-3 py-1.5"
+                >
+                  {isScanningFolder ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                      <span>Scanning...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FolderPlus className="w-3.5 h-3.5 mr-1" />
+                      <span>Scan Folder</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {/* Modern Sliding Switch Card (A3) */}
+            <div
+              onClick={() => {
+                soundService.play(addToLibrary ? 'toggle:off' : 'toggle:on');
+                setAddToLibrary((prev) => !prev);
+              }}
+              className={`mt-2 rounded-xl p-3 flex items-center justify-between gap-3 border transition-all cursor-pointer select-none group ${
+                addToLibrary
+                  ? 'bg-amber-950/20 border-amber-500/35 hover:border-amber-500/50'
+                  : 'bg-zinc-950/50 border-zinc-800/80 hover:border-zinc-700/80'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Database
+                  className={`w-4 h-4 shrink-0 transition-colors ${
+                    addToLibrary ? 'text-amber-400' : 'text-zinc-500 group-hover:text-zinc-400'
+                  }`}
+                />
+                <div className="flex flex-col min-w-0">
+                  <span
+                    className={`text-xs font-semibold leading-tight transition-colors ${
+                      addToLibrary ? 'text-zinc-100' : 'text-zinc-300 group-hover:text-zinc-200'
+                    }`}
+                  >
+                    Also add folder to permanent Library
+                  </span>
+                  <span className="text-[11px] text-zinc-500 leading-tight mt-0.5 truncate">
+                    {addToLibrary
+                      ? 'Folder registered & tracks appear in permanent Library'
+                      : 'Playlist-only tracks — isolated from Library tabs & counts'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Sliding Switch Pill */}
+              <div
+                className={`relative shrink-0 w-9 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 flex items-center ${
+                  addToLibrary ? 'bg-amber-500' : 'bg-zinc-800'
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full bg-white shadow-xs transform transition-transform duration-200 ease-in-out ${
+                    addToLibrary ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Custom Cover Picker */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-zinc-300">Playlist Cover (Optional)</label>
+            <div className="flex items-center gap-3">
+              <div
+                onClick={() => handleSelectImage(setNewPlaylistCover, createFileInputRef)}
+                className="w-20 h-20 rounded-xl border border-dashed border-zinc-700/80 hover:border-amber-500/70 bg-zinc-950 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all group shrink-0 relative"
+                title="Click to choose a cover image"
+              >
+                {newPlaylistCover ? (
+                  <>
+                    <img
+                      src={newPlaylistCover.preview}
+                      alt="Cover Preview"
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <Upload className="w-5 h-5 text-amber-400" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className="w-6 h-6 text-zinc-600 group-hover:text-amber-400 transition-colors mb-1" />
+                    <span className="text-[10px] text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                      Upload
+                    </span>
+                  </>
+                )}
+              </div>
+
+              <div className="flex flex-col justify-center gap-1 min-w-0">
+                <span className="text-xs text-zinc-300 font-medium">Custom Cover Image</span>
+                <span className="text-[11px] text-zinc-500">
+                  {newPlaylistCover
+                    ? 'Cover selected. Stored locally.'
+                    : 'Leave blank to use 4-track mosaic automatically.'}
+                </span>
+                {newPlaylistCover && (
+                  <button
+                    type="button"
+                    onClick={() => setNewPlaylistCover(null)}
+                    className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer w-fit mt-1"
+                  >
+                    <X className="w-3 h-3" />
+                    <span>Remove cover</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-zinc-300">Playlist Name</label>
             <input
@@ -653,13 +1222,148 @@ export function PlaylistsView() {
               variant="primary"
               size="sm"
               type="submit"
-              disabled={!newPlaylistName.trim()}
+              disabled={!newPlaylistName.trim() || isScanningFolder}
             >
               Create Playlist
             </Button>
           </div>
         </form>
       </Modal>
+
+      {/* Edit Playlist Modal */}
+      {activePlaylist && (
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title="Edit Playlist"
+          description="Update playlist details or change custom cover image."
+          maxWidth="sm"
+        >
+          <form onSubmit={handleSaveEdit} className="flex flex-col gap-4">
+            {/* Custom Cover Picker */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-zinc-300">Playlist Cover</label>
+              <div className="flex items-center gap-3">
+                <div
+                  onClick={() =>
+                    handleSelectImage((data) => {
+                      setEditPlaylistCover(data);
+                      setRemoveCoverMarked(false);
+                    }, editFileInputRef)
+                  }
+                  className="w-20 h-20 rounded-xl border border-dashed border-zinc-700/80 hover:border-amber-500/70 bg-zinc-950 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all group shrink-0 relative"
+                  title="Click to change cover image"
+                >
+                  {editPlaylistCover ? (
+                    <>
+                      <img
+                        src={editPlaylistCover.preview}
+                        alt="New Cover Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Upload className="w-5 h-5 text-amber-400" />
+                      </div>
+                    </>
+                  ) : activePlaylist.coverUrl && activePlaylist.coverUrl !== 'none' && !removeCoverMarked ? (
+                    <>
+                      <img
+                        src={
+                          activePlaylist.coverUrl.startsWith('data:') ||
+                          activePlaylist.coverUrl.startsWith('http') ||
+                          activePlaylist.coverUrl.startsWith('asset:')
+                            ? activePlaylist.coverUrl
+                            : convertFileSrc(activePlaylist.coverUrl)
+                        }
+                        alt="Current Cover"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Upload className="w-5 h-5 text-amber-400" />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="w-6 h-6 text-zinc-600 group-hover:text-amber-400 transition-colors mb-1" />
+                      <span className="text-[10px] text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                        Upload
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <div className="flex flex-col justify-center gap-1 min-w-0">
+                  <span className="text-xs text-zinc-300 font-medium">Custom Cover Image</span>
+                  <span className="text-[11px] text-zinc-500">
+                    {editPlaylistCover
+                      ? 'New cover chosen. Stored locally.'
+                      : removeCoverMarked
+                      ? 'Cover removed. Clean icon will display.'
+                      : activePlaylist.coverUrl && activePlaylist.coverUrl !== 'none'
+                      ? 'Custom cover active on local device.'
+                      : 'No custom cover set.'}
+                  </span>
+                  {(editPlaylistCover || (activePlaylist.coverUrl && activePlaylist.coverUrl !== 'none' && !removeCoverMarked)) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditPlaylistCover(null);
+                        setRemoveCoverMarked(true);
+                      }}
+                      className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer w-fit mt-1"
+                    >
+                      <X className="w-3 h-3" />
+                      <span>Remove cover</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-zinc-300">Playlist Name</label>
+              <input
+                type="text"
+                autoFocus
+                value={editPlaylistName}
+                onChange={(e) => setEditPlaylistName(e.target.value)}
+                placeholder="Playlist name"
+                className="px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-hidden focus:border-amber-500/50"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-zinc-300">Description (Optional)</label>
+              <input
+                type="text"
+                value={editPlaylistDesc}
+                onChange={(e) => setEditPlaylistDesc(e.target.value)}
+                placeholder="Playlist description"
+                className="px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-100 placeholder:text-zinc-600 focus:outline-hidden focus:border-amber-500/50"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                type="submit"
+                disabled={!editPlaylistName.trim()}
+              >
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       {/* Add Tracks to Playlist Modal */}
       {activePlaylist && (
@@ -687,10 +1391,7 @@ export function PlaylistsView() {
               ) : (
                 availableToAdd.map((track) => {
                   const isAlreadyIn = activePlaylist.trackIds.includes(track.id);
-                  const trackArt =
-                    getArtworkUrl(track.artworkHash) ||
-                    artworkCache[track.id] ||
-                    null;
+                  const cleanTitle = cleanTrackTitle(track.title);
 
                   return (
                     <div
@@ -701,24 +1402,13 @@ export function PlaylistsView() {
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         {/* 42x42 Artwork Thumbnail */}
                         <div className="w-10.5 h-10.5 rounded-lg overflow-hidden bg-zinc-950 border border-zinc-800/80 shrink-0 flex items-center justify-center relative shadow-xs">
-                          {trackArt ? (
-                            <img
-                              src={trackArt}
-                              alt={track.title}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-850 to-zinc-950 text-zinc-600">
-                              <Music className="w-4 h-4" />
-                            </div>
-                          )}
+                          <PlaylistTrackThumbnail trackId={track.id} artworkHash={track.artworkHash} />
                         </div>
 
                         {/* Title, Artist, Album, Specs */}
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-zinc-100 truncate">
-                            {track.title}
+                          <p className="text-xs font-semibold text-zinc-100 truncate" title={track.title}>
+                            {cleanTitle}
                           </p>
                           <div className="flex items-center gap-2 text-[11px] text-zinc-400 truncate mt-0.5">
                             <span className="truncate">{track.artist || 'Unknown Artist'}</span>
@@ -751,7 +1441,7 @@ export function PlaylistsView() {
                             addToast({
                               type: 'success',
                               title: 'Track Added',
-                              message: `"${track.title}" added to ${activePlaylist.name}.`,
+                              message: `"${cleanTitle}" added to ${activePlaylist.name}.`,
                             });
                           }}
                           className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ml-1 ${
@@ -791,6 +1481,22 @@ export function PlaylistsView() {
           </div>
         </Modal>
       )}
+
+      {/* Track Metadata Reader & Editor Modal */}
+      <TrackMetadataModal
+        isOpen={isTrackMetadataModalOpen}
+        track={editingTrack}
+        onClose={() => {
+          setIsTrackMetadataModalOpen(false);
+          setEditingTrack(null);
+          // Refresh playlist tracks if active
+          if (activePlaylistId) {
+            getPlaylistFullTracks(activePlaylistId).then((tracks) => {
+              setPlaylistTracksMap((prev) => ({ ...prev, [activePlaylistId]: tracks }));
+            });
+          }
+        }}
+      />
     </div>
   );
 }

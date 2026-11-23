@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Sidebar } from "../components/layout/Sidebar";
+import { FloatingNavPill } from "../components/layout/FloatingNavPill";
 import { BottomPlayer } from "../components/player/BottomPlayer";
 import ShapeGrid from "../components/ui/ShapeGrid/ShapeGrid";
 import { TitleBar } from "../components/layout/TitleBar";
@@ -63,6 +64,7 @@ export function App() {
 
   const isPlayerVisible = usePlayerStore((s) => Boolean(s.currentTrack && s.hasPlaybackStarted));
   const selectedAccent = useSettingsStore((s) => s.selectedAccent);
+  const navLayout = useSettingsStore((s) => s.navLayout);
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -107,14 +109,19 @@ export function App() {
 
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
+    const handleBeforeUnload = () => {
+      usePlayerStore.getState().saveCurrentSession();
+    };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       clearTimeout(scanTimer);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [initialize]);
 
@@ -193,18 +200,31 @@ export function App() {
       {/* Offline Status Warning */}
       <OfflineBanner isOffline={isOffline} />
 
-      {/* 3-Column Desktop Shell */}
+      {/* Desktop Shell (Adaptive 2/3-Column) */}
       <div className="flex-1 flex overflow-hidden z-10 relative">
-        {/* Left Sidebar */}
-        <div style={{ width: `${sidebarWidth}px` }} className="shrink-0 flex">
-          <Sidebar onOpenShortcuts={() => setIsShortcutsOpen(true)} />
-        </div>
+        {/* Left Sidebar (Only in sidebar mode) */}
+        {navLayout !== "topbar" && (
+          <>
+            <div style={{ width: `${sidebarWidth}px` }} className="shrink-0 flex">
+              <Sidebar onOpenShortcuts={() => setIsShortcutsOpen(true)} />
+            </div>
 
-        {/* Left Resize Handle */}
-        <ResizeHandle onResize={handleSidebarResize} />
+            {/* Left Resize Handle */}
+            <ResizeHandle onResize={handleSidebarResize} />
+          </>
+        )}
 
         {/* Main Content Viewport */}
         <main className="flex-1 flex flex-col overflow-hidden bg-transparent relative">
+          {/* Centered Floating Navigation Pill (When Topbar mode is selected) */}
+          {navLayout === "topbar" && (
+            <div className="absolute top-3.5 inset-x-0 flex justify-center pointer-events-none z-40 px-4">
+              <div className="pointer-events-auto">
+                <FloatingNavPill onOpenShortcuts={() => setIsShortcutsOpen(true)} />
+              </div>
+            </div>
+          )}
+
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={currentView}

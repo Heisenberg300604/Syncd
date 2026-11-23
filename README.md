@@ -2,15 +2,16 @@
 
 <div align="center">
 
-<img src="Web/client/public/favicon.svg" alt="SyncD Logo" width="96" height="96" style="border-radius: 20px; margin-bottom: 12px;" />
+<img src="Web/client/public/favicon.svg" alt="SyncD Equalizer Icon" width="104" height="104" style="border-radius: 24px; margin-bottom: 16px;" />
 
 ### *The Real-Time Social Music-Listening Sanctuary & Synchronized Media Lounge*
 
-[![Tauri Desktop](https://img.shields.io/badge/Desktop-Tauri_2_%7C_Rust-21262d?style=flat-square&logo=tauri&logoColor=24C8DB&labelColor=0d1117)](./Desktop)
-[![Web Client](https://img.shields.io/badge/Web-React_19_%7C_Vite-21262d?style=flat-square&logo=react&logoColor=61DAFB&labelColor=0d1117)](./Web/client)
-[![Android App](https://img.shields.io/badge/Android-Kotlin_%7C_Compose-21262d?style=flat-square&logo=android&logoColor=3DDC84&labelColor=0d1117)](./Mobile/Android)
-[![iOS App](https://img.shields.io/badge/iOS-Swift_%7C_SwiftUI-21262d?style=flat-square&logo=swift&logoColor=F05138&labelColor=0d1117)](./Mobile/Ios)
-[![Server & Protocol](https://img.shields.io/badge/Backend-Express_%7C_Socket.IO-21262d?style=flat-square&logo=socketdotio&logoColor=FFFFFF&labelColor=0d1117)](./Web/server)
+[![Desktop Tauri 2](https://img.shields.io/badge/Desktop-Tauri_2.2_%7C_Rust_1.75+-21262d?style=flat-square&logo=tauri&logoColor=24C8DB&labelColor=0d1117)](./Desktop)
+[![Web React 19](https://img.shields.io/badge/Web-React_19.2_%7C_Vite_8-21262d?style=flat-square&logo=react&logoColor=61DAFB&labelColor=0d1117)](./Web/client)
+[![Android Native](https://img.shields.io/badge/Android-Kotlin_%7C_Compose-21262d?style=flat-square&logo=android&logoColor=3DDC84&labelColor=0d1117)](./Mobile/Android)
+[![iOS Native](https://img.shields.io/badge/iOS-Swift_%7C_SwiftUI-21262d?style=flat-square&logo=swift&logoColor=F05138&labelColor=0d1117)](./Mobile/Ios)
+[![Backend Gateway](https://img.shields.io/badge/Backend-Express_5_%7C_Socket.IO_4-21262d?style=flat-square&logo=socketdotio&logoColor=FFFFFF&labelColor=0d1117)](./Web/server)
+[![Prisma 7 ORM](https://img.shields.io/badge/Prisma-v7.9_%7C_Neon_Postgres-21262d?style=flat-square&logo=prisma&logoColor=2D3748&labelColor=0d1117)](https://www.prisma.io/)
 
 <br/>
 
@@ -18,35 +19,36 @@
   <tr>
     <td align="center" width="20%">
       <b>Authoritative Sync</b><br/>
-      <sub>Dynamic drift recovery &lt; 2.0s</sub>
-    </td>
-    <td align="center" width="20%">
-      <b>Host Governance</b><br/>
-      <sub>Strict role-gated mutations</sub>
+      <sub>Server playhead with &lt; 2.0s drift recovery</sub>
     </td>
     <td align="center" width="20%">
       <b>Sub-30ms Audio</b><br/>
-      <sub>Native CPAL WASAPI playback</sub>
+      <sub>Lock-free CPAL WASAPI playback pipeline</sub>
+    </td>
+    <td align="center" width="20%">
+      <b>Host Governance</b><br/>
+      <sub>Role-gated mutations &amp; 30s handover</sub>
     </td>
     <td align="center" width="20%">
       <b>Lossless Linkage</b><br/>
-      <sub>Local track auto-substitution</sub>
+      <sub>Local track Lofty metadata substitution</sub>
     </td>
     <td align="center" width="20%">
-      <b>Cross-Platform</b><br/>
-      <sub>Web · Desktop · Android · iOS</sub>
+      <b>Cinematic Ambience</b><br/>
+      <sub>Warm sunset palette &amp; spatial UI cues</sub>
     </td>
   </tr>
 </table>
 
 <p align="center">
-  <a href="#ecosystem-overview">Overview</a> &nbsp;•&nbsp;
-  <a href="#system-architecture">Architecture</a> &nbsp;•&nbsp;
-  <a href="#platform-matrix">Platform Matrix</a> &nbsp;•&nbsp;
-  <a href="#synchronization-protocol">Sync Protocol</a> &nbsp;•&nbsp;
-  <a href="#monorepo-layout">Monorepo Layout</a> &nbsp;•&nbsp;
-  <a href="#prerequisites--quick-start">Quick Start</a> &nbsp;•&nbsp;
-  <a href="#continuous-integration">CI/CD</a>
+  <a href="#-ecosystem-overview">Ecosystem Overview</a> &nbsp;•&nbsp;
+  <a href="#-platform-showcase">Platform Showcase</a> &nbsp;•&nbsp;
+  <a href="#-multi-client-architecture">Architecture</a> &nbsp;•&nbsp;
+  <a href="#-synchronization-protocol">Sync Protocol</a> &nbsp;•&nbsp;
+  <a href="#-platform-matrix">Platform Matrix</a> &nbsp;•&nbsp;
+  <a href="#-monorepo-layout">Monorepo Layout</a> &nbsp;•&nbsp;
+  <a href="#-prerequisites--quick-start">Quick Start</a> &nbsp;•&nbsp;
+  <a href="#-ci-and-quality-gates">CI / Quality</a>
 </p>
 
 ---
@@ -55,55 +57,118 @@
 
 <br/>
 
-## Ecosystem Overview
+## 🧭 Ecosystem Overview
 
-**SyncD** is a multi-platform social music-listening ecosystem engineered for group synchronization, high-fidelity playback, and real-time community engagement. Rather than forcing users to rely on screen shares, lossy voice channels, or desynchronized browser tabs, SyncD connects clients over a lightweight, server-authoritative protocol that keeps audio and video aligned across all devices.
+**SyncD** is a multi-platform social music-listening sanctuary engineered for group synchronization, high-fidelity playback, and real-time community engagement. Rather than forcing users to rely on clunky screen shares, lossy voice channels, or desynchronized browser tabs, SyncD connects clients over a lightweight, **server-authoritative protocol** that keeps music, videos, and playback states harmonized down to the millisecond across desktop, mobile, and web.
 
-The repository houses four primary applications alongside shared design and audio assets:
-
-1. **[Web Application (`Web/`)](./Web/README.md):** Cloud-deployed web client and authoritative backend service delivering server-side room management, PostgreSQL persistence, and browser playback.
-2. **[Desktop Application (`Desktop/`)](./desktop-architecture.md):** Native Windows and cross-platform desktop player powered by Tauri 2 and Rust, featuring sub-30ms seek latency, zero-allocation CPAL WASAPI playback, Lofty metadata scanning, SQLite WAL + FTS5 indexing, and YouTube room sync with local lossless track linkage.
-3. **[Android Native App (`Mobile/Android/`)](./Mobile/Android/SyncD_Android_README.md):** Jetpack Compose and AndroidX Media3 (ExoPlayer) native mobile client with background playback services, lock-screen media controls, and real-time room presence.
-4. **[iOS Native App (`Mobile/Ios/`)](./Mobile/Ios/SyncD_iOS_README.md):** Swift and SwiftUI native mobile client featuring AVFoundation media engines, Control Center / Now Playing lock-screen integration, and low-latency Socket.IO room coordination.
-5. **[Sound Design Engine (`Audio/`)](./Audio/):** Modular library of handcrafted UI audio cues and spatial feedback events (room joins, scans, notifications, drawer animations, and toggles).
+### Core Architectural Pillars
+- **Server-Authoritative Clock:** The server maintains true playhead time and broadcasts synchronized states. Clients gently reconcile drift under 2 seconds (+/- 2% pitch bending) and hard seek only when exceeding the drift boundary.
+- **True Cross-Platform Native Stacks:** No compromised web-view wrappers for mobile or desktop. Desktop is powered by **Tauri 2 + Rust + CPAL**, Android by **Kotlin + Jetpack Compose + Media3**, and iOS by **Swift + SwiftUI + AVFoundation**.
+- **Host-Guarded Governance with Grace Handover:** Room hosts hold exclusive rights to seek, skip, and pause. If a host disconnects, a 30-second countdown protects the room before transferring ownership seamlessly to the next senior member.
+- **Lossless Local Linkage:** SyncD Desktop inspects local lossless audio libraries (FLAC, ALAC, WAV) using Lofty tag indexing; when a room plays a track matching your local collection, the native engine substitutes pristine local audio while staying locked to the group playhead.
 
 ---
 
-## System Architecture
+## 🎛️ Platform Showcase
 
-### Multi-Client Topology
+SyncD distributes its capabilities across dedicated native and web frontends powered by a high-performance real-time gateway:
 
-The SyncD ecosystem unifies native desktop, mobile, and web applications under an authoritative Node.js/Socket.IO backend with PostgreSQL persistence and Clerk identity integration:
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### 🖥️ Desktop Application (`Desktop/`)
+*Built with Tauri 2.2, Rust 1.75+, React 19, and Tailwind CSS v4*
+
+- **Native Audio Pipeline:** Sub-30ms seek latency via Symphonia decoders, lock-free RTRB ring buffers, and CPAL (WASAPI/ASIO) low-level stream playback.
+- **Local Library Indexing:** Blazing-fast parallel filesystem crawler powered by Rayon, Lofty tag extraction, and SQLite 3 (WAL mode + FTS5 full-text search).
+- **Lossless Audio Substitution:** Replaces cloud audio streams with matching local lossless files dynamically while preserving millisecond room sync.
+- **Fluid Desktop UX:** Powered by Zustand 5 state orchestration, GSAP physics, Lucide & Hugeicons, and native OS windowing.
+- 📖 **Deep Dive:** [Desktop Architecture Spec](./Desktop/docs/ARCHITECTURE.md) • [Playback Engine Spec](./Desktop/docs/PLAYBACK_ARCHITECTURE.md)
+
+</td>
+<td width="50%" valign="top">
+
+### 🌐 Web Client & Server Gateway (`Web/`)
+*Built with React 19.2, Vite 8, Express 5, Socket.IO 4, and Prisma 7*
+
+- **Cinematic Web Lounge:** Ambient WebGL sunset wave line shaders (Three.js), magnetic spring buttons, vinyl turntable graphics, and reactive equalizer animations.
+- **Authoritative Gateway:** Express 5 REST API + Socket.IO v4 real-time server handling room state, user presence, chat, and monotonic clock synchronization.
+- **Identity & Persistence:** Clerk JWT authentication, PostgreSQL hosted on Neon Serverless, and Prisma 7 with native pg adapter pooling.
+- **YouTube Media Streaming:** Compliant YouTube IFrame API integration with adaptive synchronization and drift suppression.
+- 📖 **Deep Dive:** [Web Documentation](./Web/README.md) • [Web Architecture](./Web/docs/ARCHITECTURE.md)
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🤖 Android Native Client (`Mobile/Android/`)
+*Built with Kotlin, Jetpack Compose, and AndroidX Media3 (ExoPlayer)*
+
+- **Media3 Playback Service:** Long-running `MediaSessionService` powering background audio playback, system media notifications, and lock-screen controls.
+- **Modern Android Architecture:** Declarative Jetpack Compose UI, Navigation Compose, unidirectional data flow (ViewModel + StateFlow), and Android Keystore security.
+- **Real-Time Room Presence:** Low-overhead Socket.IO client keeping room chat, member roster, and playhead strictly synchronized with the gateway.
+- **Audio Routing & Focus:** Intelligent handling of headset connects, Bluetooth routing, audio interruptions, and transient network drops.
+- 📖 **Deep Dive:** [Android Native Guide](./Mobile/Android/SyncD_Android_README.md)
+
+</td>
+<td width="50%" valign="top">
+
+### 🍏 iOS Native Client (`Mobile/Ios/`)
+*Built with Swift, SwiftUI, Combine, and AVFoundation*
+
+- **Native Apple Audio Engine:** `AVPlayer` and `AVQueuePlayer` playback integration supporting authorized remote audio streams and local playback.
+- **System Media Integration:** Complete lock-screen Now Playing metadata, Control Center controls, and MPRemoteCommandCenter hardware integration.
+- **SwiftUI Componentry:** Floating persistent mini-player, full-screen interactive queue, fluid sheet transitions, and real-time room chat.
+- **Robust Session Handling:** Automatic token refresh, Keychain-backed credential storage, and Combine-driven reactive state feeds.
+- 📖 **Deep Dive:** [iOS Native Guide](./Mobile/Ios/SyncD_iOS_README.md)
+
+</td>
+</tr>
+</table>
+
+### 🔊 Sound Design & Spatial Audio Engine (`Audio/`)
+A modular library of handcrafted 44.1kHz stereo UI sound cues providing tactile auditory feedback across all clients:
+- **Room Feedback:** Ambient cues for room creation, joining, and leaving (`Audio/Room/`).
+- **Library Scanning:** Distinct feedback for successful file indexation, scan errors, and tally increments (`Audio/Scan/`).
+- **Interactive UI:** Micro-cues for drawer slides, switch toggles, updates, and undo deletions (`Audio/Drawer/`, `Audio/Toggle/`, `Audio/Deletion/`, `Audio/Notification/`).
+
+---
+
+## 🏛️ Multi-Client Architecture
+
+The SyncD ecosystem unifies desktop, mobile, and web applications under a single authoritative Node.js/Socket.IO backend with PostgreSQL persistence and Clerk identity integration:
 
 ```mermaid
 flowchart TD
-    subgraph Clients["SyncD Multi-Platform Clients"]
-        WEB["Web Client<br/>React 19 · Vite 8 · Tailwind v4"]
-        DESK["Desktop Client<br/>Tauri 2 · Rust · SQLite WAL · CPAL"]
-        AND["Android Client<br/>Kotlin · Compose · Media3 ExoPlayer"]
-        IOS["iOS Client<br/>Swift · SwiftUI · AVFoundation"]
+    subgraph Clients["SyncD Multi-Platform Client Tier"]
+        WEB["Web Client<br/>React 19.2 · Vite 8 · Tailwind v4 · Three.js"]
+        DESK["Desktop Client<br/>Tauri 2.2 · Rust · Symphonia · CPAL · SQLite"]
+        AND["Android Client<br/>Kotlin · Jetpack Compose · Media3 ExoPlayer"]
+        IOS["iOS Client<br/>Swift · SwiftUI · AVFoundation · Combine"]
     end
 
-    subgraph Gateway["Backend & Real-Time Gateway (Web/server)"]
+    subgraph Gateway["Real-Time Gateway & Backend (Web/server)"]
         EXPRESS["Express v5 REST API<br/>Rooms · Queue · Auth · Profiles"]
         SOCKET["Socket.IO v4 Engine<br/>Authoritative Clock · Presence · Chat"]
-        PRISMA["Prisma v7 ORM"]
+        PRISMA["Prisma v7 ORM<br/>pg Adapter Driver"]
     end
 
     subgraph External["External Cloud Infrastructure"]
-        NEON[("PostgreSQL<br/>Neon Serverless")]
-        CLERK["Clerk Auth<br/>JWT & Session Management"]
-        YT["YouTube Data API v3<br/>Search & Audio/Video Streams"]
+        NEON[("PostgreSQL Database<br/>Neon Serverless")]
+        CLERK["Clerk Identity<br/>JWT Auth & Session Management"]
+        YT["YouTube Data API v3<br/>Search & Stream Feeds"]
     end
 
-    WEB <-->|HTTP / WebSocket| EXPRESS
-    WEB <-->|Real-Time Protocol| SOCKET
-    DESK <-->|HTTP / WebSocket| EXPRESS
-    DESK <-->|Real-Time Protocol| SOCKET
-    AND <-->|Retrofit / Socket.IO| EXPRESS
-    AND <-->|Real-Time Protocol| SOCKET
-    IOS <-->|URLSession / Socket.IO| EXPRESS
-    IOS <-->|Real-Time Protocol| SOCKET
+    WEB <-->|HTTP / REST| EXPRESS
+    WEB <-->|WebSocket Events| SOCKET
+    DESK <-->|HTTP / REST| EXPRESS
+    DESK <-->|WebSocket Events| SOCKET
+    AND <-->|Retrofit / REST| EXPRESS
+    AND <-->|WebSocket Events| SOCKET
+    IOS <-->|URLSession / REST| EXPRESS
+    IOS <-->|WebSocket Events| SOCKET
 
     EXPRESS --> PRISMA
     PRISMA --> NEON
@@ -113,79 +178,89 @@ flowchart TD
 
 ---
 
-## Platform Matrix
+## ⚡ Synchronization Protocol
 
-| Platform | Location | Primary Tech Stack | Audio / Playback Engine | Storage / State |
-| :--- | :--- | :--- | :--- | :--- |
-| **Backend Server** | [`Web/server/`](./Web/server) | Node.js 20+, Express 5, Socket.IO 4, TypeScript | Server-Authoritative Clock | PostgreSQL (Neon), Prisma 7 |
-| **Web Client** | [`Web/client/`](./Web/client) | React 19, TypeScript, Vite 8, Tailwind CSS 4 | YouTube IFrame API | Web Audio API, React Router 7 |
-| **Desktop Client** | [`Desktop/`](./Desktop) | Tauri 2, Rust 1.75+, React 19, Vite 6, Tailwind 4 | Symphonia + CPAL (WASAPI/ASIO) + YouTube Sync | SQLite 3 (WAL + FTS5), Zustand |
-| **Android Client** | [`Mobile/Android/`](./Mobile/Android) | Kotlin, Jetpack Compose, Navigation Compose | AndroidX Media3 (ExoPlayer) + MediaSession | Room DB, DataStore, Keystore |
-| **iOS Client** | [`Mobile/Ios/`](./Mobile/Ios) | Swift, SwiftUI, Combine | AVFoundation (`AVPlayer` / `AVQueuePlayer`) | Keychain, CoreData / SwiftData |
-| **Audio Assets** | [`Audio/`](./Audio) | MP3 Audio Assets (44.1kHz, stereo) | Native sound players across clients | Static filesystem assets |
-
----
-
-## Synchronization Protocol
-
-All clients observe a **Server-Authoritative Playhead Model** with bounded client-side drift reconciliation:
+All clients adhere to a **Server-Authoritative Monotonic Clock Model** designed to prevent playback thrashing and eliminate echo loops:
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Host as Room Host
-    participant Svr as SyncD Server (Socket.IO)
+    participant Svr as SyncD Gateway (Socket.IO)
     participant DB as Neon PostgreSQL
     actor Member as Room Member
 
-    Note over Host,Member: 1. Host Mutates Playback
+    Note over Host,Member: 1. Host Initiates Playback Mutation
     Host->>Svr: emit("sync-playback", { action: "play", currentTime: 42.5 })
     
-    Note over Svr: Verify Host Permissions & Compute Timestamps
+    Note over Svr: Verify Host Permissions & Monotonic Timestamp
     Svr->>DB: Persist room state (track, position, status)
     
-    Note over Svr,Member: 2. Broadcast Server-Authoritative Clock
+    Note over Svr,Member: 2. Broadcast Authoritative Clock to Room
     Svr-->>Host: ack("sync-playback", { status: "ok" })
     Svr-->>Member: emit("playback-state", { action: "play", currentTime: 42.5, serverTimestamp: 1710000000120 })
 
-    Note over Member: 3. Client Drift Calculation
-    Member->>Member: Expected = currentTime + (now() - serverTimestamp)
-    Member->>Member: Drift = abs(localPlayhead - Expected)
+    Note over Member: 3. Dynamic Drift Calculation & Recovery
+    Member->>Member: ExpectedPosition = currentTime + (now() - serverTimestamp)
+    Member->>Member: Drift = abs(localPlayhead - ExpectedPosition)
     
     alt Drift <= 2.0 seconds
-        Member->>Member: Maintain smooth playback (adjust playbackRate +/- 2%)
+        Member->>Member: Smooth Rate Adjustment (playbackRate +/- 2%)
     else Drift > 2.0 seconds
-        Member->>Member: Hard seek to Expected position (drift recovery)
+        Member->>Member: Hard Seek to ExpectedPosition (Instant Reconciliation)
     end
 ```
 
 ### Protocol Safeguards
-- **Host Governance:** Only verified room hosts can emit state-mutating actions (`play`, `pause`, `seek`, `next-track`).
-- **Host Transfer Grace Period:** If the host drops unexpectedly, a 30-second countdown initiates before ownership safely transfers to the next senior room member.
-- **Echo Suppression:** When seeking or switching tracks, event listeners ignore feedback echoes for 2,000ms to eliminate thrashing.
-- **Lossless Local Linkage (Desktop):** If a social room song matches a verified local lossless audio file (via Lofty tag fingerprinting), SyncD Desktop plays the pristine local stream while preserving millisecond synchronization.
+1. **Strict Host Role Gating:** Mutations (`play`, `pause`, `seek`, `next-track`) are authenticated on the backend against the active host ID before any state change is acknowledged.
+2. **30-Second Host Grace Period:** If the host drops due to network interruptions, a 30-second reservation timer holds room ownership before automatically promoting the next most senior participant.
+3. **2,000ms Echo Suppression:** Client audio listeners mute incoming loopback events for 2,000ms post-seek to eliminate audio flutter and desync cascades.
+4. **Lossless Local Substitution:** SyncD Desktop matches incoming YouTube song signatures against locally stored lossless audio (using Lofty tags); if found, it plays pristine local FLAC/WAV audio while remaining locked to the server playhead.
 
 ---
 
-## Monorepo Layout
+## 📊 Platform Matrix
+
+| Capability / Attribute | Web Client | Desktop (Tauri 2) | Android Native | iOS Native | Backend Server |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Directory** | [`Web/client/`](./Web/client) | [`Desktop/`](./Desktop) | [`Mobile/Android/`](./Mobile/Android) | [`Mobile/Ios/`](./Mobile/Ios) | [`Web/server/`](./Web/server) |
+| **Language / Framework** | React 19.2, Vite 8, TS 6 | Rust 1.75+, React 19, TS 5.7 | Kotlin, Jetpack Compose | Swift, SwiftUI, Combine | Node 20+, Express 5, TS |
+| **Styling / Design System** | Tailwind CSS v4.3 | Tailwind CSS v4.0, GSAP | Compose Material 3 Tokens | SwiftUI Design System | — |
+| **Audio Playback Engine** | YouTube IFrame API | Symphonia + CPAL (WASAPI/ASIO) | AndroidX Media3 (ExoPlayer) | AVFoundation (`AVPlayer`) | Monotonic Server Clock |
+| **Sub-30ms Seek Latency** | ❌ (Browser Web Audio) | ✅ (Lock-free Ring Buffer) | ⚠️ (~50ms ExoPlayer) | ⚠️ (~50ms AVPlayer) | N/A |
+| **Local File Indexing** | ❌ (Sandboxed) | ✅ (SQLite FTS5 + Rayon) | ⚠️ (Device MediaStore) | ⚠️ (App Document Sandbox) | — |
+| **Lossless Substitution** | ❌ | ✅ (Lofty Tag Match) | 🔄 (Roadmap) | 🔄 (Roadmap) | — |
+| **Background Playback** | ❌ (Browser Tab Only) | ✅ (Window Minimize) | ✅ (`MediaSessionService`) | ✅ (`AVAudioSession` Background) | N/A |
+| **System Media Controls** | ⚠️ (Media Session API) | ✅ (OS Media Hook) | ✅ (Notification & Lockscreen) | ✅ (Now Playing & Control Center)| N/A |
+| **Storage / Caching** | LocalStorage / IndexedDB | SQLite 3 (WAL + FTS5) | Room DB + DataStore | CoreData / SwiftData + Keychain | PostgreSQL (Neon) + Prisma 7 |
+
+---
+
+## 📂 Monorepo Layout
 
 ```text
 Syncd/
 ├── .github/
 │   └── workflows/
-│       ├── web-ci.yml                 # Lint, build & test for Web client & server
-│       └── desktop-ci.yml             # Rust clippy, check & frontend build for Desktop
-├── Audio/                             # UI sound design assets & event cues
+│       ├── web-ci.yml                 # Lint, build & test for Web client & backend
+│       ├── desktop-ci.yml             # Rust clippy, check & frontend build for Desktop
+│       └── desktop-release.yml        # Multi-platform Tauri production release pipeline
+├── Audio/                             # Handcrafted 44.1kHz stereo UI sound cues
 │   ├── Deletion/                      # Action undo & deletion cues
-│   ├── Drawer/                        # Drawer open/close audio
+│   ├── Drawer/                        # Drawer open/close soundscapes
 │   ├── Notification/                  # Notification & chat ping sounds
-│   ├── Room/                          # Room create, join, leave feedback
+│   ├── Room/                          # Room creation, join, and leave feedback
 │   ├── Scan/                          # Library scan outcomes (Success, Fail, Tally)
 │   ├── Toggle/                        # Switch & toggle effects
 │   └── Update/                        # State update indicators
 ├── Desktop/                           # Tauri 2 native desktop application
-│   ├── docs/                          # 8 Master engineering specifications
-│   ├── src/                           # React 19 + TypeScript + Tailwind v4 UI
+│   ├── docs/                          # Comprehensive desktop engineering specifications
+│   │   ├── ARCHITECTURE.md            # Master desktop architecture & engine spec
+│   │   ├── PLAYBACK_ARCHITECTURE.md   # CPAL + Symphonia + RTRB low-latency pipeline
+│   │   ├── API_INTEGRATION.md         # Gateway Socket.IO & REST integration spec
+│   │   ├── SECURITY.md                # Local storage & SQLite encryption standards
+│   │   └── UI_UX_SPECIFICATION.md     # Desktop design tokens & layout guidelines
+│   ├── src/                           # React 19 + TypeScript + Tailwind v4 frontend
 │   ├── src-tauri/                     # Rust backend (Symphonia, CPAL, Rusqlite, Lofty)
 │   ├── package.json                   # Desktop frontend scripts & dependencies
 │   └── vite.config.ts                 # Vite 6 configuration for Tauri
@@ -194,64 +269,82 @@ Syncd/
 │   │   ├── app/                       # Android application module
 │   │   ├── gradle/                    # Gradle wrapper & version catalogs
 │   │   ├── build.gradle.kts           # Kotlin DSL root configuration
-│   │   └── SyncD_Android_README.md    # Android architecture & setup guide
+│   │   └── SyncD_Android_README.md    # Android architecture, Media3 & setup guide
 │   └── Ios/                           # Native iOS application
-│       ├── SyncD/                     # Swift / SwiftUI source files
-│       ├── SyncD.xcodeproj/           # Xcode project bundle
-│       ├── SyncDTests/                # XCTest unit & integration suites
-│       └── SyncD_iOS_README.md        # iOS architecture & setup guide
-├── Web/                               # Web client & backend service
-│   ├── client/                        # React 19 web frontend
-│   ├── server/                        # Express 5 + Socket.IO 4 + Prisma backend
+│   │   ├── SyncD/                     # Swift / SwiftUI source files
+│   │   ├── SyncD.xcodeproj/           # Xcode project bundle
+│   │   ├── SyncDTests/                # XCTest unit & integration suites
+│   │   └── SyncD_iOS_README.md        # iOS architecture, AVFoundation & setup guide
+├── Web/                               # Web client & authoritative backend service
+│   ├── client/                        # React 19.2 + Three.js + Tailwind v4 web frontend
+│   ├── server/                        # Express 5 + Socket.IO 4 + Prisma 7 backend
 │   ├── docs/                          # Web architectural & API documentation
+│   │   ├── ARCHITECTURE.md            # Backend architecture & drift algorithm
+│   │   ├── CURRENT_STATE.md           # Implementation audit & feature readiness
+│   │   ├── PRD.md                     # Product requirements & user stories
+│   │   └── ROADMAP.md                 # Web release milestones & feature timeline
 │   └── README.md                      # Comprehensive Web client/server guide
-├── desktop-architecture.md            # Master desktop architecture roadmap
-└── README.md                          # Root monorepo documentation
+└── README.md                          # Root monorepo showcase & ecosystem documentation
 ```
 
 ---
 
-## Prerequisites & Quick Start
+## 🚀 Prerequisites & Quick Start
 
-### Global Toolchain Prerequisites
+### Global Toolchain Requirements
 
-| Tool | Version Requirement | Used By |
+| Tool | Version Requirement | Purpose |
 | :--- | :--- | :--- |
-| **Node.js** | `>= 20.0.0` (LTS recommended) | Web, Desktop (Frontend) |
-| **npm** | `>= 10.0.0` | Web, Desktop |
-| **Rust & Cargo** | `>= 1.75.0` (with MSVC toolchain on Windows) | Desktop (`src-tauri`) |
-| **Android Studio** | Hedgehog / Jellyfish or newer (JDK 17+) | Mobile (`Android`) |
-| **Xcode** | `>= 15.0` (macOS 14+) | Mobile (`iOS`) |
+| **Node.js** | `>= 20.0.0` (LTS recommended) | Web Client & Server, Desktop Frontend |
+| **npm** | `>= 10.0.0` | Dependency Management |
+| **Rust & Cargo** | `>= 1.75.0` (MSVC toolchain on Windows) | Desktop Native Audio Engine (`Desktop/src-tauri`) |
+| **Android Studio** | Ladybug / Jellyfish or newer (JDK 17+) | Mobile Native Client (`Mobile/Android`) |
+| **Xcode** | `>= 15.0` (macOS Sonoma 14+) | Mobile Native Client (`Mobile/Ios`) |
 
 ---
 
-### 1. Web Backend & Client
+### 1. Authoritative Backend Gateway (`Web/server`)
 
-The backend server must be running to support room discovery, authentication, and WebSocket sync across all platforms.
+The backend server manages room discovery, monotonic clocks, user sessions, and WebSocket synchronization across all platforms.
 
 ```bash
 # 1. Navigate to server, install dependencies, and setup Prisma
 cd Web/server
 npm install
-cp .env.example .env      # Configure DATABASE_URL, CLERK_SECRET_KEY, etc.
-npx prisma generate
-npx prisma migrate dev
 
-# 2. Start the development server (runs on http://localhost:5000)
+# 2. Configure environment
+cp .env.example .env      # Set DATABASE_URL (Neon PostgreSQL), CLERK_SECRET_KEY, etc.
+
+# 3. Initialize Prisma ORM
+npm run db:generate
+npm run db:migrate
+
+# 4. Start the development server (runs on http://localhost:5000)
 npm run dev
+```
 
-# 3. In a separate terminal, start the Web Client
-cd ../client
+---
+
+### 2. Web Client (`Web/client`)
+
+```bash
+cd Web/client
+
+# 1. Install dependencies
 npm install
-cp .env.example .env      # Configure VITE_CLERK_PUBLISHABLE_KEY, etc.
-npm run dev               # Runs on http://localhost:5173
+
+# 2. Configure environment
+cp .env.example .env      # Set VITE_CLERK_PUBLISHABLE_KEY, etc.
+
+# 3. Launch Vite development server (runs on http://localhost:5173)
+npm run dev
 ```
 
 *For complete details, see [`Web/README.md`](./Web/README.md).*
 
 ---
 
-### 2. Desktop Application (Tauri 2 + Rust)
+### 3. Tauri Desktop Application (`Desktop`)
 
 ```bash
 cd Desktop
@@ -259,25 +352,25 @@ cd Desktop
 # 1. Install frontend dependencies
 npm install
 
-# 2. Run Desktop app in Tauri development mode
+# 2. Launch Desktop app in Tauri development mode (compiles Rust + Vite)
 npm run tauri dev
 ```
 
-*For building production native binaries:*
+*For building production native installers:*
 ```bash
 npm run tauri build
 ```
-*For complete architecture specs, see [`desktop-architecture.md`](./desktop-architecture.md) and [`Desktop/docs/`](./Desktop/docs).*
+*For deep engine architecture, see [`Desktop/docs/ARCHITECTURE.md`](./Desktop/docs/ARCHITECTURE.md) and [`Desktop/docs/PLAYBACK_ARCHITECTURE.md`](./Desktop/docs/PLAYBACK_ARCHITECTURE.md).*
 
 ---
 
-### 3. Native Android Client
+### 4. Native Android Client (`Mobile/Android`)
 
 1. Open **Android Studio**.
-2. Select **Open** and choose the `Mobile/Android` directory.
-3. Allow Gradle to synchronize dependencies.
-4. Copy `syncd.local.properties.example` to `local.properties` (or configure your SDK location).
-5. Build and launch on an Android Virtual Device (API 34+) or physical device:
+2. Select **Open** and select the `Mobile/Android` directory.
+3. Allow Gradle to sync dependencies from the version catalog.
+4. Set up `local.properties` with your Android SDK location.
+5. Launch on an Android Virtual Device (API 34+) or physical device:
    ```bash
    cd Mobile/Android
    ./gradlew assembleDebug
@@ -287,46 +380,53 @@ npm run tauri build
 
 ---
 
-### 4. Native iOS Client
+### 5. Native iOS Client (`Mobile/Ios`)
 
 1. Open **Xcode** on macOS.
 2. Open `Mobile/Ios/SyncD.xcodeproj`.
-3. Configure your Development Team in **Signing & Capabilities**.
-4. Select an iOS Simulator (iOS 17+) or connected iPhone and run (`Cmd + R`).
+3. Select your Development Team in **Signing & Capabilities**.
+4. Choose an iOS Simulator (iOS 17+) or connected physical device and run (`Cmd + R`).
 
 *For complete details, see [`Mobile/Ios/SyncD_iOS_README.md`](./Mobile/Ios/SyncD_iOS_README.md).*
 
 ---
 
-## Continuous Integration
+## 🛡️ CI and Quality Gates
 
-The repository uses GitHub Actions workflows with path-based triggers to ensure optimal test runtimes:
+The monorepo enforces automated GitHub Actions workflows with path-based triggers to ensure fast, isolated CI pipelines:
 
-| Workflow | Path Triggers | Actions Executed |
+| Workflow | Path Triggers | Validations Executed |
 | :--- | :--- | :--- |
-| **[Web CI](.github/workflows/web-ci.yml)** | `Web/**` | Type checking, ESLint linting, Prisma schema validation, Vitest test execution |
-| **[Desktop CI](.github/workflows/desktop-ci.yml)** | `Desktop/**` | Rust `cargo check`, `cargo clippy`, frontend TypeScript verification & Vite build |
+| **[Web CI](./.github/workflows/web-ci.yml)** | `Web/**` | TypeScript type checking, ESLint linting, Prisma schema validation, Node test suite |
+| **[Desktop CI](./.github/workflows/desktop-ci.yml)** | `Desktop/**` | Rust `cargo check`, `cargo clippy`, frontend TypeScript verification & Vite build |
+| **[Desktop Release](./.github/workflows/desktop-release.yml)** | Release tags | Production Tauri cross-compilation, asset bundling, and release packaging |
 
-To run local verification before submitting changes:
+### Running Local Quality Verification
 ```bash
-# Verify Web Server
+# 1. Verify Web Backend & Client
 cd Web/server && npm run typecheck && npm test
+cd ../client && npm run build
 
-# Verify Desktop
-cd Desktop && npm run typecheck && cargo check --manifest-path src-tauri/Cargo.toml
+# 2. Verify Desktop Frontend & Native Rust Engine
+cd Desktop && npm run typecheck
+cargo check --manifest-path src-tauri/Cargo.toml
 ```
 
 ---
 
-## Security & Architecture Standards
+## 🔒 Security & Privacy Standards
 
-- **Strict Separation of Concerns:** UI rendering, audio playback pipelines, network transports, and local caching layers operate in isolated modules.
-- **Server Authority:** Playhead position, host promotion, and room queue mutations are strictly validated on the backend.
-- **Dedicated Design Tokens:** Desktop and native platforms strictly conform to curated design token palettes without uncurated color drifts.
-- **Zero In-Tree Secrets:** All API keys, database credentials, and Clerk secrets are managed via local `.env` files and environment stores excluded from version control.
+- **Zero-Secret In-Tree Policy:** No secrets, signing certificates, or production API keys are committed. All secrets use isolated `.env` configurations excluded from git.
+- **Server Role Authorization:** Room mutation endpoints require verified host session tokens before executing queue modifications or playback seeks.
+- **Local Sandbox Conformance:** The desktop engine operates strictly within user-designated audio directories without unbounded filesystem scanning.
+- **Auditory Privacy:** Real-time chat and room presence events are ephemeral and discarded upon room dissolution.
 
 ---
 
 <div align="center">
-<sub>Crafted with passion for audiophiles, social listeners, and cross-platform native engineering.</sub>
+
+**SyncD** • *Engineered with passion for audiophiles, social listeners, and cross-platform native craftsmanship.*
+
+<sub>Made with ❤️ by the SyncD Open Source Engineering Team</sub>
+
 </div>

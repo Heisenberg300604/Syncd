@@ -53,3 +53,19 @@ pub fn audio_list_devices(
 ) -> Result<Vec<AudioDeviceDescriptor>, String> {
     Ok(state.audio.list_devices())
 }
+
+#[tauri::command]
+pub fn update_track_duration(
+    state: State<'_, AppState>,
+    track_id: String,
+    duration_seconds: f64,
+) -> Result<(), String> {
+    if duration_seconds > 0.0 {
+        let mut db = state.db.lock();
+        let _ = db.conn().execute(
+            "UPDATE tracks SET duration_seconds = ?1 WHERE id = ?2 AND (duration_seconds IS NULL OR duration_seconds <= 0.0);",
+            rusqlite::params![duration_seconds, track_id],
+        );
+    }
+    Ok(())
+}

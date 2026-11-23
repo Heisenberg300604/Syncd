@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, Music } from 'lucide-react';
+import { Play, Pause, Music, Edit3 } from 'lucide-react';
 import type { TrackRow } from '../../../types/library';
 import { usePlayerStore } from '../../../stores/usePlayerStore';
 import { useLibraryStore } from '../../../stores/useLibraryStore';
@@ -8,6 +8,7 @@ import { CodecBadge } from '../../../components/ui/CodecBadge';
 
 interface TrackCardProps {
   track: TrackRow;
+  onEditMetadata?: (track: TrackRow) => void;
 }
 
 function formatDuration(totalSeconds: number): string {
@@ -17,30 +18,59 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
 
-export const TrackCard: React.FC<TrackCardProps> = ({ track }) => {
+export const TrackCard: React.FC<TrackCardProps> = ({ track, onEditMetadata }) => {
   const { currentTrack, status, playTrack, play, pause } = usePlayerStore();
-  const { getArtworkUrl, artworkCache, getArtwork } = useLibraryStore();
+  const { getArtworkUrl, artworkCache, getArtwork, invalidateArtworkUrl } = useLibraryStore();
 
   const syncArtwork = getArtworkUrl(track.artworkHash) || artworkCache[track.id] || null;
   const [artwork, setArtwork] = useState<string | null>(syncArtwork);
+  const [hasError, setHasError] = useState(false);
   const isCurrent = currentTrack?.id === track.id;
   const isCurrentlyPlaying = isCurrent && status === 'playing';
 
   useEffect(() => {
-    if (syncArtwork) {
+    if (syncArtwork && !hasError) {
       setArtwork(syncArtwork);
       return;
     }
     let isMounted = true;
-    if (track.hasArtwork && !artwork) {
+    if (track.hasArtwork && (!artwork || hasError)) {
       getArtwork(track.id).then((src) => {
-        if (isMounted && src) setArtwork(src);
+        if (isMounted) {
+          if (src) {
+            setArtwork(src);
+            setHasError(false);
+          } else {
+            setHasError(true);
+          }
+        }
       });
     }
     return () => {
       isMounted = false;
     };
-  }, [track.id, track.hasArtwork, syncArtwork, artwork, getArtwork]);
+  }, [track.id, track.hasArtwork, syncArtwork, artwork, hasError, getArtwork]);
+
+  const handleImageError = () => {
+    // If fast-path .jpg guess failed, invalidate cache and query real file from Rust (.png or re-extraction)
+    if (track.artworkHash) {
+      invalidateArtworkUrl(track.artworkHash);
+    }
+    invalidateArtworkUrl(track.id);
+
+    if (track.hasArtwork) {
+      getArtwork(track.id).then((src) => {
+        if (src && src !== artwork) {
+          setArtwork(src);
+          setHasError(false);
+        } else {
+          setHasError(true);
+        }
+      }).catch(() => setHasError(true));
+    } else {
+      setHasError(true);
+    }
+  };
 
   const handlePlay = async () => {
     if (isCurrent) {
@@ -90,7 +120,7 @@ export const TrackCard: React.FC<TrackCardProps> = ({ track }) => {
     );
   };
 
-  const hasNoArtwork = !track.hasArtwork || !artwork;
+  const hasNoArtwork = !track.hasArtwork || !artwork || hasError;
 
   return (
     <div
@@ -104,10 +134,11 @@ export const TrackCard: React.FC<TrackCardProps> = ({ track }) => {
     >
       {/* Artwork or Glass Container */}
       <div className="relative aspect-square w-full rounded-xl overflow-hidden flex items-center justify-center bg-zinc-950/40">
-        {artwork ? (
+        {artwork && !hasError ? (
           <img
             src={artwork}
-            alt={track.title}
+            alt=""
+            onError={handleImageError}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
             decoding="async"
@@ -139,10 +170,30 @@ export const TrackCard: React.FC<TrackCardProps> = ({ track }) => {
           </button>
         </div>
 
-        {/* New Folder & Audio Document Codec Badge (Image 2 style) */}
+        {/* Floating Edit Metadata Button */}
+        {onEditMetadata && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditMetadata(track);
+            }}
+            className="absolute top-2 left-2 p-1.5 rounded-lg bg-black/60 text-zinc-300 hover:text-amber-400 hover:bg-black/80 backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer z-10"
+            title="Edit Metadata & File Tags"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Modern Clean Audio Codec Badge with Micro-Interactions */}
         {track.format && (
           <div className="absolute top-2 right-2 z-10 filter drop-shadow-md">
-            <CodecBadge format={track.format} variant="folder" size="xs" />
+            <CodecBadge
+              format={track.format}
+              bitrateKbps={track.bitrateKbps}
+              variant="card"
+              size="xs"
+            />
           </div>
         )}
       </div>

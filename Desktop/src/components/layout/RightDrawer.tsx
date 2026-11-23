@@ -34,6 +34,27 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 }
 
+const QueueItemThumbnail: React.FC<{ artworkUrl?: string }> = ({ artworkUrl }) => {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [artworkUrl]);
+
+  if (artworkUrl && !hasError) {
+    return (
+      <img
+        src={artworkUrl}
+        alt=""
+        onError={() => setHasError(true)}
+        className="w-full h-full object-cover"
+        loading="lazy"
+      />
+    );
+  }
+  return <Music className="w-3.5 h-3.5 text-zinc-500" />;
+};
+
 export const RightDrawer: React.FC<RightDrawerProps> = ({
   onClose,
   width = 340,
@@ -421,16 +442,7 @@ export const RightDrawer: React.FC<RightDrawerProps> = ({
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       {/* Artwork or Music Icon with Play indicator */}
                       <div className="relative w-8 h-8 rounded-lg bg-zinc-900 overflow-hidden shrink-0 flex items-center justify-center border border-zinc-800/80">
-                        {item.artworkUrl ? (
-                          <img
-                            src={item.artworkUrl}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <Music className="w-3.5 h-3.5 text-zinc-500" />
-                        )}
+                        <QueueItemThumbnail artworkUrl={item.artworkUrl} />
                         {isItemCurrent && status === 'playing' ? (
                           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                             <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />

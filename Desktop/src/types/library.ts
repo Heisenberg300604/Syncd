@@ -12,6 +12,7 @@ export interface TrackRow {
   title: string;
   artist: string;
   album: string;
+  albumArtist?: string | null;
   durationSeconds: number;
   trackNumber: number | null;
   year: number | null;
